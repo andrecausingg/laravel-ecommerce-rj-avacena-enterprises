@@ -16,6 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
+
+
     public function register(Request $request)
     {
         // Declare Value
@@ -46,7 +48,7 @@ class AuthController extends Controller
 
             return $this->emailRegister($idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'), $request->input('password_confirmation'));
         } else {
-            return response()->json(['error' => 'Please Input on Phone Number or Email', RESPONSE::HTTP_UNPROCESSABLE_ENTITY], 0);
+            return response()->json(['error' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
         }
     }
 
@@ -138,8 +140,7 @@ class AuthController extends Controller
                     Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
 
                     // Set expiration time to 2 hours (120 minutes)
-                    $expiration = Carbon::now()->addMinutes(120);
-
+                    $expiration = Carbon::now()->addSeconds(1);
                     // Generate JWT token with a custom expiration time
                     $token = JWTAuth::fromUser($userCreate, ['exp' => $expiration->timestamp]);
                     return response()->json(
@@ -178,26 +179,32 @@ class AuthController extends Controller
         }
     }
 
-
     public function verifyEmail(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
 
-        $validator = Validator::make($request->all(), [
-            'verification_number' => 'required|numeric|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], RESPONSE::HTTP_NOT_FOUND);
-        }
-
         try {
-            // Attempt to parse and authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
+            // Attempt to parse the token without authentication to check expiration
+            $token = JWTAuth::parseToken();
+            // Get the expiration time of the token
+            $expiration = $token->getPayload()->get('exp');
+            if (Carbon::now()->isAfter(Carbon::createFromTimestamp($expiration))) {
+                return response()->json(['error' => 'Token expired. Please sign up again.'], Response::HTTP_UNAUTHORIZED);
+            }
 
+            // Authenticate the user with the provided token
+            $user = $token->authenticate();
             // Check if the user is found
             if (!$user) {
                 return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'verification_number' => 'required|numeric|min:6',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
             // Check if the provided verification number matches the stored one
@@ -214,12 +221,13 @@ class AuthController extends Controller
 
             return response()->json(['error' => 'Invalid verification number'], Response::HTTP_NOT_FOUND);
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            // Attempt to refresh the token
-            $newToken = JWTAuth::refresh();
-            // Send the new token in the response or use it for subsequent requests
+            // Handle TokenExpiredException (e.g., token expired)
+            return response()->json(['error' => 'Token expired. Please sign up again.'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            // Handle JWT exception (e.g., token expired, invalid, etc.)
-            return response()->json(['error' => 'Unauthorized'], 401);
+            // Handle JWTException (e.g., token invalid)
+            return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
     }
+
+    
 }
