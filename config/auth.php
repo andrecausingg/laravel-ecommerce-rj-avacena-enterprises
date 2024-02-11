@@ -14,7 +14,10 @@ return [
     */
 
     'defaults' => [
-        'guard' => 'web',
+        // 'guard' => 'web',
+        // 'passwords' => 'users',
+
+        'guard' => 'api',
         'passwords' => 'users',
     ],
 
@@ -39,6 +42,10 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+        ],
+        'api' => [
+            'driver' => 'jwt', // Set the driver to jwt
+            'provider' => 'users', // change that what table of user to login
         ],
     ],
 
