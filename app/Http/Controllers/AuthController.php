@@ -45,6 +45,8 @@ class AuthController extends Controller
             }
 
             return $this->emailRegister($idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'), $request->input('password_confirmation'));
+        } else {
+            return response()->json(['error' => 'Please Select Phone or Email'], RESPONSE::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
 
