@@ -16,7 +16,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-
+    public function login(Request $request){
+        
+    }
 
     public function register(Request $request)
     {
@@ -28,6 +30,7 @@ class AuthController extends Controller
             $idHash = Str::uuid()->toString();
         } while (AuthModel::where('id_hash', $idHash)->exists());
 
+        // Check if phone number is not empty
         if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
             $validator = Validator::make($request->all(), [
                 'password' => 'required|string|min:6|confirmed:password_confirmation',
@@ -36,6 +39,8 @@ class AuthController extends Controller
             if ($validator->fails()) {
                 return response()->json(['error' => $validator->errors()], 400);
             }
+
+            // Check if Email is not empty
         } else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
             // Validate Password
             $validator = Validator::make($request->all(), [
@@ -140,7 +145,7 @@ class AuthController extends Controller
                     Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
 
                     // Set expiration time to 2 hours (120 minutes)
-                    $expiration = Carbon::now()->addSeconds(1);
+                    $expiration = Carbon::now()->addSeconds(120);
                     // Generate JWT token with a custom expiration time
                     $token = JWTAuth::fromUser($userCreate, ['exp' => $expiration->timestamp]);
                     return response()->json(
@@ -229,5 +234,35 @@ class AuthController extends Controller
         }
     }
 
-    
+    public function resendVerificationCode()
+    {
+        $verificationNumber = mt_rand(100000, 999999);
+        // Attempt to parse the token without authentication to check expiration
+
+        $token = JWTAuth::parseToken();
+        // Get the expiration time of the token
+        $expiration = $token->getPayload()->get('exp');
+        if (Carbon::now()->isAfter(Carbon::createFromTimestamp($expiration))) {
+            return response()->json(['error' => 'Token expired. Please sign up again.'], Response::HTTP_UNAUTHORIZED);
+        }
+        // Authenticate the user with the provided token
+        $user = $token->authenticate();
+        // Check if the user is found
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($user->update([
+            'verification_number' => $verificationNumber,
+        ])) {
+            $emailParts = explode('@', Crypt::decrypt($user->email));
+            $name = [$emailParts[0]];
+
+            Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+
+            return response()->json([
+                'message' => 'New verification code sent to your email'
+            ], Response::HTTP_OK);
+        }
+    }
 }
