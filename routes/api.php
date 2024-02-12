@@ -22,14 +22,24 @@ use App\Http\Controllers\AuthController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 
-Route::middleware('jwt.verify')->prefix('signup')->group(function () {
-    $SignUpController = AuthController::class;
-    Route::post('/verify-email', [$SignUpController, 'verifyEmail']);
-    Route::post('/resend-code', [$SignUpController, 'resendVerificationCode']);
+Route::middleware('jwt.verify')->group(function () {
+    $AuthController = AuthController::class;
+
+    Route::prefix('signup')->group(function () use ($AuthController) {
+        Route::post('/verify-email', [$AuthController, 'verifyEmail']);
+        Route::post('/resend-code', [$AuthController, 'resendVerificationCode']);
+    });
+
+    Route::prefix('new-password')->group(function () use ($AuthController) {
+        Route::post('/update-password', [$AuthController, 'updatePassword']);
+    });
 });
 
+
 Route::middleware(['jwt.auth'])->group(function () {
-    $SignUpController = AuthController::class;
-    Route::get('/index', [$SignUpController, 'index']);
+    $AuthController = AuthController::class;
+
+    Route::get('/index', [$AuthController, 'index']);
 });
