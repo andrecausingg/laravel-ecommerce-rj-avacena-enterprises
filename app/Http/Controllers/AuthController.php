@@ -74,21 +74,32 @@ class AuthController extends Controller
             if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at !== NULL) {
                 try {
                     // $expirationTime = Carbon::now()->addSeconds(30);
+                    // Expiration Time 1month
                     $expirationTime = Carbon::now()->addMinutes(2592000);
-                    $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userModel);
-
-                    if (!$token) {
+                    $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userModel);
+                    if (!$newToken) {
                         return response()->json([
                             'error' => 'Token generation failed',
                             'message' => 'Unable to generate a token from user'
                         ], Response::HTTP_OK);
                     }
 
+                    $userModel->session_token = $newToken;
+                    $userModel->session_expire_at = $expirationTime;
+                    if (!$userModel->save()) {
+                        return response()->json(
+                            [
+                                'message' => 'Error To update session token and expiration'
+                            ],
+                            Response::HTTP_INTERNAL_SERVER_ERROR
+                        );
+                    }
+
                     return response()->json([
                         'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
                         'user' => $userModel,
                         'token_type' => 'Bearer',
-                        'access_token' => $token,
+                        'access_token' => $newToken,
                         'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
                         'message' => 'Login Successfully'
                     ], Response::HTTP_OK);
