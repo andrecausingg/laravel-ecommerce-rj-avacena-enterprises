@@ -7,13 +7,15 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
+use App\Mail\ResetPasswordMail;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
-
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -110,6 +112,7 @@ class AuthController extends Controller
         }
     }
 
+    // PARENT REGISTER
     public function register(Request $request)
     {
         // Declare Value
@@ -141,13 +144,14 @@ class AuthController extends Controller
                 return response()->json(['error' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->emailRegister($idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'), $request->input('password_confirmation'));
+            return $this->emailRegister($idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'));
         } else {
             return response()->json(['error' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
         }
     }
 
-    public function emailRegister($idHash, $verificationNumber, $roleUser, $status, $email, $password, $password_confirmation)
+    // CHILD REGISTER EMAIL
+    public function emailRegister($idHash, $verificationNumber, $roleUser, $status, $email, $password)
     {
         try {
             $notExist = 0;
@@ -284,25 +288,16 @@ class AuthController extends Controller
         $verificationNumber = mt_rand(100000, 999999);
 
         try {
-            // Attempt to parse the token without authentication to check expiration
-            $token = JWTAuth::parseToken();
-            // Get the expiration time of the token
-            $expiration = $token->getPayload()->get('exp');
-            if (Carbon::now()->isAfter(Carbon::createFromTimestamp($expiration))) {
-                return response()->json(['error' => 'Token expired. Please sign up again.'], Response::HTTP_UNAUTHORIZED);
-            }
-
             // Authenticate the user with the provided token
-            $user = $token->authenticate();
-            // Check if the user is found
+            $user = JWTAuth::parseToken()->authenticate();
             if (!$user) {
                 return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
             }
 
+            // Validate
             $validator = Validator::make($request->all(), [
                 'verification_number' => 'required|numeric|min:6',
             ]);
-
             if ($validator->fails()) {
                 return response()->json(['error' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
@@ -328,7 +323,6 @@ class AuthController extends Controller
             return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
     }
-
     public function resendVerificationCode()
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -353,11 +347,98 @@ class AuthController extends Controller
             $emailParts = explode('@', Crypt::decrypt($user->email));
             $name = [$emailParts[0]];
 
-            Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+            Mail::to(Crypt::decrypt($user->email))->send(new ResendVerificationMail($verificationNumber, $name));
 
             return response()->json([
                 'message' => 'New verification code sent to your email'
             ], Response::HTTP_OK);
+        }
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        // Validate
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Get All Users and Decrypt Email
+        $users = AuthModel::all();
+        foreach ($users as $user) {
+            try {
+                // Start Decrypt
+                $decryptedEmail = Crypt::decrypt($user->email);
+                // If Exist the email
+                if ($decryptedEmail == $request->email) {
+                    if ($user->email_verified_at != NULL) {
+                        // 2hrs expiration to verified Email
+                        $expirationTime = Carbon::now()->addMinutes(120);
+                        $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+
+                        // Get the Name of Gmail
+                        $emailParts = explode('@', $request->email);
+                        $name = [$emailParts[0]];
+
+                        // Send to Email Now
+                        Mail::to($request->email)->send(new ResetPasswordMail($token, $request->email));
+
+                        return response()->json(
+                            [
+                                'message' => 'Successfully sent the update password link to your email',
+                            ],
+                            Response::HTTP_OK
+                        );
+                    }
+                    // Break the loop once a match is found
+                    break;
+                }
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                return response()->json(['message' => 'Error Decrypting Email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+
+    public function updatePassword(Request $request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Validate Password
+            $validator = Validator::make($request->all(), [
+                'password' => 'required|string|min:6|confirmed',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Update the password
+            $user->password = Hash::make($request->password);
+            $user->save();
+
+            // Store old password
+            $userOldPass = AuthModel::create([
+                'user_id' => $user->id,
+                'old_password' => $user->getOriginal('password'),
+            ]);
+
+            if ($userOldPass) {
+                return response()->json(['message' => 'Successfully updated password'], Response::HTTP_OK);
+            } else {
+                return response()->json(['error' => 'Failed to create old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            // Handle TokenExpiredException (e.g., token expired)
+            return response()->json(['error' => 'Token expired. Please request a password reset again.'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            // Handle JWTException (e.g., token invalid)
+            return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
     }
 }
