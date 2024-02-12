@@ -51,6 +51,7 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $verificationNumber = mt_rand(100000, 999999);
         $userRole = '1a409bb7-c650-4829-9162-a73555880c43';
         $adminRole = 'c2dbf655-7fa5-49e0-ba1f-5e35440444d4';
         $staffRole = '01887426-98ed-4bc5-bbd5-5e7a8462ff83';
@@ -111,7 +112,46 @@ class AuthController extends Controller
                 }
 
                 break;
-            } else {
+            } else if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at === NULL) {
+                // Generate a new token for the user
+                $expirationTime = Carbon::now()->addMinutes(120);
+                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userModel);
+
+                if (!$newToken) {
+                    return response()->json([
+                        'error' => 'Token generation failed',
+                        'message' => 'Unable to generate a token from user'
+                    ], Response::HTTP_OK);
+                }
+
+                // Update verification_number | password | verify email token
+                $userModel->verification_number = $verificationNumber;
+                $userModel->verify_email_token = $newToken;
+                $userModel->verify_email_token_expire_at = $expirationTime;
+
+                // Save
+                if (!$userModel->save()) {
+                    return response()->json(
+                        [
+                            'error' => 'Error To update to verification number, token and expiration time'
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+                // Get the Name of Gmail
+                $emailParts = explode('@', $email);
+                $name = [$emailParts[0]];
+
+                // Send the new token to the user via email
+                Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+
+                return response()->json(
+                    [
+                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                        'message' => '/signup/verify-email?tj=' . $newToken,
+                    ],
+                    Response::HTTP_OK
+                );
                 $authenticated = 1;
             }
         }
@@ -195,7 +235,7 @@ class AuthController extends Controller
                             if (!$user->save()) {
                                 return response()->json(
                                     [
-                                        'message' => 'Error To update to verification number'
+                                        'error' => 'Error To update to verification number, token and expiration time'
                                     ],
                                     Response::HTTP_INTERNAL_SERVER_ERROR
                                 );
@@ -209,8 +249,10 @@ class AuthController extends Controller
 
                             return response()->json(
                                 [
+                                    'message' => 'Successfully create token',
+                                    'url_token' => '/signup/verify-email?tj=' . $newToken,
                                     'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                                    'message' => '/signup/verify-email?tj=' . $newToken,
+
                                 ],
                                 Response::HTTP_OK
                             );
@@ -273,8 +315,9 @@ class AuthController extends Controller
             Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
 
             return response()->json([
+                'message' => 'Successfully create token',
+                'url_token' => '/signup/verify-email?tj=' . $newToken,
                 'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                'message' => '/signup/verify-email?tj=' . $newToken,
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Handle exceptions and return an error response with CORS headers
@@ -475,7 +518,7 @@ class AuthController extends Controller
             ]);
 
             if ($userOldPass) {
-                return response()->json(['message' => 'Successfully updated password'], Response::HTTP_OK);
+                return response()->json(['message' => 'Successfully update the password'], Response::HTTP_OK);
             } else {
                 return response()->json(['error' => 'Failed to create old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
