@@ -23,12 +23,13 @@ use App\Http\Controllers\AuthController;
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
-Route::middleware('jwt.verify')->group(function () {
-    Route::post('/verify-email',[AuthController::class, 'verifyEmail']);
+Route::middleware('jwt.verify')->prefix('signup')->group(function () {
+    $SignUpController = AuthController::class;
+    Route::post('/verify-email', [$SignUpController, 'verifyEmail']);
+    Route::post('/resend-code', [$SignUpController, 'resendVerificationCode']);
 });
 
-// Route group with 'jwt.auth' middleware (for user authentication)
 Route::middleware(['jwt.auth'])->group(function () {
-    // Your authenticated routes go here
+    $SignUpController = AuthController::class;
+    Route::get('/index', [$SignUpController, 'index']);
 });
-
