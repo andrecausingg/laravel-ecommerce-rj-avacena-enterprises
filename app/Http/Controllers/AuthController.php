@@ -181,22 +181,7 @@ class AuthController extends Controller
                             $user->verify_email_token_expire_at = $expirationTime;
 
                             // Save
-                            if ($user->save()) {
-                                // Get the Name of Gmail
-                                $emailParts = explode('@', $email);
-                                $name = [$emailParts[0]];
-
-                                // Send the new token to the user via email
-                                Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
-
-                                return response()->json(
-                                    [
-                                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                                        'message' => '/signup/verify-email?tj=' . $newToken,
-                                    ],
-                                    Response::HTTP_OK
-                                );
-                            } else {
+                            if (!$user->save()) {
                                 return response()->json(
                                     [
                                         'message' => 'Error To update to verification number'
@@ -204,6 +189,20 @@ class AuthController extends Controller
                                     Response::HTTP_INTERNAL_SERVER_ERROR
                                 );
                             }
+                            // Get the Name of Gmail
+                            $emailParts = explode('@', $email);
+                            $name = [$emailParts[0]];
+
+                            // Send the new token to the user via email
+                            Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+
+                            return response()->json(
+                                [
+                                    'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                                    'message' => '/signup/verify-email?tj=' . $newToken,
+                                ],
+                                Response::HTTP_OK
+                            );
                         } else {
                             return response()->json(
                                 [
@@ -320,6 +319,7 @@ class AuthController extends Controller
                 // Update user status and set email_verified_at to the current timestamp
                 $user->update([
                     'status' => 'ACTIVE',
+                    'verify_email_token' => Str::uuid(),
                     'email_verified_at' => now(),
                     'verification_number' => $verificationNumber,
                 ]);
@@ -395,14 +395,24 @@ class AuthController extends Controller
                     if ($user->email_verified_at != NULL) {
                         // 2hrs expiration to verified Email
                         $expirationTime = Carbon::now()->addMinutes(120);
-                        $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+                        $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
 
-                        // Get the Name of Gmail
-                        $emailParts = explode('@', $request->email);
-                        $name = [$emailParts[0]];
+                        // Update token and expiration
+                        $user->reset_password_token = $newToken;
+                        $user->reset_password_token_expire_at = $expirationTime;
+
+                        // Save
+                        if (!$user->save()) {
+                            return response()->json(
+                                [
+                                    'error' => 'Error to save token and expiration',
+                                ],
+                                Response::HTTP_INTERNAL_SERVER_ERROR
+                            );
+                        }
 
                         // Send to Email Now
-                        Mail::to($request->email)->send(new ResetPasswordMail($token, $request->email));
+                        Mail::to($request->email)->send(new ResetPasswordMail($newToken, $request->email));
 
                         return response()->json(
                             [
@@ -426,7 +436,13 @@ class AuthController extends Controller
             // Authenticate the user with the provided token
             $user = JWTAuth::parseToken()->authenticate();
             if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
             }
 
             // Validate Password
