@@ -7,17 +7,107 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
+use Tymon\JWTAuth\Facades\JWTAuth;
+
 class AuthController extends Controller
 {
-    public function login(Request $request){
-        
+    public function index()
+    {
+        // Attempt to parse the token without authentication to check expiration
+        $token = JWTAuth::parseToken();
+        // Get the expiration time of the token
+        $expiration = $token->getPayload()->get('exp');
+        if (Carbon::now()->isAfter(Carbon::createFromTimestamp($expiration))) {
+            return response()->json(['error' => 'Token expired. Please log in again.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Authenticate the user with the provided token
+        $user = $token->authenticate();
+        // Check if the user is found
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            // Try to validate the token
+            $user = JWTAuth::parseToken()->authenticate();
+
+            return response()->json(['message' => $user], Response::HTTP_OK);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            // Token has expired
+            return response()->json(['error' => 'Token has expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            // Other JWT exceptions
+            return response()->json(['error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
+        }
+    }
+
+    public function login(Request $request)
+    {
+        $userRole = '1a409bb7-c650-4829-9162-a73555880c43';
+        $adminRole = 'c2dbf655-7fa5-49e0-ba1f-5e35440444d4';
+        $staffRole = '01887426-98ed-4bc5-bbd5-5e7a8462ff83';
+        $authenticated = 0;
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $users = AuthModel::all();
+        foreach ($users as $userModel) {
+            $decryptedEmail = Crypt::decrypt($userModel->email);
+
+            if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at !== NULL) {
+
+                try {
+                    // $expirationTime = Carbon::now()->addSeconds(30);
+                    $expirationTime = Carbon::now()->addMinutes(2592000);
+                    $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userModel);
+
+                    if (!$token) {
+                        return response()->json([
+                            'error' => 'Token generation failed',
+                            'message' => 'Unable to generate a token from user'
+                        ], Response::HTTP_OK);
+                    }
+
+                    return response()->json([
+                        'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
+                        'user' => $userModel,
+                        'token_type' => 'Bearer',
+                        'access_token' => $token,
+                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                        'message' => 'Login Successfully'
+                    ], Response::HTTP_OK);
+                } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+                    return response()->json([
+                        'status' => 0,
+                        'message' => $e->getMessage(),
+                    ], Response::HTTP_OK);
+                }
+
+                break;
+            } else {
+                $authenticated = 1;
+            }
+        }
+
+        if ($authenticated === 1) {
+            return response()->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+        }
     }
 
     public function register(Request $request)
@@ -82,18 +172,24 @@ class AuthController extends Controller
                                 $emailParts = explode('@', $email);
                                 $name = [$emailParts[0]];
 
-                                // Set expiration time to 2 hours (120 minutes)
-                                $expiration = Carbon::now()->addMinutes(120);
-                                // Generate JWT token with a custom expiration time
-                                $token = JWTAuth::fromUser($user, ['exp' => $expiration->timestamp]);
+                                // 2hrs expiration to verified Email
+                                $expirationTime = Carbon::now()->addMinutes(120);
+                                $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+
+                                if (!$token) {
+                                    return response()->json([
+                                        'error' => 'Token generation failed',
+                                        'message' => 'Unable to generate a token from user'
+                                    ], Response::HTTP_OK);
+                                }
 
                                 // Send to Email Now
                                 Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
 
                                 return response()->json(
                                     [
-                                        'token' => $token,
-                                        'message' => 'Redirect to verification page'
+                                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                                        'message' => '/signup/verify-email?token=' .  $token,
                                     ],
                                     Response::HTTP_OK
                                 );
@@ -144,14 +240,13 @@ class AuthController extends Controller
                     // Send to Email Now
                     Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
 
-                    // Set expiration time to 2 hours (120 minutes)
-                    $expiration = Carbon::now()->addSeconds(120);
-                    // Generate JWT token with a custom expiration time
-                    $token = JWTAuth::fromUser($userCreate, ['exp' => $expiration->timestamp]);
+                    // 2hrs expiration to verified Email
+                    $expirationTime = Carbon::now()->addMinutes(120);
+                    $token = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userCreate);
                     return response()->json(
                         [
-                            'token' => $token,
-                            'message' => 'User created successfully'
+                            'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                            'message' => '/signup/verify-email?token=' .  $token,
                         ],
                         Response::HTTP_OK
                     );

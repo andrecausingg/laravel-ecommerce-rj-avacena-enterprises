@@ -30,4 +30,6 @@ Route::middleware('jwt.verify')->prefix('signup')->group(function () {
 });
 
 Route::middleware(['jwt.auth'])->group(function () {
+    $SignUpController = AuthController::class;
+    Route::get('/index', [$SignUpController, 'index']);
 });
