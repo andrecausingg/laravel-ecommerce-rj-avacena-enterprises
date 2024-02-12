@@ -27,6 +27,7 @@ return new class extends Migration
             $table->text('verify_phone_token')->nullable();
             $table->text('reset_password_token')->nullable();
 
+            $table->timestamp('session_expire_at')->nullable();
             $table->timestamp('verify_email_token_expire_at')->nullable();
             $table->timestamp('verify_token_expire_at')->nullable();
             $table->timestamp('reset_password_token_expire_at')->nullable();
