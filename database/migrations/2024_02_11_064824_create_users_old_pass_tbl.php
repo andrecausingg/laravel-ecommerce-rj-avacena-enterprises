@@ -15,6 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('user_id_hash');
             $table->string('password');
+            
+            // Date | Time
+            $table->timestamp('deleted_at')->nullable();
             $table->timestamps();
         });
     }
