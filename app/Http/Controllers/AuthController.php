@@ -139,11 +139,11 @@ class AuthController extends Controller
                     );
                 }
                 // Get the Name of Gmail
-                $emailParts = explode('@', $email);
+                $emailParts = explode('@', $decryptedEmail);
                 $name = [$emailParts[0]];
 
                 // Send the new token to the user via email
-                Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+                Mail::to($decryptedEmail)->send(new VerificationMail($verificationNumber, $name));
 
                 return response()->json(
                     [
@@ -152,6 +152,7 @@ class AuthController extends Controller
                     ],
                     Response::HTTP_OK
                 );
+            }else{
                 $authenticated = 1;
             }
         }
