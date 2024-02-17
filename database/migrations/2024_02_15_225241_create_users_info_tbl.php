@@ -16,17 +16,17 @@ return new class extends Migration
             $table->string('user_id_hash');
 
             // Personal Information
-            $table->string('first_name');
+            $table->string('first_name')->nullable();
             $table->string('middle_name')->nullable();
-            $table->string('last_name');
+            $table->string('last_name')->nullable();
 
             // $table->string('suffix');
             // $table->string('gender');
             // $table->string('birth_date');    
 
             // Contacts
-            $table->string('contact_number');
-            $table->string('email');
+            $table->string('contact_number')->nullable();
+            $table->string('email')->nullable();
 
             // Address
             $table->text('address_1')->nullable();

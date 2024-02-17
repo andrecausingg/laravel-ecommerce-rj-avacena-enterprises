@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuthModel;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
@@ -96,9 +97,18 @@ class AuthController extends Controller
                         );
                     }
 
+                    // Check If users_info_tbl exist 
+                    $userInfo = UserInfoModel::where('user_id_hash', $userModel->id_hash)
+                        ->where(function ($query) {
+                            $query->whereNull('first_name')->orWhere('first_name', '');
+                            $query->orWhereNull('last_name')->orWhere('last_name', '');
+                        })
+                        ->first();
+
                     return response()->json([
                         'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
-                        'user' => $userModel,
+                        'user' => $userModel, 
+                        'user_info' => $userInfo ? 'New User' : 'Existing User',
                         'token_type' => 'Bearer',
                         'access_token' => $newToken,
                         'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
@@ -152,7 +162,7 @@ class AuthController extends Controller
                     ],
                     Response::HTTP_OK
                 );
-            }else{
+            } else {
                 $authenticated = 1;
             }
         }
@@ -204,7 +214,6 @@ class AuthController extends Controller
     public function emailRegister($idHash, $verificationNumber, $roleUser, $status, $email, $password)
     {
         try {
-            $notExist = 0;
             // Get All Users and Decrypt Email
             $users = AuthModel::all();
             foreach ($users as $user) {
@@ -241,6 +250,7 @@ class AuthController extends Controller
                                     Response::HTTP_INTERNAL_SERVER_ERROR
                                 );
                             }
+
                             // Get the Name of Gmail
                             $emailParts = explode('@', $email);
                             $name = [$emailParts[0]];
@@ -268,9 +278,6 @@ class AuthController extends Controller
 
                         // Break the loop once a match is found
                         break;
-                        // Else Not Exist Email then Create New User
-                    } else {
-                        $notExist = 1;
                     }
                 } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
                     return response()->json(['message' => 'Error Decrypting Email'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -314,6 +321,20 @@ class AuthController extends Controller
 
             // Send an email to the user with the new token
             Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+
+            // Create User Info Model
+            $userInfoCreate = UserInfoModel::create([
+                'user_id_hash' => $userCreate->id_hash,
+                'email' => $userCreate->email,
+            ]);
+            if (!$userInfoCreate) {
+                return response()->json(
+                    [
+                        'message' => 'Failed to create user information',
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
 
             return response()->json([
                 'message' => 'Successfully create token',
