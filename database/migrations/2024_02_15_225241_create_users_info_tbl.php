@@ -20,9 +20,9 @@ return new class extends Migration
             $table->string('middle_name')->nullable();
             $table->string('last_name')->nullable();
 
-            // $table->string('suffix');
-            // $table->string('gender');
-            // $table->string('birth_date');    
+            // $table->string('suffix')->nullable();
+            // $table->string('gender')->nullable();
+            // $table->string('birth_date')->nullable();    
 
             // Contacts
             $table->string('contact_number')->nullable();

@@ -56,7 +56,6 @@ class AuthController extends Controller
         $userRole = '1a409bb7-c650-4829-9162-a73555880c43';
         $adminRole = 'c2dbf655-7fa5-49e0-ba1f-5e35440444d4';
         $staffRole = '01887426-98ed-4bc5-bbd5-5e7a8462ff83';
-        $authenticated = 0;
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -69,10 +68,12 @@ class AuthController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Decrypt al email first
         $users = AuthModel::all();
         foreach ($users as $userModel) {
             $decryptedEmail = Crypt::decrypt($userModel->email);
 
+            // Check if Verified Email
             if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at !== NULL) {
                 try {
                     // $expirationTime = Carbon::now()->addSeconds(30);
@@ -107,7 +108,7 @@ class AuthController extends Controller
 
                     return response()->json([
                         'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
-                        'user' => $userModel, 
+                        'user' => $userModel,
                         'user_info' => $userInfo ? 'New User' : 'Existing User',
                         'token_type' => 'Bearer',
                         'access_token' => $newToken,
@@ -122,7 +123,9 @@ class AuthController extends Controller
                 }
 
                 break;
-            } else if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at === NULL) {
+            }
+            // Check if Not Verified then redirect to Verify Email
+            else if ($decryptedEmail == $request->input("email") && Hash::check($request->input('password'), $userModel->password) && $userModel->email_verified_at === NULL) {
                 // Generate a new token for the user
                 $expirationTime = Carbon::now()->addMinutes(120);
                 $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userModel);
@@ -162,13 +165,11 @@ class AuthController extends Controller
                     ],
                     Response::HTTP_OK
                 );
-            } else {
-                $authenticated = 1;
             }
-        }
-
-        if ($authenticated === 1) {
-            return response()->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+            // Wrong Credentials
+            else {
+                return response()->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+            }
         }
     }
 
@@ -190,11 +191,11 @@ class AuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['error' => $validator->errors()], 400);
+                return response()->json(['error' => $validator->errors()],  Response::HTTP_UNPROCESSABLE_ENTITY);
             }
-
-            // Check if Email is not empty
-        } else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
+        }
+        // Check if Email is not empty
+        else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
             // Validate Password
             $validator = Validator::make($request->all(), [
                 'password' => 'required|string|min:6|confirmed:password_confirmation',

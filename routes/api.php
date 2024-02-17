@@ -24,6 +24,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 
+// Register and Update New Password
 Route::middleware('jwt.verify')->group(function () {
     $AuthController = AuthController::class;
 
@@ -37,7 +38,7 @@ Route::middleware('jwt.verify')->group(function () {
     });
 });
 
-
+// Authenticated Users
 Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
 
