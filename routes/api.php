@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserInfoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,4 +44,9 @@ Route::middleware('jwt.verify')->group(function () {
 Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
     Route::get('/index', [$AuthController, 'index']);
+
+    $UserInfoController = UserInfoController::class;
+    Route::prefix('user-info')->group(function () use ($UserInfoController) {
+        Route::get('/index', [$UserInfoController, 'index']);
+    });
 });
