@@ -3,30 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
-use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Mail\ResendVerificationMail;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
+use Tymon\JWTAuth\Facades\JWTAuth;
+
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    public function index()
-    {
-        
-        $userInfoModel = UserInfoModel::all();
-        return response()->json([
-            'message' => $userInfoModel
-        ], Response::HTTP_OK);
-    }
 
     public function login(Request $request)
     {
@@ -86,7 +79,7 @@ class AuthController extends Controller
 
                     return response()->json([
                         'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
-                        // 'user' => $userModel,
+                        'user' => $userModel,
                         'user_info' => $userInfo ? 'New User' : 'Existing User',
                         'token_type' => 'Bearer',
                         'access_token' => $newToken,
@@ -530,5 +523,24 @@ class AuthController extends Controller
             // Handle JWTException (e.g., token invalid)
             return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
+    }
+
+    // GLOBAL FUNCTIONS
+    // Code to check if authenticate users
+    public function authorizeUser($request)
+    {
+        // Authenticate the user with the provided token
+        $user = JWTAuth::parseToken()->authenticate();
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Get the bearer token from the headers
+        $bearerToken = $request->bearerToken();
+        if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $user;
     }
 }
