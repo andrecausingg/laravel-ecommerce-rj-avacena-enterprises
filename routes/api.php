@@ -36,11 +36,11 @@ Route::middleware('jwt.verify')->group(function () {
     Route::prefix('new-password')->group(function () use ($AuthController) {
         Route::post('/update-password', [$AuthController, 'updatePassword']);
     });
+
 });
 
 // Authenticated Users
 Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
-
     Route::get('/index', [$AuthController, 'index']);
 });

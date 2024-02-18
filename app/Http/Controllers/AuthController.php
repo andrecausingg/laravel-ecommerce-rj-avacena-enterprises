@@ -21,33 +21,11 @@ class AuthController extends Controller
 {
     public function index()
     {
-        // Attempt to parse the token without authentication to check expiration
-        $token = JWTAuth::parseToken();
-        // Get the expiration time of the token
-        $expiration = $token->getPayload()->get('exp');
-        if (Carbon::now()->isAfter(Carbon::createFromTimestamp($expiration))) {
-            return response()->json(['error' => 'Token expired. Please log in again.'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Authenticate the user with the provided token
-        $user = $token->authenticate();
-        // Check if the user is found
-        if (!$user) {
-            return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        try {
-            // Try to validate the token
-            $user = JWTAuth::parseToken()->authenticate();
-
-            return response()->json(['message' => $user], Response::HTTP_OK);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            // Token has expired
-            return response()->json(['error' => 'Token has expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            // Other JWT exceptions
-            return response()->json(['error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
-        }
+        
+        $userInfoModel = UserInfoModel::all();
+        return response()->json([
+            'message' => $userInfoModel
+        ], Response::HTTP_OK);
     }
 
     public function login(Request $request)
@@ -108,7 +86,7 @@ class AuthController extends Controller
 
                     return response()->json([
                         'role' => $userModel->role === 'USER' ? $userRole : ($userModel->role === 'ADMIN' ? $adminRole : ($userModel->role === 'STAFF' ? $staffRole : '')),
-                        'user' => $userModel,
+                        // 'user' => $userModel,
                         'user_info' => $userInfo ? 'New User' : 'Existing User',
                         'token_type' => 'Bearer',
                         'access_token' => $newToken,
