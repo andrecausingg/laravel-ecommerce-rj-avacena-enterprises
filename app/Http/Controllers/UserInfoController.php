@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\UserInfoModel;
 use Illuminate\Http\Request;
+use App\Models\UserInfoModel;
 use Illuminate\Support\Facades\Crypt;
 
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
@@ -89,7 +90,31 @@ class UserInfoController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'contact_number' => 'required|string|max:20',
+            'email' => 'required|email|max:255',
+            'address_1' => 'required|string|max:255',
+            'address_2' => 'nullable|string|max:255',
+            'region_code' => 'required|string|max:255',
+            'province_code' => 'required|string|max:255',
+            'city_or_municipality_code' => 'required|string|max:255',
+            'region_name' => 'required|string|max:255',
+            'province_name' => 'required|string|max:255',
+            'city_or_municipality_name' => 'required|string|max:255',
+            'barangay' => 'required|string|max:255',
+            'description_location' => 'nullable|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        
     }
 
     /**
