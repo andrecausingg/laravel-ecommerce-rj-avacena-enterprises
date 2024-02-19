@@ -333,7 +333,7 @@ class AuthController extends Controller
             'password' => Hash::make($password),
             'role' => $roleUser,
             'status' => $status,
-            'verification_number' => rand(100000, 999999),
+            'verification_number' => $verificationNumber,
         ]);
 
         if (!$userCreate) {
