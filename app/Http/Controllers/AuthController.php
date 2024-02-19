@@ -421,10 +421,11 @@ class AuthController extends Controller
                 }
 
                 // Send to Email Now
-                Mail::to($request->email)->send(new ResetPasswordMail($newToken, $request->email));
+                Mail::to($request->email)->send(new ResetPasswordMail($newToken, $request->email, $expirationTime));
 
                 return response()->json(
                     [
+                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
                         'message' => 'Successfully sent the update password link to your ' . $request->email,
                         'token' => $newToken,
                     ],
@@ -438,58 +439,94 @@ class AuthController extends Controller
     public function updatePassword(Request $request)
     {
         // Authenticate the user with the provided token
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!$user) {
-            return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Get the bearer token from the headers
-        $bearerToken = $request->bearerToken();
-        if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->authorizeUserUpdatePassword($request);
 
         // Validate Password
         $validator = Validator::make($request->all(), [
             'password' => 'required|string|min:6|confirmed',
         ]);
+
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
-        // Update the password
-        $user->password = Hash::make($request->password);
-        $user->save();
+        // Check Exist I.D Hash
+        $newPass = AuthModel::where('id_hash', $user->id_hash)->first();
+        if (!$newPass) {
+            return response()->json(['message' => "Email doesn't exist"], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Check if failed to update new password
+        $newPass->password = Hash::make($request->password);
+        if (!$newPass->save()) {
+            return response()->json(['message' => 'Failed to update the password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
         // Store old password
         $userOldPass = AuthModel::create([
-            'user_id' => $user->id,
+            'user_id_hash' => $user->id,
             'old_password' => $user->getOriginal('password'),
         ]);
-
-        if ($userOldPass) {
-            return response()->json(['message' => 'Successfully update the password'], Response::HTTP_OK);
-        } else {
-            return response()->json(['error' => 'Failed to create old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (!$userOldPass) {
+            return response()->json(['message' => 'Failed to store old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully updated the password'], Response::HTTP_OK);
     }
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
     public function authorizeUser($request)
     {
-        // Authenticate the user with the provided token
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!$user) {
-            return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-        }
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
 
-        // Get the bearer token from the headers
-        $bearerToken = $request->bearerToken();
-        if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+
+            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
             return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
 
-        return $user;
+    public function authorizeUserUpdatePassword($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+
+            if (!$bearerToken || $user->reset_password_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }
