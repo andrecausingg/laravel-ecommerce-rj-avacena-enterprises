@@ -22,6 +22,13 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthController extends Controller
 {
 
+    // return response()->json([
+    //     'id' => $user->id,
+    //     'email_db' => $decryptedEmail,
+    //     'email_input' => $request->input('email'),
+    //     'user' => $user,
+    // ], Response::HTTP_OK);
+
     public function login(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -42,24 +49,13 @@ class AuthController extends Controller
 
         // Decrypt al email first
         $users = AuthModel::all();
+
         foreach ($users as $user) {
             $decryptedEmail = Crypt::decrypt($user->email);
-            // if ($decryptedEmail === $request->email && $user->email_verified_at === null) {
-            //     return response()->json([
-            //         'id' => $user->id,
-            //         'email_db' => $decryptedEmail,
-            //         'email_input' => $request->input('email'),
-            //         'user' => $user,
-            //     ], Response::HTTP_OK);
-            // }
+
             // Check if Verified Email
             if ($decryptedEmail == $request->input('email') && Hash::check($request->input('password'), $user->password) && $user->email_verified_at !== null) {
-                return response()->json([
-                    'id' => $user->id,
-                    'email_db' => $decryptedEmail,
-                    'email_input' => $request->input('email'),
-                    'user' => $user,
-                ], Response::HTTP_OK);
+
 
                 // $expirationTime = Carbon::now()->addSeconds(30);
                 // Expiration Time 1month
@@ -141,10 +137,6 @@ class AuthController extends Controller
                     ],
                     Response::HTTP_OK
                 );
-            }
-            // Wrong Credentials
-            else {
-                return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
             }
         }
     }
@@ -470,32 +462,7 @@ class AuthController extends Controller
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
-    public function authorizeUserLogin($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
 
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
 
     public function authorizeUserUpdatePassword($request)
     {
