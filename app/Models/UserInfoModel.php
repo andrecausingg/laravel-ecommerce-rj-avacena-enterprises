@@ -26,6 +26,8 @@ class UserInfoModel extends Model
         'province_name',
         'city_or_municipality_name',
         'barangay',
-        'description_location',
+        'deleted_at',
+        'created_at',
+        'updated_at',
     ];
 }

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('logs_tbl', function (Blueprint $table) {
             $table->id();
-            $table->string('user_id_hash');
+            $table->string('user_id_hash')->nullable();
             $table->string('ip_address');
             $table->string('user_action');
             $table->string('details');
