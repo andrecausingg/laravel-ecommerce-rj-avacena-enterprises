@@ -186,69 +186,75 @@ class AuthController extends Controller
     // CHILD REGISTER EMAIL
     public function emailRegister($idHash, $verificationNumber, $roleUser, $status, $email, $password)
     {
-        // Get All Users and Decrypt Email
+        // Get All Users and Decrypt
         $users = AuthModel::all();
+        $decryptDatas = [];
+
+        // Decrypt
         foreach ($users as $user) {
             // Start Decrypt
-            $decryptedEmail = Crypt::decrypt($user->email);
-            // If Exist the email
-            if ($decryptedEmail == $email) {
-                // Not verified yet then send code
-                if ($user->email_verified_at == NULL) {
-                    // Generate a new token for the user
-                    $expirationTime = Carbon::now()->addMinutes(120);
-                    $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+            $decryptData = Crypt::decrypt($user->email);
 
-                    if (!$newToken) {
-                        return response()->json([
-                            'error' => 'Token generation failed',
-                            'message' => 'Unable to generate a token from user'
-                        ], Response::HTTP_OK);
-                    }
+            // Append the decrypted data to the array along with email_verified_at
+            $decryptDatas[] = [
+                'email' => $decryptData,
+                'email_verified_at' => $user->email_verified_at,
+            ];
+        }
 
-                    // Update verification_number | password | verify email token
-                    $user->verification_number = $verificationNumber;
-                    $user->password = Hash::make($password);
-                    $user->verify_email_token = $newToken;
-                    $user->verify_email_token_expire_at = $expirationTime;
+        // Check if the requested email exists in the decrypted emails and email_verified_at is not null
+        foreach ($decryptDatas as $data) {
+            if ($data['email'] === $email && $data['email_verified_at'] === null) {
+                // Generate a new token for the user
+                $expirationTime = Carbon::now()->addMinutes(120);
+                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
 
-                    // Save
-                    if (!$user->save()) {
-                        return response()->json(
-                            [
-                                'error' => 'Error To update to verification number, token and expiration time'
-                            ],
-                            Response::HTTP_INTERNAL_SERVER_ERROR
-                        );
-                    }
+                if (!$newToken) {
+                    return response()->json([
+                        'error' => 'Token generation failed',
+                        'message' => 'Unable to generate a token from user'
+                    ], Response::HTTP_OK);
+                }
 
-                    // Get the Name of Gmail
-                    $emailParts = explode('@', $email);
-                    $name = [$emailParts[0]];
+                // Update verification_number | password | verify email token
+                $user->verification_number = $verificationNumber;
+                $user->password = Hash::make($password);
+                $user->verify_email_token = $newToken;
+                $user->verify_email_token_expire_at = $expirationTime;
 
-                    // Send the new token to the user via email
-                    Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
-
+                // Save
+                if (!$user->save()) {
                     return response()->json(
                         [
-                            'message' => 'Successfully create token',
-                            'url_token' => '/signup/verify-email?tj=' . $newToken,
-                            'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-
+                            'error' => 'Error To update to verification number, token and expiration time'
                         ],
-                        Response::HTTP_OK
-                    );
-                } else {
-                    return response()->json(
-                        [
-                            'message' => 'Email already exist'
-                        ],
-                        Response::HTTP_UNPROCESSABLE_ENTITY
+                        Response::HTTP_INTERNAL_SERVER_ERROR
                     );
                 }
 
-                // Break the loop once a match is found
-                break;
+                // Get the Name of Gmail
+                $emailParts = explode('@', $email);
+                $name = [$emailParts[0]];
+
+                // Send the new token to the user via email
+                Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+
+                return response()->json(
+                    [
+                        'message' => 'Successfully create token',
+                        'url_token' => '/signup/verify-email?tj=' . $newToken,
+                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+
+                    ],
+                    Response::HTTP_OK
+                );
+            } else if ($data['email'] === $email && $data['email_verified_at'] !== null) {
+                return response()->json(
+                    [
+                        'message' => 'Email already exist'
+                    ],
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
             }
         }
 
@@ -264,7 +270,7 @@ class AuthController extends Controller
 
         if (!$userCreate) {
             // Error creating user
-            return response()->json(['message' => 'Error creating user'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to create user'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Generate a new token for the user
@@ -272,7 +278,7 @@ class AuthController extends Controller
         $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userCreate);
 
         if (!$newToken) {
-            return response()->json(['error' => 'Token generation failed'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to generate token'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Update user with the new token for email verification
@@ -280,7 +286,7 @@ class AuthController extends Controller
         $userCreate->verify_email_token_expire_at = $expirationTime;
 
         if (!$userCreate->save()) {
-            return response()->json(['error' => 'Error updating token for email verification'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to update token and expire at'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Get the Name of Gmail
