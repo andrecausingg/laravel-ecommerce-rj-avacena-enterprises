@@ -301,17 +301,8 @@ class AuthController extends Controller
     {
         $verificationNumber = mt_rand(100000, 999999);
 
-        // Authenticate the user with the provided token
-        $user = JWTAuth::parseToken()->authenticate();
-        if (!$user) {
-            return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Get the bearer token from the headers
-        $bearerToken = $request->bearerToken();
-        if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        }
+        // Token Validation
+        $user = $this->authorizeUserVerifyEmail($request);
 
         // Validate
         $validator = Validator::make($request->all(), [
@@ -340,6 +331,7 @@ class AuthController extends Controller
     {
         $verificationNumber = mt_rand(100000, 999999);
 
+        // Token Validation
         $user = $this->authorizeUserResendCode($request);
 
         if ($user->update([
@@ -421,52 +413,75 @@ class AuthController extends Controller
 
     public function updatePassword(Request $request)
     {
-        // Authenticate the user with the provided token
-        $user = $this->authorizeUserUpdatePassword($request);
+        try {
+            // Token Validation
+            $user = $this->authorizeUserUpdatePassword($request);
 
-        // Validate Password
-        $validator = Validator::make($request->all(), [
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Find user by id_hash
-        $existingUser = AuthModel::where('id_hash', $user->id_hash)->first();
-
-        // Check if user exists
-        if (!$existingUser) {
-            return response()->json(['message' => "User doesn't exist"], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Update the user's password
-        $existingUser->password = Hash::make($request->password);
-
-        // Check if the password update is successful
-        if ($existingUser->save()) {
-            // Store old password
-            $userOldPass = OldPasswordModel::create([
-                'user_id_hash' => $user->id_hash,
-                'password' => $existingUser->password,
+            // Validate Password
+            $validator = Validator::make($request->all(), [
+                'password' => 'required|string|min:6|confirmed',
             ]);
 
-            // Check if storing old password is successful
-            if ($userOldPass) {
-                return response()->json(['message' => 'Successfully to store the old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            } else {
-                return response()->json(['message' => 'Failed to store old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            // Check if validation fails
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], Response::HTTP_BAD_REQUEST);
             }
-        } else {
-            return response()->json(['message' => 'Failed updated the password'], Response::HTTP_OK);
+
+            // Find user by id_hash
+            $existingUser = AuthModel::where('id_hash', $user->id_hash)->first();
+
+            // Check if user exists
+            if (!$existingUser) {
+                return response()->json(['message' => "User doesn't exist"], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Update the user's password
+            $existingUser->password = Hash::make($request->password);
+
+            // Check if the password update is successful
+            if ($existingUser->save()) {
+                // Store old password
+                $userOldPass = OldPasswordModel::create([
+                    'user_id_hash' => $user->id_hash,
+                    'password' => $existingUser->password,
+                ]);
+
+                // Check if storing old password is successful
+                if ($userOldPass) {
+                    return response()->json(['message' => 'Successfully to store the old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                } else {
+                    return response()->json(['message' => 'Failed to store old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+            } else {
+                return response()->json(['message' => 'Failed updated the password'], Response::HTTP_OK);
+            }
+        } catch (\Exception $e) {
+            // Handle exceptions and return an error response with CORS headers
+            $errorMessage = $e->getMessage();
+            $errorCode = $e->getCode();
+
+            // Create a JSON error response
+            $response = [
+                'success' => false,
+                'error' => [
+                    'code' => $errorCode,
+                    'message' => $errorMessage,
+                ],
+            ];
+
+            // Add additional error details if available
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                $response['error']['details'] = $e->errors();
+            }
+
+            // Return the JSON error response with CORS headers and an appropriate HTTP status code
+            return response()->json($response, Response::HTTP_INTERNAL_SERVER_ERROR)->header('Content-Type', 'application/json');
         }
     }
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
-    public function authorizeUser($request)
+    public function authorizeUserLogin($request)
     {
         try {
             // Authenticate the user with the provided token
@@ -519,7 +534,7 @@ class AuthController extends Controller
             return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     public function authorizeUserResendCode($request)
     {
         try {
@@ -533,6 +548,31 @@ class AuthController extends Controller
             // Get the bearer token from the headers
             $bearerToken = $request->bearerToken();
 
+            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function authorizeUserVerifyEmail($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
             if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
                 return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
             }
