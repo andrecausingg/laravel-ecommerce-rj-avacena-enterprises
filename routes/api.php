@@ -48,5 +48,6 @@ Route::middleware(['jwt.auth'])->group(function () {
     $UserInfoController = UserInfoController::class;
     Route::prefix('user-info')->group(function () use ($UserInfoController) {
         Route::get('/index', [$UserInfoController, 'index']);
+        Route::post('/update', [$UserInfoController, 'update']);
     });
 });
