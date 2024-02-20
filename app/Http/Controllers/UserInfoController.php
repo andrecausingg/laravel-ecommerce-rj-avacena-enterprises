@@ -11,6 +11,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Jenssegers\Agent\Facades\Agent;
 
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -29,6 +30,7 @@ class UserInfoController extends Controller
             $decryptedUserInfo = [
                 'id' => $userInfo && $userInfo->id ? $userInfo->id : null,
                 'user_id_hash' => $userInfo && $userInfo->user_id_hash ? $userInfo->user_id_hash : null,
+                'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
                 'first_name' => $userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : null,
                 'middle_name' => $userInfo && $userInfo->middle_name ? Crypt::decrypt($userInfo->middle_name) : null,
                 'last_name' => $userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null,
@@ -79,7 +81,7 @@ class UserInfoController extends Controller
 
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'image' => 'image|mimes:jpeg,png|max:10240',
+            'image' => 'image|mimes:jpeg,png,jpg|max:10240',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -102,12 +104,22 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $image = $request->file('image');
+        $imageActualExt = $image->getClientOriginalExtension();
+        do {
+            $filename = uniqid() . "_" . time() . "_" . mt_rand() . "." . $imageActualExt;
+        } while (UserInfoModel::where('image', $filename)->exists());
+        Storage::disk('public')->put($filename, file_get_contents($image));
 
         $existHash = UserInfoModel::where('user_id_hash', $user->id_hash)->doesntExist();
         if ($existHash) {
             // Encrypt the data
             foreach ($validator->validated() as $key => $value) {
-                $validatedData[$key] = Crypt::encrypt($value);
+                if ($key === 'image') {
+                    $validatedData[$key] = Crypt::encrypt($filename);
+                } else {
+                    $validatedData[$key] = Crypt::encrypt($value);
+                }
             }
 
             // Create UserInfoModel with encrypted data
@@ -162,10 +174,11 @@ class UserInfoController extends Controller
 
         // Validation rules
         $validator = Validator::make($request->all(), [
+            'image' => 'image|mimes:jpeg,png,jpg|max:10240',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
-            'contact_number' => 'required|string|max:20',
+            'contact_number' => 'required|string|max:11',
             'email' => 'required|email|max:255',
             'address_1' => 'required|string|max:255',
             'address_2' => 'nullable|string|max:255',
@@ -191,32 +204,46 @@ class UserInfoController extends Controller
 
         // Define the fields to loop through
         $fields = [
-            'first_name', 'middle_name', 'last_name', 'contact_number',
+            'image', 'first_name', 'middle_name', 'last_name', 'contact_number',
             'email', 'address_1', 'address_2', 'region_code',
             'province_code', 'city_or_municipality_code', 'region_name',
             'province_name', 'city_or_municipality_name', 'barangay',
             'description_location',
         ];
 
+        // Initialize an array to store changes for logging
+        $changesForLogs = [];
+
         // Loop through the fields for encryption and decryption
         foreach ($fields as $field) {
-            // Decrypt existing value
-            $existingValue = Crypt::decrypt($userInfo->$field);
+            // Decrypt existing value only if it's not empty
+            $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
 
             // Update decrypted value if there are changes
-            $userInfo->$field = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
+            $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
+
+            // Check if the value has changed
+            if ($newValue !== $existingValue) {
+                $changesForLogs[$field] = [
+                    'old' => $existingValue,
+                    'new' => $request->input($field),
+                ];
+            }
+
+            // Update the user info
+            $userInfo->$field = $newValue;
         }
 
         // Save the changes
         if ($userInfo->save()) {
-            return response()->json(
-                [
-                    'message' => 'Successfully Update Data',
-                    'result' => $userInfo,
-                ],
-                Response::HTTP_OK
-            );
+            // Update successful, log the changes
+            $this->updateLogs($request, $user->id_hash, $userInfo, $userAgent, $changesForLogs);
+
+            return response()->json(['message' => 'User information updated successfully'], Response::HTTP_OK);
         }
+
+        // If the code reaches here, there was an issue saving the changes
+        return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**
@@ -313,7 +340,7 @@ class UserInfoController extends Controller
         if (!$logEntry) {
             return response()->json(
                 [
-                    'message' => 'Failed to create logs',
+                    'message' => 'Failed to create logs for create user info',
                 ],
                 Response::HTTP_OK
             );
@@ -321,9 +348,43 @@ class UserInfoController extends Controller
 
         return response()->json(
             [
-                'message' => 'Successfully create logs',
+                'message' => 'Successfully create logs for create user info',
             ],
             Response::HTTP_OK
         );
+    }
+
+    public function updateLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
+    {
+        // Retrieve the original user information
+        $originalUserInfo = UserInfoModel::where('user_id_hash', $idHash)->first();
+
+        if (!$originalUserInfo) {
+            return response()->json(['error' => 'Original user information not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update user information with the following changes:',
+            'user_id_hash' => $userInfoData->user_id_hash,
+            'changed_fields' => $changesForLogs,
+        ];
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE USER INFORMATION',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['error' => 'Failed to create logs'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response()->json(['message' => 'Successfully created logs'], Response::HTTP_OK);
     }
 }
