@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('users_old_pass_tbl', function (Blueprint $table) {
+        Schema::create('history_tbl', function (Blueprint $table) {
             $table->id();
-            $table->string('user_id_hash');
-            $table->string('password');
-            
-            // Date | Time
-            $table->timestamp('deleted_at')->nullable();
+            $table->text('user_id_hash');
+            $table->string('tbl_name');
+            $table->string('column_name');
+            $table->text('value');
             $table->timestamps();
         });
     }
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users_old_pass_tbl');
+        Schema::dropIfExists('history_tbl');
     }
 };

@@ -79,10 +79,11 @@ class UserInfoController extends Controller
 
         // Validation rules
         $validator = Validator::make($request->all(), [
+            'image' => 'image|mimes:jpeg,png|max:10240',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
-            'contact_number' => 'required|string|max:20',
+            'contact_number' => 'required|string|max:11',
             'email' => 'required|email|max:255',
             'address_1' => 'required|string|max:255',
             'address_2' => 'nullable|string|max:255',
@@ -101,27 +102,34 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Create User Info Model
-        $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validator->validated()));
-        if (!$userInfoCreate) {
-            return response()->json(
-                [
-                    'message' => 'Failed to create user information',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+
+        $existHash = UserInfoModel::where('user_id_hash', $user->id_hash)->doesntExist();
+        if ($existHash) {
+            // Encrypt the data
+            foreach ($validator->validated() as $key => $value) {
+                $validatedData[$key] = Crypt::encrypt($value);
+            }
+
+            // Create UserInfoModel with encrypted data
+            $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validatedData));
+            if (!$userInfoCreate) {
+                return response()->json(
+                    [
+                        'message' => 'Failed to create user information',
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+
+            // Store Logs
+            return $this->storeLogs($request, $user->id_hash, $userInfoCreate, $userAgent);
         }
 
-        // Store Logs
-        $this->storeLogs($userInfoCreate, $userAgent);
-
-        // Save the changes
         return response()->json(
             [
-                'message' => 'Successfully Update Data',
-                'result' => $userInfoCreate,
+                'message' => 'User i.d hash already exist',
             ],
-            Response::HTTP_OK
+            Response::HTTP_INTERNAL_SERVER_ERROR
         );
     }
 
@@ -270,9 +278,52 @@ class UserInfoController extends Controller
         // ]);
     }
 
-    public function storeLogs($userInfoCreate, $userAgent)
+    // GLOBAL CODE
+    public function storeLogs(Request $request, $idHash, $userInfoData, $userAgent)
     {
-        $userInfoCreate = LogsModel::create(array_merge(['user_id_hash' => $user->id_hash], $validator->validated()));
+        $userInfoDetails = [
+            'message' => 'Store a user information with the following details:',
+            'user_id_hash' => $userInfoData->user_id_hash,
+            'first_name' => $userInfoData->first_name,
+            'last_name' => $userInfoData->last_name,
+            'contact_number' => $userInfoData->contact_number,
+            'email' => $userInfoData->email,
+            'address_1' => $userInfoData->address_1,
+            'address_2' => $userInfoData->address_2,
+            'region_code' => $userInfoData->region_code,
+            'province_code' => $userInfoData->province_code,
+            'city_or_municipality_code' => $userInfoData->city_or_municipality_code,
+            'region_name' => $userInfoData->region_name,
+            'province_name' => $userInfoData->province_name,
+            'city_or_municipality_name' => $userInfoData->city_or_municipality_name,
+            'barangay' => $userInfoData->barangay,
+        ];
 
+        $details = json_encode($userInfoDetails, JSON_PRETTY_PRINT);
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'CREATE USER INFORMATION',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(
+                [
+                    'message' => 'Failed to create logs',
+                ],
+                Response::HTTP_OK
+            );
+        }
+
+        return response()->json(
+            [
+                'message' => 'Successfully create logs',
+            ],
+            Response::HTTP_OK
+        );
     }
 }

@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('logs_tbl', function (Blueprint $table) {
             $table->id();
-            $table->string('user_id_hash')->nullable();
-            $table->string('ip_address');
-            $table->string('user_action');
-            $table->string('details');
-            $table->string('user_device');
+            $table->text('user_id_hash')->nullable();
+            $table->text('ip_address');
+            $table->text('user_action');
+            $table->text('details');
+            $table->text('user_device');
             $table->timestamps();
         });
     }

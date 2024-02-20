@@ -12,6 +12,7 @@ class UserInfoModel extends Model
     protected $primaryKey = 'id';
     protected $fillable = [
         'user_id_hash',
+        'image',
         'first_name',
         'middle_name',
         'last_name',

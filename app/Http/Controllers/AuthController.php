@@ -4,18 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
 use Illuminate\Support\Str;
+use App\Models\HistoryModel;
 use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
-use App\Models\OldPasswordModel;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Crypt;
 
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -55,8 +55,6 @@ class AuthController extends Controller
 
             // Check if Verified Email
             if ($decryptedEmail == $request->input('email') && Hash::check($request->input('password'), $user->password) && $user->email_verified_at !== null) {
-
-
                 // $expirationTime = Carbon::now()->addSeconds(30);
                 // Expiration Time 1month
                 $expirationTime = Carbon::now()->addMinutes(2592000);
@@ -79,17 +77,17 @@ class AuthController extends Controller
                 }
 
                 // Check If users_info_tbl exist 
-                $userInfo = UserInfoModel::where('user_id_hash', $user->id_hash)
-                    ->where(function ($query) {
-                        $query->whereNull('first_name')->orWhere('first_name', '');
-                        $query->orWhereNull('last_name')->orWhere('last_name', '');
-                    })
-                    ->first();
+                $userInfoExists = UserInfoModel::where('user_id_hash', $user->id_hash)
+                ->where(function ($query) {
+                    $query->whereNull('first_name')->orWhere('first_name', '');
+                    $query->orWhereNull('last_name')->orWhere('last_name', '');
+                })
+                ->exists();
 
                 return response()->json([
                     'role' => $user->role === 'USER' ? $userRole : ($user->role === 'ADMIN' ? $adminRole : ($user->role === 'STAFF' ? $staffRole : '')),
-                    'user' => $user,
-                    'user_info' => $userInfo ? 'New User' : 'Existing User',
+                    // 'user' => $user,
+                    'user_info' => $userInfoExists ? 'Existing User' : 'New User',
                     'token_type' => 'Bearer',
                     'access_token' => $newToken,
                     'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
@@ -104,8 +102,7 @@ class AuthController extends Controller
 
                 if (!$newToken) {
                     return response()->json([
-                        'error' => 'Token generation failed',
-                        'message' => 'Unable to generate a token from user'
+                        'message' => 'Failed to generate a token from user'
                     ], Response::HTTP_OK);
                 }
 
@@ -139,6 +136,10 @@ class AuthController extends Controller
                 );
             }
         }
+
+        return response()->json([
+            'message' => 'Invalid credential'
+        ], Response::HTTP_OK);
     }
 
     // PARENT REGISTER
@@ -422,13 +423,15 @@ class AuthController extends Controller
             // Check if the password update is successful
             if ($existingUser->save()) {
                 // Store old password
-                $userOldPass = OldPasswordModel::create([
+                $history = HistoryModel::create([
                     'user_id_hash' => $user->id_hash,
-                    'password' => $existingUser->password,
+                    'tbl_name' => $user->id_hash,
+                    'column_name' => $existingUser->password,
+                    'value' => $existingUser->password,
                 ]);
 
                 // Check if storing old password is successful
-                if ($userOldPass) {
+                if ($history) {
                     return response()->json(['message' => 'Successfully to store the old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 } else {
                     return response()->json(['message' => 'Failed to store old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
