@@ -393,7 +393,7 @@ class UserInfoController extends Controller
         // ]);
     }
 
-    // GLOBAL CODE
+    // LOGS
     public function storeLogs(Request $request, $idHash, $userInfoData, $userAgent)
     {
         // Define the fields to include in the logs
@@ -429,7 +429,6 @@ class UserInfoController extends Controller
 
         return response()->json(['message' => 'Successfully create logs for create user info'], Response::HTTP_OK);
     }
-
 
     public function updateLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
     {

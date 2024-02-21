@@ -465,8 +465,6 @@ class AuthController extends Controller
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
-
-
     public function authorizeUserUpdatePassword($request)
     {
         try {
