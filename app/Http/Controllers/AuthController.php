@@ -229,7 +229,7 @@ class AuthController extends Controller
                 return response()->json(
                     [
                         'message' => 'Successfully create token',
-                        'data' => $user,
+                        // 'data' => $user,
                         'url_token' => '/signup/verify-email?tj=' . $newToken,
                         'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
 

@@ -8,8 +8,9 @@ use App\Models\UserInfoModel;
 
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Jenssegers\Agent\Facades\Agent;
+use Illuminate\Support\Facades\Log;
 
+use Jenssegers\Agent\Facades\Agent;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -197,47 +198,88 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Retrieve the user information
         $userInfo = UserInfoModel::where('user_id_hash', $user->id_hash)->first();
+
+        // Check if user information exists
         if (!$userInfo) {
             return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
         }
 
+        // Initialize an array to store changes for logging
+        $changesForLogs = [];
+
+        // Handle image upload and update
+        // Track changes for logging only if the image has changed
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $imageActualExt = $image->getClientOriginalExtension();
+            do {
+                // Decrypt the existing image name
+                $existingImage = $userInfo->image ? Crypt::decrypt($userInfo->image) : null;
+
+                $filename = uniqid() . "_" . time() . "_" . mt_rand() . "." . $imageActualExt;
+            } while (UserInfoModel::where('image', Crypt::encrypt($filename))->exists());
+
+            // Check if the image has changed
+            if ($existingImage !== $filename) {
+                // Encrypt the new image name before saving it
+                $userInfo->image = Crypt::encrypt($filename);
+
+                // Save the image file
+                Storage::disk('public')->put($filename, file_get_contents($image));
+
+                // Log the changes for image
+                $changesForLogs['image'] = [
+                    'old' => $existingImage,
+                    'new' => $filename,
+                ];
+            }
+        }
+
         // Define the fields to loop through
         $fields = [
-            'image', 'first_name', 'middle_name', 'last_name', 'contact_number',
+            'first_name', 'middle_name', 'last_name', 'contact_number',
             'email', 'address_1', 'address_2', 'region_code',
             'province_code', 'city_or_municipality_code', 'region_name',
             'province_name', 'city_or_municipality_name', 'barangay',
             'description_location',
         ];
 
-        // Initialize an array to store changes for logging
-        $changesForLogs = [];
-
         // Loop through the fields for encryption and decryption
         foreach ($fields as $field) {
-            // Decrypt existing value only if it's not empty
-            $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
+            try {
+                $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
+                $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
 
-            // Update decrypted value if there are changes
-            $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
+                // Check if the value has changed
+                if ($newValue !== $existingValue) {
+                    $changesForLogs[$field] = [
+                        'old' => $existingValue,
+                        'new' => $request->input($field),
+                    ];
+                }
 
-            // Check if the value has changed
-            if ($newValue !== $existingValue) {
-                $changesForLogs[$field] = [
-                    'old' => $existingValue,
-                    'new' => $request->input($field),
-                ];
+                // Update the user info
+                $userInfo->$field = $newValue;
+            } catch (\Exception $e) {
+                // Log or dump information about the exception
+                Log::info("Decryption error for field $field: " . $e->getMessage());
             }
-
-            // Update the user info
-            $userInfo->$field = $newValue;
         }
+
+        // Remove fields where old and new values are the same
+        $changesForLogs = array_filter($changesForLogs, function ($change) {
+            return $change['old'] !== $change['new'];
+        });
 
         // Save the changes
         if ($userInfo->save()) {
-            // Update successful, log the changes
-            $this->updateLogs($request, $user->id_hash, $userInfo, $userAgent, $changesForLogs);
+            // Check if there are changes before logging
+            if (!empty($changesForLogs)) {
+                // Update successful, log the changes
+                $this->updateLogs($request, $user->id_hash, $userInfo, $userAgent, $changesForLogs);
+            }
 
             return response()->json(['message' => 'User information updated successfully'], Response::HTTP_OK);
         }
@@ -356,13 +398,6 @@ class UserInfoController extends Controller
 
     public function updateLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
     {
-        // Retrieve the original user information
-        $originalUserInfo = UserInfoModel::where('user_id_hash', $idHash)->first();
-
-        if (!$originalUserInfo) {
-            return response()->json(['error' => 'Original user information not found'], Response::HTTP_NOT_FOUND);
-        }
-
         // Create a log entry for changed fields
         $logDetails = [
             'message' => 'Update user information with the following changes:',
