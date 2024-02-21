@@ -25,10 +25,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 
-// Register and Update New Password
-Route::middleware('jwt.verify')->group(function () {
+// Authenticated Users
+Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
-
     Route::prefix('signup')->group(function () use ($AuthController) {
         Route::post('/verify-email', [$AuthController, 'verifyEmail']);
         Route::post('/resend-code', [$AuthController, 'resendVerificationCode']);
@@ -38,17 +37,11 @@ Route::middleware('jwt.verify')->group(function () {
         Route::post('/update-password', [$AuthController, 'updatePassword']);
     });
 
-});
-
-// Authenticated Users
-Route::middleware(['jwt.auth'])->group(function () {
-    $AuthController = AuthController::class;
-    Route::get('/index', [$AuthController, 'index']);
-
     $UserInfoController = UserInfoController::class;
     Route::prefix('user-info')->group(function () use ($UserInfoController) {
         Route::get('/index', [$UserInfoController, 'index']);
         Route::post('/store', [$UserInfoController, 'store']);
         Route::post('/update', [$UserInfoController, 'update']);
+        Route::get('/get-personal-info', [$UserInfoController, 'getPersonalInfo']);
     });
 });
