@@ -19,9 +19,9 @@ return new class extends Migration
             $table->text('image')->nullable();
 
             // Personal Information
-            $table->string('first_name');
-            $table->string('middle_name')->nullable();
-            $table->string('last_name');
+            $table->text('first_name');
+            $table->text('middle_name')->nullable();
+            $table->text('last_name');
 
             // $table->string('suffix')->nullable();
             // $table->string('gender')->nullable();
@@ -34,9 +34,9 @@ return new class extends Migration
             // Address
             $table->text('address_1');
             $table->text('address_2')->nullable();
-            $table->string('region_code');  
-            $table->string('province_code');
-            $table->string('city_or_municipality_code');
+            $table->text('region_code');  
+            $table->text('province_code');
+            $table->text('city_or_municipality_code');
             $table->text('region_name');
             $table->text('province_name');
             $table->text('city_or_municipality_name');
