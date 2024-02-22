@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
+use App\Models\LogsModel;
 use Illuminate\Support\Str;
 use App\Models\HistoryModel;
 use Illuminate\Http\Request;
@@ -13,8 +14,8 @@ use App\Mail\ResetPasswordMail;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -78,11 +79,11 @@ class AuthController extends Controller
 
                 // Check If users_info_tbl exist 
                 $userInfoExists = UserInfoModel::where('user_id_hash', $user->id_hash)
-                ->where(function ($query) {
-                    $query->whereNull('first_name')->orWhere('first_name', '');
-                    $query->orWhereNull('last_name')->orWhere('last_name', '');
-                })
-                ->exists();
+                    ->where(function ($query) {
+                        $query->whereNull('first_name')->orWhere('first_name', '');
+                        $query->orWhereNull('last_name')->orWhere('last_name', '');
+                    })
+                    ->exists();
 
                 return response()->json([
                     'role' => $user->role === 'USER' ? $userRole : ($user->role === 'ADMIN' ? $adminRole : ($user->role === 'STAFF' ? $staffRole : '')),
@@ -463,8 +464,74 @@ class AuthController extends Controller
         }
     }
 
+    // USER INFO UPDATE PASSWORD
+    public function updatePasswordPersonalInfo(Request $request)
+    {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|confirmed:new_password_confirmation',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Fetch the user from the database
+        $userAuth = AuthModel::where('id_hash', $user->id_hash)->first();
+
+        // Check if user exists
+        if (!$userAuth) {
+            return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Check if current_password is correct
+        if (Hash::check($request->input('current_password'), $userAuth->password)) {
+            // Update the user's password
+            // $userAuth->password = Hash::make($request->input('new_password'));
+            // $userAuth->save();
+
+            return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
+        } else {
+            return response()->json(['message' => 'Incorrect current password'], Response::HTTP_UNAUTHORIZED);
+        }
+    }
+
+
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
+    public function authorizeUser($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public function authorizeUserUpdatePassword($request)
     {
         try {
@@ -542,5 +609,55 @@ class AuthController extends Controller
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
             return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public function updateEmailLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
+    {
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update user information with the following changes:',
+            'user_id_hash' => $userInfoData->user_id_hash,
+            'changed_fields' => [],
+        ];
+
+        // Loop through changesForLogs and encrypt old and new values before adding to logDetails
+        foreach ($changesForLogs as $field => $change) {
+            $encryptedOldValue = $change['old'] ? Crypt::encrypt($change['old']) : null;
+            $encryptedNewValue = $change['new'] ? Crypt::encrypt($change['new']) : null;
+
+            $logDetails['changed_fields'][$field] = [
+                'old' => $encryptedOldValue,
+                'new' => $encryptedNewValue,
+            ];
+
+            // Create HistoryModel entry
+            $historyCreate = HistoryModel::create([
+                'user_id_hash' => $idHash,
+                'tbl_name' => 'history_tbl',
+                'column_name' => $field, // Use the field name as the column name
+                'value' => $encryptedOldValue,
+            ]);
+
+            if (!$historyCreate) {
+                return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE USER INFORMATION',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+
+        return response()->json(['message' => 'Successfully update logs for update user info'], Response::HTTP_OK);
     }
 }
