@@ -48,6 +48,6 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/update', [$UserInfoController, 'update']);
         Route::get('/get-personal-info', [$UserInfoController, 'getPersonalInfo']);
 
-        Route::post('/update-email', [$AuthController, 'updatePasswordPersonalInfo']);
+        Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser  ']);
     });
 });

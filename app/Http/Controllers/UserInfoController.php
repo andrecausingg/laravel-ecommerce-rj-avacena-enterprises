@@ -476,7 +476,7 @@ class UserInfoController extends Controller
         $logEntry = LogsModel::create([
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE USER INFORMATION',
+            'user_action' => 'UPDATE USER PASSWORD IN SETTINGS',
             'user_device' => $userAgent,
             'details' => $details,
         ]);

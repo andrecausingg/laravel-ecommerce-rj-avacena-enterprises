@@ -29,7 +29,6 @@ class AuthController extends Controller
     //     'email_input' => $request->input('email'),
     //     'user' => $user,
     // ], Response::HTTP_OK);
-
     public function login(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -68,32 +67,30 @@ class AuthController extends Controller
 
                 $user->session_token = $newToken;
                 $user->session_expire_at = $expirationTime;
-                if (!$user->save()) {
-                    return response()->json(
-                        [
-                            'message' => 'Failed to update session token and expiration'
-                        ],
-                        Response::HTTP_INTERNAL_SERVER_ERROR
-                    );
+                if ($user->save()) {
+                    // Check If users_info_tbl exist 
+                    $userInfoExists = UserInfoModel::where('user_id_hash', $user->id_hash)
+                        ->where(function ($query) {
+                            $query->whereNull('first_name')->orWhere('first_name', '');
+                            $query->orWhereNull('last_name')->orWhere('last_name', '');
+                        })
+                        ->exists();
+
+                    return response()->json([
+                        'role' => $user->role === 'USER' ? $userRole : ($user->role === 'ADMIN' ? $adminRole : ($user->role === 'STAFF' ? $staffRole : '')),
+                        // 'user' => $user,
+                        'user_info' => $userInfoExists ? 'Existing User' : 'New User',
+                        'token_type' => 'Bearer',
+                        'access_token' => $newToken,
+                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+                        'message' => 'Login Successfully'
+                    ], Response::HTTP_OK);
                 }
 
-                // Check If users_info_tbl exist 
-                $userInfoExists = UserInfoModel::where('user_id_hash', $user->id_hash)
-                    ->where(function ($query) {
-                        $query->whereNull('first_name')->orWhere('first_name', '');
-                        $query->orWhereNull('last_name')->orWhere('last_name', '');
-                    })
-                    ->exists();
-
-                return response()->json([
-                    'role' => $user->role === 'USER' ? $userRole : ($user->role === 'ADMIN' ? $adminRole : ($user->role === 'STAFF' ? $staffRole : '')),
-                    // 'user' => $user,
-                    'user_info' => $userInfoExists ? 'Existing User' : 'New User',
-                    'token_type' => 'Bearer',
-                    'access_token' => $newToken,
-                    'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                    'message' => 'Login Successfully'
-                ], Response::HTTP_OK);
+                return response()->json(
+                    ['message' => 'Failed to update session token and expiration'],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
             }
             // Check if Not Verified then redirect to Verify Email
             else if ($decryptedEmail == $request->input('email') && Hash::check($request->input('password'), $user->password) && $user->email_verified_at === null) {
@@ -225,8 +222,10 @@ class AuthController extends Controller
                 $name = [$emailParts[0]];
 
                 // Send the new token to the user via email
-                Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
-
+                $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+                if (!$email) {
+                    return response()->json(['message' => 'Failed to send verification number on your email'], Response::HTTP_OK);
+                }
                 return response()->json(
                     [
                         'message' => 'Successfully create token',
@@ -287,7 +286,10 @@ class AuthController extends Controller
         $name = $emailParts[0];
 
         // Send an email to the user with the new token
-        Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+        $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+        if (!$email) {
+            return response()->json(['message' => 'Failed to send verification number on your email'], Response::HTTP_OK);
+        }
 
         return response()->json([
             'message' => 'Successfully create token',
@@ -382,7 +384,7 @@ class AuthController extends Controller
 
                 // Send to Email Now
                 $mail = Mail::to($request->email)->send(new ResetPasswordMail($newToken, $request->email, $expirationTime));
-                if ($mail) {
+                if (!$mail) {
                     return response()->json(['message' => 'Failed to send reset password link on your email'], Response::HTTP_OK);
                 }
                 return response()->json(['message' => 'Successfully sent reset password link on your email' . $decryptedEmail], Response::HTTP_OK);
@@ -465,7 +467,7 @@ class AuthController extends Controller
     }
 
     // USER INFO UPDATE PASSWORD
-    public function updatePasswordPersonalInfo(Request $request)
+    public function updatePasswordOnSettingUser(Request $request)
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -493,17 +495,30 @@ class AuthController extends Controller
         }
 
         // Check if current_password is correct
-        if (Hash::check($request->input('current_password'), $userAuth->password)) {
-            // Update the user's password
-            // $userAuth->password = Hash::make($request->input('new_password'));
-            // $userAuth->save();
+        if (Hash::check($request->input('new_password'), $userAuth->password)) {
+            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_OK);
+        } else if (Hash::check($request->input('current_password'), $userAuth->password)) {
+            // Store old and new passwords
+            $logsData = [
+                'old_password' => $userAuth->password,
+                'new_password' => Hash::make($request->input('new_password')),
+            ];
 
-            return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
+            // Update the user's password
+            $userAuth->password = $logsData['new_password'];
+
+            if ($userAuth->save()) {
+                // Logs
+                $this->updatePasswordOnSettingUserLogs($request, $user->id_hash, $logsData, $userAgent);
+
+                return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
+            } else {
+                return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
         } else {
             return response()->json(['message' => 'Incorrect current password'], Response::HTTP_UNAUTHORIZED);
         }
     }
-
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
@@ -611,52 +626,42 @@ class AuthController extends Controller
         }
     }
 
-    public function updateEmailLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
+    // Logs
+    public function updatePasswordOnSettingUserLogs($request, $idHash, $data, $userAgent)
     {
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update user information with the following changes:',
-            'user_id_hash' => $userInfoData->user_id_hash,
-            'changed_fields' => [],
+            'message' => 'Update authentication with the following changes:',
+            'user_id_hash' => $idHash,
+            'changed_fields' => $data, // Use the provided data array
         ];
 
-        // Loop through changesForLogs and encrypt old and new values before adding to logDetails
-        foreach ($changesForLogs as $field => $change) {
-            $encryptedOldValue = $change['old'] ? Crypt::encrypt($change['old']) : null;
-            $encryptedNewValue = $change['new'] ? Crypt::encrypt($change['new']) : null;
-
-            $logDetails['changed_fields'][$field] = [
-                'old' => $encryptedOldValue,
-                'new' => $encryptedNewValue,
-            ];
-
-            // Create HistoryModel entry
-            $historyCreate = HistoryModel::create([
-                'user_id_hash' => $idHash,
-                'tbl_name' => 'history_tbl',
-                'column_name' => $field, // Use the field name as the column name
-                'value' => $encryptedOldValue,
-            ]);
-
-            if (!$historyCreate) {
-                return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-        }
-
         $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'user_id_hash' => $idHash,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'password',
+            'value' => $data['old_password'],
+        ]);
+
+        if (!$history) {
+            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE USER INFORMATION',
+            'user_action' => 'UPDATE USER PASSWORD IN SETTINGS',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
-        if (!$logEntry) {
+
+        if ($logEntry) {
             return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
 
         return response()->json(['message' => 'Successfully update logs for update user info'], Response::HTTP_OK);
     }
