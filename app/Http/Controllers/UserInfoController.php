@@ -119,9 +119,6 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
         // Validation rules
         $validator = Validator::make($request->all(), [
             'image' => 'image|mimes:jpeg,png,jpg|max:10240',
@@ -173,16 +170,13 @@ class UserInfoController extends Controller
             // Create UserInfoModel with encrypted data
             $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validatedData));
             if (!$userInfoCreate) {
-                return response()->json(
-                    [
-                        'message' => 'Failed to create user information',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+                return response()->json(['message' => 'Failed to create user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             // Store Logs
-            return $this->storeLogs($request, $user->id_hash, $userInfoCreate, $userAgent);
+            $this->storeLogs($request, $user->id_hash, $userInfoCreate);
+
+            return response()->json(['message' => 'Failed to create user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json(
@@ -216,9 +210,6 @@ class UserInfoController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
-
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -268,7 +259,7 @@ class UserInfoController extends Controller
             $newImageEncrypted = Crypt::encrypt($filename);
 
             // Log the changes for the image if it's different
-            if ($newImageEncrypted !== $userInfo->image) {
+            if (Crypt::decrypt($userInfo->image) != $filename) {
                 $changesForLogs['image'] = [
                     'old' => Crypt::decrypt($userInfo->image),
                     'new' => $filename,
@@ -324,10 +315,12 @@ class UserInfoController extends Controller
             // Check if there are changes before logging
             if (!empty($changesForLogs)) {
                 // Update successful, log the changes
-                $this->updateLogs($request, $user->id_hash, $userInfo, $userAgent, $changesForLogs);
+                $this->updateLogs($request, $user->id_hash, $userInfo, $changesForLogs);
+
+                return response()->json(['message' => 'User information updated successfully'], Response::HTTP_OK);
             }
 
-            return response()->json(['message' => 'User information updated successfully'], Response::HTTP_OK);
+            return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // If the code reaches here, there was an issue saving the changes
@@ -402,8 +395,11 @@ class UserInfoController extends Controller
     }
 
     // LOGS
-    public function storeLogs(Request $request, $idHash, $userInfoData, $userAgent)
+    public function storeLogs($request, $idHash, $userInfoData)
     {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
         // Define the fields to include in the logs
         $fieldsToInclude = [
             'user_id_hash', 'image', 'first_name', 'last_name', 'contact_number',
@@ -434,12 +430,13 @@ class UserInfoController extends Controller
         if (!$logEntry) {
             return response()->json(['message' => 'Failed to create logs for create user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        return response()->json(['message' => 'Successfully create logs for create user info'], Response::HTTP_OK);
     }
 
-    public function updateLogs(Request $request, $idHash, $userInfoData, $userAgent, $changesForLogs)
+    public function updateLogs(Request $request, $idHash, $userInfoData, $changesForLogs)
     {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
         // Create a log entry for changed fields
         $logDetails = [
             'message' => 'Update user information with the following changes:',
@@ -476,7 +473,7 @@ class UserInfoController extends Controller
         $logEntry = LogsModel::create([
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE USER PASSWORD IN SETTINGS',
+            'user_action' => 'UPDATE USER INFORMATION',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
