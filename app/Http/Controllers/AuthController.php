@@ -748,6 +748,10 @@ class AuthController extends Controller
         }
     }
 
+    public function updateRoleAndStatus(Request $request){
+        
+    }
+
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
     public function authorizeUser($request)

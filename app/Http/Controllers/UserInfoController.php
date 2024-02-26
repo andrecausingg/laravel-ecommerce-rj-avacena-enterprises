@@ -273,7 +273,6 @@ class UserInfoController extends Controller
             $userInfo->image = $newImageEncrypted;
         }
 
-
         // Define the fields to loop through
         $fields = [
             'first_name', 'middle_name', 'last_name', 'contact_number',
