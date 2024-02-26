@@ -642,7 +642,7 @@ class AuthController extends Controller
         return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
     }
 
-    public function updateEmail(Request $request)
+    public function updateEmailAdmin(Request $request)
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -660,30 +660,32 @@ class AuthController extends Controller
 
         // Fetch the user from the database
         $userAuth = AuthModel::where('id_hash', $request->id_hash)->first();
+        if (!$userAuth) {
+            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         $isEmailsExist = AuthModel::get();
         $exist = 0;
-        $oldEmail = '';
         foreach ($isEmailsExist as $isEmailExist) {
-            $decryptedEmail = strtolower(Crypt::decrypt($isEmailExist->email)) ?? null;
-            $newEmail = strtolower($request->new_email);
-            if ($decryptedEmail == $newEmail) {
+            $decryptedEmail = Crypt::decrypt($isEmailExist->email) ?? null;
+            if ($decryptedEmail == $request->new_email) {
                 $exist = 1;
-                $oldEmail = $decryptedEmail;
                 break;
             }
         }
 
-        if (strtolower(Crypt::decrypt($userAuth->email)) == $newEmail) {
+        $decryptedCurrentEmail = Crypt::decrypt($userAuth->email);
+        if ($decryptedCurrentEmail == $request->new_email) {
             return response()->json(['message' => 'The new email cannot be the same as the old email. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else if ($exist == 1) {
-            return response()->json(['message' => 'Email is taken'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => 'The email is already taken'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else {
             // Store old and new emails
             $logsData = [
-                'old_email' => Crypt::encrypt($oldEmail),
-                'new_email' => Crypt::encrypt($newEmail),
+                'old_email' => Crypt::encrypt($decryptedCurrentEmail),
+                'new_email' => Crypt::encrypt($request->new_email),
             ];
+
 
             // Update the user's email
             $userAuth->email = $logsData['new_email'];
@@ -691,11 +693,57 @@ class AuthController extends Controller
             // Saving
             if ($userAuth->save()) {
                 // Logs
-                $this->updateEmailOnSettingUserLogs($request, $request->id_hash, $logsData);
+                $this->updateEmailAdminLogs($request, $request->id_hash, $user->id_hash, $logsData);
 
                 return response()->json(['message' => 'Email updated successfully'], Response::HTTP_OK);
             } else {
                 return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+
+    public function updatePasswordAdmin(Request $request)
+    {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'id_hash' => 'required|string',
+            'new_password' => 'required|string|min:6|confirmed:new_password_confirmation',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Fetch the user from the database
+        $userAuth = AuthModel::where('id_hash', $request->id_hash)->first();
+        if (!$userAuth) {
+            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (Hash::check($request->new_password, $userAuth->password)) {
+            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } else {
+            // Store old and new passwords
+            $logsData = [
+                'old_password' => $userAuth->password,
+                'new_password' => Hash::make($request->input('new_password')),
+            ];
+
+            // Update the user password
+            $userAuth->password = $logsData['new_password'];
+
+            // Saving
+            if ($userAuth->save()) {
+                // Logs
+                $this->updatePasswordAdminLogs($request, $request->id_hash, $user->id_hash, $logsData);
+
+                return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
+            } else {
+                return response()->json(['message' => 'Failed to update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
         }
     }
@@ -915,7 +963,7 @@ class AuthController extends Controller
         }
     }
 
-    public function updateEmailLogs($request, $idHash, $data)
+    public function updateEmailAdminLogs($request, $idHashClient, $userConfigIdHash, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
@@ -923,7 +971,7 @@ class AuthController extends Controller
         // Create a log entry for changed fields
         $logDetails = [
             'message' => 'Update email with the following changes:',
-            'user_id_hash' => $idHash,
+            'user_id_hash' => $idHashClient,
             'changed_fields' => $data, // Use the provided data array
         ];
 
@@ -931,19 +979,19 @@ class AuthController extends Controller
 
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id_hash' => $idHash,
+            'user_id_hash' => $idHashClient,
             'tbl_name' => 'users_tbl',
             'column_name' => 'email',
             'value' => $data['old_email'],
         ]);
 
         if (!$history) {
-            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to create history for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
-            'user_id_hash' => $idHash,
+            'user_id_hash' => $userConfigIdHash,
             'ip_address' => $request->ip(),
             'user_action' => 'UPDATE EMAIL ON ADMIN DASHBOARD',
             'user_device' => $userAgent,
@@ -951,7 +999,47 @@ class AuthController extends Controller
         ]);
 
         if (!$logEntry) {
-            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to update logs for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updatePasswordAdminLogs($request, $idHashClient, $userConfigIdHash, $data)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update password with the following changes:',
+            'user_id_hash' => $idHashClient,
+            'changed_fields' => $data, // Use the provided data array
+        ];
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'user_id_hash' => $idHashClient,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'password',
+            'value' => $data['old_password'],
+        ]);
+
+        if (!$history) {
+            return response()->json(['message' => 'Failed to create history for update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $userConfigIdHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE PASSWORD ON ADMIN DASHBOARD',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -39,6 +39,8 @@ Route::middleware(['jwt.auth'])->group(function () {
     // User Accounts
     Route::prefix('accounts')->group(function () use ($AuthController) {
         Route::get('/index', [$AuthController, 'index']);
+        Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
+        Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
     });
 
     // Update Password
