@@ -41,6 +41,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::get('/index', [$AuthController, 'index']);
         Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
         Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
+        Route::post('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
     });
 
     // Update Password

@@ -12,9 +12,10 @@ use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Log;
 use App\Mail\ResendVerificationMail;
-use Illuminate\Support\Facades\Hash;
 
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
@@ -748,8 +749,68 @@ class AuthController extends Controller
         }
     }
 
-    public function updateRoleAndStatus(Request $request){
-        
+    public function updateRoleAndStatus(Request $request)
+    {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'id_hash' => 'required|string',
+            'role' => 'required|string|max:255',
+            'status' => 'required|string|max:255',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Fetch the user from the database
+        $userAuth = AuthModel::where('id_hash', $request->id_hash)->first();
+        if (!$userAuth) {
+            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Define the fields to loop through
+        $fields = [
+            'role', 'status',
+        ];
+
+        $changesForLogs = [];
+
+        // Loop through the fields for encryption and decryption
+        foreach ($fields as $field) {
+            try {
+                // Check if the value has changed
+                if ($request->input($field) !== $userAuth->$field) {
+                    $changesForLogs[$field] = [
+                        'old' => $userAuth->$field,
+                        'new' => $request->input($field),
+                    ];
+                }
+
+                // Update the user info
+                $userAuth->$field = $request->input($field);
+            } catch (\Exception $e) {
+                // Log or dump information about the exception
+                Log::info("Decryption error for field $field: " . $e->getMessage());
+            }
+        }
+
+        // Save changes if any
+        if (!empty($changesForLogs)) {
+            if ($userAuth->save()) {
+                // Logs
+                $this->updateRoleAndStatusLogs($request, $request->id_hash, $user->id_hash, $changesForLogs);
+
+                return response()->json(['message' => 'Role and Status updated successfully'], Response::HTTP_OK);
+            } else {
+                return response()->json(['message' => 'Failed to update Role and Status'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        } else {
+            return response()->json(['message' => 'No changes to update'], Response::HTTP_OK);
+        }
     }
 
     // GLOBAL FUNCTIONS
@@ -1045,5 +1106,54 @@ class AuthController extends Controller
         if (!$logEntry) {
             return response()->json(['message' => 'Failed to update logs for update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public function updateRoleAndStatusLogs($request, $idHash, $userConfigIdHash, $changesForLogs)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update role or status with the following changes:',
+            'user_id_hash' => $idHash,
+            'changed_fields' => [],
+        ];
+
+        // Loop through changesForLogs and encrypt old and new values before adding to logDetails
+        foreach ($changesForLogs as $field => $change) {
+            $logDetails['changed_fields'][$field] = [
+                'old' => $change['old'],
+                'new' => $change['new'],
+            ];
+
+            // Create HistoryModel entry
+            $historyCreate = HistoryModel::create([
+                'user_id_hash' => $idHash,
+                'tbl_name' => 'users_tbl',
+                'column_name' => $field, // Use the field name as the column name
+                'value' => $change['old'],
+            ]);
+
+            if (!$historyCreate) {
+                return response()->json(['message' => 'Failed to create history for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $userConfigIdHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE ROLE OR STATUS',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response()->json(['message' => 'Successfully update logs for update role and status'], Response::HTTP_OK);
     }
 }
