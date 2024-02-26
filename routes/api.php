@@ -36,6 +36,11 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/resend-code', [$AuthController, 'resendVerificationCode']);
     });
 
+    // User Accounts
+    Route::prefix('accounts')->group(function () use ($AuthController) {
+        Route::get('/index', [$AuthController, 'index']);
+    });
+
     // Update Password
     Route::prefix('new-password')->group(function () use ($AuthController) {
         Route::post('/update-password', [$AuthController, 'updatePassword']);

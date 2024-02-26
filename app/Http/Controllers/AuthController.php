@@ -474,7 +474,7 @@ class AuthController extends Controller
         }
     }
 
-    // USER SETTING UPDATE PASSWORD
+    // USER SETTING UPDATE PASSWORD AND EMAIL
     public function updatePasswordOnSettingUser(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -606,6 +606,99 @@ class AuthController extends Controller
         }
     }
 
+    // UPDATE USER SPECIFIC USER EMAIL PASSWORD ROLE AND STATUS
+    public function index(Request $request)
+    {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Decrypt all emails and other attributes
+        $decryptedAuthUser = [];
+
+        $authUsers = AuthModel::all();
+
+        foreach ($authUsers as $authUser) {
+            $decryptedEmail = $authUser->email ? Crypt::decrypt($authUser->email) : null;
+            $userInfo = UserInfoModel::where('user_id_hash', $authUser->id_hash)->first(); // Assuming it returns one record
+
+            $decryptedAuthUser[] = [
+                'id' => $authUser->id ?? null,
+                'id_hash' => $authUser->id_hash ?? null,
+                'phone_number' => $authUser->phone_number ?? null,
+                'email' => $decryptedEmail,
+                'role' => $authUser->role ?? null,
+                'status' => $authUser->status ?? null,
+                'deleted_at' => $authUser->deleted_at ?? null,
+                'created_at' => $authUser->created_at ?? null,
+                'updated_at' => $authUser->updated_at ?? null,
+
+                'userInfo' => [
+                    'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+                ],
+            ];
+        }
+
+        // Display or use the decrypted attributes as needed
+        return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
+    }
+
+    public function updateEmail(Request $request)
+    {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Validation rules
+        $validator = Validator::make($request->all(), [
+            'id_hash' => 'required|string',
+            'new_email' => 'required|email',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Fetch the user from the database
+        $userAuth = AuthModel::where('id_hash', $request->id_hash)->first();
+
+        $isEmailsExist = AuthModel::get();
+        $exist = 0;
+        $oldEmail = '';
+        foreach ($isEmailsExist as $isEmailExist) {
+            $decryptedEmail = strtolower(Crypt::decrypt($isEmailExist->email)) ?? null;
+            $newEmail = strtolower($request->new_email);
+            if ($decryptedEmail == $newEmail) {
+                $exist = 1;
+                $oldEmail = $decryptedEmail;
+                break;
+            }
+        }
+
+        if (strtolower(Crypt::decrypt($userAuth->email)) == $newEmail) {
+            return response()->json(['message' => 'The new email cannot be the same as the old email. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } else if ($exist == 1) {
+            return response()->json(['message' => 'Email is taken'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } else {
+            // Store old and new emails
+            $logsData = [
+                'old_email' => Crypt::encrypt($oldEmail),
+                'new_email' => Crypt::encrypt($newEmail),
+            ];
+
+            // Update the user's email
+            $userAuth->email = $logsData['new_email'];
+
+            // Saving
+            if ($userAuth->save()) {
+                // Logs
+                $this->updateEmailOnSettingUserLogs($request, $request->id_hash, $logsData);
+
+                return response()->json(['message' => 'Email updated successfully'], Response::HTTP_OK);
+            } else {
+                return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
 
     // GLOBAL FUNCTIONS
     // Code to check if authenticate users
@@ -813,6 +906,46 @@ class AuthController extends Controller
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
             'user_action' => 'LOGIN',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updateEmailLogs($request, $idHash, $data)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update email with the following changes:',
+            'user_id_hash' => $idHash,
+            'changed_fields' => $data, // Use the provided data array
+        ];
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'user_id_hash' => $idHash,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'email',
+            'value' => $data['old_email'],
+        ]);
+
+        if (!$history) {
+            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE EMAIL ON ADMIN DASHBOARD',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
