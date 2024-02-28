@@ -179,14 +179,14 @@ class AuthController extends Controller
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->emailRegister($idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'));
+            return $this->emailRegister($request, $idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'));
         } else {
             return response()->json(['message' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
         }
     }
 
     // CHILD REGISTER EMAIL
-    public function emailRegister($idHash, $verificationNumber, $roleUser, $status, $email, $password)
+    public function emailRegister($request, $idHash, $verificationNumber, $roleUser, $status, $email, $password)
     {
         // Get All Users and Decrypt
         $users = AuthModel::all();
@@ -207,6 +207,14 @@ class AuthController extends Controller
                         'message' => 'Unable to generate a token from user'
                     ], Response::HTTP_OK);
                 }
+
+                // Store password
+                $logsData = [
+                    'password' => Crypt::encrypt($password),
+                ];
+
+                // Logs
+                $this->passwordOnRegisterEmailLogs($request, $idHash, $logsData);
 
                 // Update verification_number | password | verify email token
                 $user->verification_number = $verificationNumber;
@@ -407,75 +415,51 @@ class AuthController extends Controller
 
     public function updatePassword(Request $request)
     {
-        try {
-            // Token Validation
-            $user = $this->authorizeUserUpdatePassword($request);
+        // Token Validation
+        $user = $this->authorizeUserUpdatePassword($request);
 
-            // Validate Password
-            $validator = Validator::make($request->all(), [
-                'password' => 'required|string|min:6|confirmed',
-            ]);
+        // Validate Password
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|min:6|confirmed',
+        ]);
 
-            // Check if validation fails
-            if ($validator->fails()) {
-                return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
-            }
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
 
-            // Find user by id_hash
-            $existingUser = AuthModel::where('id_hash', $user->id_hash)->first();
+        // Fetch the user from the database
+        $userAuth = AuthModel::where('id_hash', $user->id_hash)->first();
 
-            // Check if user exists
-            if (!$existingUser) {
-                return response()->json(['message' => "User doesn't exist"], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
+        // Check if user exists
+        if (!$userAuth) {
+            return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
+        }
 
-            // Update the user's password
-            $existingUser->password = Hash::make($request->password);
-
-            // Check if the password update is successful
-            if ($existingUser->save()) {
-                // Store old password
-                $history = HistoryModel::create([
-                    'user_id_hash' => $user->id_hash,
-                    'tbl_name' => $user->id_hash,
-                    'column_name' => $existingUser->password,
-                    'value' => $existingUser->password,
-                ]);
-
-                // Check if storing old password is successful
-                if ($history) {
-                    return response()->json(['message' => 'Successfully to store the old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                } else {
-                    return response()->json(['message' => 'Failed to store old password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
-            } else {
-                return response()->json(['message' => 'Failed updated the password'], Response::HTTP_OK);
-            }
-        } catch (\Exception $e) {
-            // Handle exceptions and return an error response with CORS headers
-            $errorMessage = $e->getMessage();
-            $errorCode = $e->getCode();
-
-            // Create a JSON error response
-            $response = [
-                'success' => false,
-                'error' => [
-                    'code' => $errorCode,
-                    'message' => $errorMessage,
-                ],
+        if (Hash::check($request->input('password'), $userAuth->password)) {
+            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } else {
+            // Store password
+            $logsData = [
+                'password' => Crypt::encrypt($request->input('password')),
             ];
 
-            // Add additional error details if available
-            if ($e instanceof \Illuminate\Validation\ValidationException) {
-                $response['error']['details'] = $e->errors();
-            }
+            // Update the user's password
+            $userAuth->password =  Hash::make($request->input('password'));
 
-            // Return the JSON error response with CORS headers and an appropriate HTTP status code
-            return response()->json($response, Response::HTTP_INTERNAL_SERVER_ERROR)->header('Content-Type', 'application/json');
+            // Saving
+            if ($userAuth->save()) {
+                // Logs
+                $this->updatePasswordLogs($request, $user->id_hash, $logsData);
+
+                return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
+            } else {
+                return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
         }
     }
 
-    // USER SETTING UPDATE PASSWORD AND EMAIL
+    // UPDATE PASSWORD | CLIENT SIDE
     public function updatePasswordOnSettingUser(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -486,7 +470,7 @@ class AuthController extends Controller
         // Validation rules
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|string',
-            'new_password' => 'required|string|confirmed:new_password_confirmation',
+            'password' => 'required|string|min:6|confirmed',
             'verification_number' => 'required|numeric|min:6',
         ]);
 
@@ -503,7 +487,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
         }
 
-        if (Hash::check($request->input('new_password'), $userAuth->password)) {
+        if (Hash::check($request->input('password'), $userAuth->password)) {
             return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else if (!Hash::check($request->input('current_password'), $userAuth->password)) {
             return response()->json(['message' => 'Incorrect current password'], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -512,12 +496,12 @@ class AuthController extends Controller
         } else {
             // Store old and new passwords
             $logsData = [
-                'old_password' => $userAuth->password,
-                'new_password' => Hash::make($request->input('new_password')),
+                'old_password' => Crypt::encrypt($request->input('current_password')),
+                'new_password' => Crypt::encrypt($request->input('password')),
             ];
 
             // Update the user's password
-            $userAuth->password = $logsData['new_password'];
+            $userAuth->password =  Hash::make($request->input('password'));
             $userAuth->verification_number = $verificationNumber;
 
             // Saving
@@ -532,6 +516,7 @@ class AuthController extends Controller
         }
     }
 
+    // UPDATE EMAIL | CLIENT SIDE
     public function updateEmailOnSettingUser(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -584,6 +569,7 @@ class AuthController extends Controller
         }
     }
 
+    // SEND VERIFICATION CODE | CLIENT SIDE
     public function updateEmailAndPasswordSendVerificationCode(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -607,7 +593,7 @@ class AuthController extends Controller
         }
     }
 
-    // UPDATE USER SPECIFIC USER EMAIL PASSWORD ROLE AND STATUS
+    // GET ALL USER ACCOUNT | ADMIN SIDE
     public function index(Request $request)
     {
         // Authorize the user
@@ -643,6 +629,7 @@ class AuthController extends Controller
         return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
     }
 
+    // UPDATE EMAIL | ADMIN SIDE
     public function updateEmailAdmin(Request $request)
     {
         // Authorize the user
@@ -703,6 +690,7 @@ class AuthController extends Controller
         }
     }
 
+    // UPDATE PASSWORD | ADMIN SIDE
     public function updatePasswordAdmin(Request $request)
     {
         // Authorize the user
@@ -749,6 +737,7 @@ class AuthController extends Controller
         }
     }
 
+    // UPDATE ROLE AND STATUS | ADMIN SIDE
     public function updateRoleAndStatus(Request $request)
     {
         // Authorize the user
@@ -920,6 +909,86 @@ class AuthController extends Controller
     }
 
     // Logs
+    public function passwordOnRegisterEmailLogs($request, $idHash, $data)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Store password on register email',
+            'user_id_hash' => $idHash,
+            'changed_fields' => $data, // Use the provided data array
+        ];
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'user_id_hash' => $idHash,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'password',
+            'value' => $data['password'],
+        ]);
+
+        if (!$history) {
+            return response()->json(['message' => 'Failed to create history for store password on registering email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'STORE PASSWORD ON REGISTERING EMAIL',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for store password on registering email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updatePasswordLogs($request, $idHash, $data)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create a log entry for changed fields
+        $logDetails = [
+            'message' => 'Update password on forgot password:',
+            'user_id_hash' => $idHash,
+            'changed_fields' => $data, // Use the provided data array
+        ];
+
+        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'user_id_hash' => $idHash,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'password',
+            'value' => $data['old_password'],
+        ]);
+
+        if (!$history) {
+            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE PASSWORD ON FORGOT PASSWORD',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public function updatePasswordOnSettingUserLogs($request, $idHash, $data)
     {
         // Get Device Information
