@@ -20,7 +20,7 @@ use App\Http\Controllers\UserInfoController;
 //     return $request->user();
 // });
 
-
+Route::get('/index-history', [AuthController::class, 'indexHistory']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);

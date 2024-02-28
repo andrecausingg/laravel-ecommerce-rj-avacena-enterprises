@@ -23,7 +23,32 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
+    public function indexHistory()
+    {
+        $decryptedData = [];
 
+        $historys = HistoryModel::get();
+
+        foreach ($historys as $history) {
+            $decryptedHistory = [
+                'id' => $history && $history->id ? $history->id : null,
+                'user_id_hash' => $history && $history->user_id_hash ? $history->user_id_hash : null,
+                'table_name' => $history && $history->tbl_name ? $history->tbl_name : null,
+                'column_name' => $history && $history->column_name ? $history->column_name : null,
+                'value' => $history && $history->value ? Crypt::decrypt($history->value) : null,
+            ];
+
+            $decryptedData[] = $decryptedHistory;
+        }
+
+        return response()->json(
+            [
+                'message' => 'Successfully Retrieve Data',
+                'result' => $decryptedData,
+            ],
+            Response::HTTP_OK
+        );
+    }
     // return response()->json([
     //     'id' => $user->id,
     //     'email_db' => $decryptedEmail,
@@ -208,14 +233,6 @@ class AuthController extends Controller
                     ], Response::HTTP_OK);
                 }
 
-                // Store password
-                $logsData = [
-                    'password' => Crypt::encrypt($password),
-                ];
-
-                // Logs
-                $this->passwordOnRegisterEmailLogs($request, $idHash, $logsData);
-
                 // Update verification_number | password | verify email token
                 $user->verification_number = $verificationNumber;
                 $user->password = Hash::make($password);
@@ -223,33 +240,45 @@ class AuthController extends Controller
                 $user->verify_email_token_expire_at = $expirationTime;
 
                 // Save
-                if (!$user->save()) {
+                if ($user->save()) {
+                    // Indicator Logs
+                    $indicator = 'existAccCreate';
+
+                    // Array Logs
+                    $logsData = [
+                        'email' => Crypt::encrypt($email),
+                        'password' => Crypt::encrypt($password),
+                    ];
+
+                    // Logs
+                    $this->passwordOnRegisterEmailLogs($request, $user->id_hash, $logsData, $indicator);
+
+                    // Get the Name of Gmail
+                    $emailParts = explode('@', $email);
+                    $name = [$emailParts[0]];
+
+                    // Send the new token to the user via email
+                    $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+                    if (!$email) {
+                        return response()->json(['message' => 'Failed to send verification number on your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
                     return response()->json(
                         [
-                            'message' => 'Error To update to verification number, token and expiration time'
+                            'message' => 'Successfully create token',
+                            // 'data' => $user,
+                            'url_token' => '/signup/verify-email?tj=' . $newToken,
+                            'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
+
                         ],
-                        Response::HTTP_INTERNAL_SERVER_ERROR
+                        Response::HTTP_OK
                     );
                 }
 
-                // Get the Name of Gmail
-                $emailParts = explode('@', $email);
-                $name = [$emailParts[0]];
-
-                // Send the new token to the user via email
-                $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
-                if (!$email) {
-                    return response()->json(['message' => 'Failed to send verification number on your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
                 return response()->json(
                     [
-                        'message' => 'Successfully create token',
-                        // 'data' => $user,
-                        'url_token' => '/signup/verify-email?tj=' . $newToken,
-                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-
+                        'message' => 'Error To update to verification number, token and expiration time'
                     ],
-                    Response::HTTP_OK
+                    Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
 
@@ -296,6 +325,18 @@ class AuthController extends Controller
             return response()->json(['message' => 'Failed to update token and expire at'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        // Indicator Logs
+        $indicator = 'freshAccCreate';
+
+        // Array Logs
+        $logsData = [
+            'email' => Crypt::encrypt($email),
+            'password' => Crypt::encrypt($password),
+        ];
+
+        // Logs
+        $this->passwordOnRegisterEmailLogs($request, $idHash, $logsData, $indicator);
+
         // Get the Name of Gmail
         $emailParts = explode('@', $email);
         $name = $emailParts[0];
@@ -329,7 +370,7 @@ class AuthController extends Controller
         }
 
         // Check if the provided verification number matches the stored one
-        if ($user->verification_number = !$request->verification_number) {
+        if ($user->verification_number != $request->verification_number) {
             return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -444,8 +485,14 @@ class AuthController extends Controller
                 'password' => Crypt::encrypt($request->input('password')),
             ];
 
+            // 2hrs expiration to verified Email
+            $expirationTime = Carbon::now()->addSecond();
+            $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+
             // Update the user's password
             $userAuth->password =  Hash::make($request->input('password'));
+            $userAuth->reset_password_token =  $newToken;
+            $userAuth->reset_password_token_expire_at =  $expirationTime;
 
             // Saving
             if ($userAuth->save()) {
@@ -909,16 +956,16 @@ class AuthController extends Controller
     }
 
     // Logs
-    public function passwordOnRegisterEmailLogs($request, $idHash, $data)
+    public function passwordOnRegisterEmailLogs($request, $idHash, $data, $indicator)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Store password on register email',
+            'message' => $indicator == 'freshAccCreate' ? 'Register an account using email' : 'Exist account redirect to verification page',
             'user_id_hash' => $idHash,
-            'changed_fields' => $data, // Use the provided data array
+            'fields' => $data, // Use the provided data array
         ];
 
         $details = json_encode($logDetails, JSON_PRETTY_PRINT);
@@ -939,7 +986,7 @@ class AuthController extends Controller
         $logEntry = LogsModel::create([
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'STORE PASSWORD ON REGISTERING EMAIL',
+            'user_action' => $indicator == 'freshAccCreate' ? 'REGISTER AN ACCOUNT USING EMAIL' : 'EXIST ACCOUNT REDIRECT TO VERIFICATION PAGE',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
@@ -968,7 +1015,7 @@ class AuthController extends Controller
             'user_id_hash' => $idHash,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
-            'value' => $data['old_password'],
+            'value' => $data['password'],
         ]);
 
         if (!$history) {
@@ -996,7 +1043,7 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update password with the following changes:',
+            'message' => 'Update password on setting with the following changes:',
             'user_id_hash' => $idHash,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1008,7 +1055,7 @@ class AuthController extends Controller
             'user_id_hash' => $idHash,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
-            'value' => $data['old_password'],
+            'value' => $data['new_password'],
         ]);
 
         if (!$history) {

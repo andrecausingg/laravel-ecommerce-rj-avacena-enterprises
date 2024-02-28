@@ -20,6 +20,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
+
+
+
     /**
      * Display a listing of the resource.
      */
@@ -440,7 +443,7 @@ class UserInfoController extends Controller
         $logDetails = [
             'message' => 'Update user information with the following changes:',
             'user_id_hash' => $userInfoData->user_id_hash,
-            'changed_fields' => [],
+            'fields' => [],
         ];
 
         // Loop through changesForLogs and encrypt old and new values before adding to logDetails
@@ -448,7 +451,7 @@ class UserInfoController extends Controller
             $encryptedOldValue = $change['old'] ? Crypt::encrypt($change['old']) : null;
             $encryptedNewValue = $change['new'] ? Crypt::encrypt($change['new']) : null;
 
-            $logDetails['changed_fields'][$field] = [
+            $logDetails['fields'][$field] = [
                 'old' => $encryptedOldValue,
                 'new' => $encryptedNewValue,
             ];
