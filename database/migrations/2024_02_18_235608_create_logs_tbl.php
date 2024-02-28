@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('user_id_hash')->nullable();
             $table->text('ip_address');
             $table->text('user_action');
-            $table->text('details');
+            $table->longText('details');
             $table->text('user_device');
             $table->timestamps();
         });

@@ -746,7 +746,7 @@ class AuthController extends Controller
         // Validation rules
         $validator = Validator::make($request->all(), [
             'id_hash' => 'required|string',
-            'new_password' => 'required|string|min:6|confirmed:new_password_confirmation',
+            'password' => 'required|string|min:6|confirmed:password_confirmation',
         ]);
 
         // Check if validation fails
@@ -766,11 +766,11 @@ class AuthController extends Controller
             // Store old and new passwords
             $logsData = [
                 'old_password' => $userAuth->password,
-                'new_password' => Hash::make($request->input('new_password')),
+                'new_password' => Crypt::encrypt($request->input('password')),
             ];
 
             // Update the user password
-            $userAuth->password = $logsData['new_password'];
+            $userAuth->password = Hash::make($request->input('password'));
 
             // Saving
             if ($userAuth->save()) {

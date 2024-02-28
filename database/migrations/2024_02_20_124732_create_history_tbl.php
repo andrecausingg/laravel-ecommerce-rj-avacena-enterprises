@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('user_id_hash');
             $table->string('tbl_name');
             $table->string('column_name');
-            $table->text('value');
+            $table->longText('value');
             $table->timestamps();
         });
     }

@@ -16,12 +16,12 @@ return new class extends Migration
             $table->text('user_id_hash');
             
             // Profile Picture
-            $table->text('image')->nullable();
+            $table->longText('image')->nullable();
 
             // Personal Information
-            $table->text('first_name');
-            $table->text('middle_name')->nullable();
-            $table->text('last_name');
+            $table->longText('first_name');
+            $table->longText('middle_name')->nullable();
+            $table->longText('last_name');
 
             // $table->string('suffix')->nullable();
             // $table->string('gender')->nullable();
@@ -32,16 +32,16 @@ return new class extends Migration
             $table->string('email')->nullable();
 
             // Address
-            $table->text('address_1');
-            $table->text('address_2')->nullable();
-            $table->text('region_code');  
-            $table->text('province_code');
-            $table->text('city_or_municipality_code');
-            $table->text('region_name');
-            $table->text('province_name');
-            $table->text('city_or_municipality_name');
-            $table->text('barangay');
-            $table->text('description_location')->nullable();
+            $table->longText('address_1');
+            $table->longText('address_2')->nullable();
+            $table->longText('region_code');  
+            $table->longText('province_code');
+            $table->longText('city_or_municipality_code');
+            $table->longText('region_name');
+            $table->longText('province_name');
+            $table->longText('city_or_municipality_name');
+            $table->longText('barangay');
+            $table->longText('description_location')->nullable();
 
             // Date | Time
             $table->timestamp('deleted_at')->nullable();

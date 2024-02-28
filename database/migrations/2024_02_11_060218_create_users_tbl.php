@@ -16,15 +16,15 @@ return new class extends Migration
 
             // Authentication
             $table->text('id_hash')->unique();
-            $table->text('phone_number')->unique()->nullable();
-            $table->text('email')->unique()->nullable();
-            $table->text('password');
+            $table->longText('phone_number')->unique()->nullable();
+            $table->longText('email')->unique()->nullable();
+            $table->longText('password');
             $table->string('role');
             $table->string('status');
 
             // Verifications
             $table->integer('verification_number');
-            $table->string('verification_key')->nullable();
+            $table->longText('verification_key')->nullable();
 
             // Token
             $table->text('session_token')->nullable();
