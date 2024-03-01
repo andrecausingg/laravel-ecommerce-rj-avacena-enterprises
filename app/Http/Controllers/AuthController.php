@@ -646,6 +646,10 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
         // Decrypt all emails and other attributes
         $decryptedAuthUser = [];
 
@@ -682,6 +686,10 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
         // Validation rules
         $validator = Validator::make($request->all(), [
             'id_hash' => 'required|string',
@@ -690,7 +698,7 @@ class AuthController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Fetch the user from the database
@@ -743,6 +751,10 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
         // Validation rules
         $validator = Validator::make($request->all(), [
             'id_hash' => 'required|string',
@@ -789,6 +801,10 @@ class AuthController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
+
+        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -963,7 +979,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => $indicator == 'freshAccCreate' ? 'Register an account using email' : 'Exist account redirect to verification page',
             'user_id_hash' => $idHash,
             'fields' => $data, // Use the provided data array
         ];
@@ -1003,7 +1018,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update password on forgot password:',
             'user_id_hash' => $idHash,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1043,7 +1057,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update password on setting with the following changes:',
             'user_id_hash' => $idHash,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1083,7 +1096,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update email with the following changes:',
             'user_id_hash' => $idHash,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1123,7 +1135,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'User Login',
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
         ];
@@ -1151,7 +1162,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update email with the following changes:',
             'user_id_hash' => $idHashClient,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1191,7 +1201,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update password with the following changes:',
             'user_id_hash' => $idHashClient,
             'changed_fields' => $data, // Use the provided data array
         ];
@@ -1231,7 +1240,6 @@ class AuthController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update role or status with the following changes:',
             'user_id_hash' => $idHash,
             'changed_fields' => [],
         ];

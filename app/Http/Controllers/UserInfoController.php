@@ -20,14 +20,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
-
-
-
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        if ($user->id_hash == '' || $user->id_hash == null) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
         $decryptedUserInfos = [];
 
         $userInfos = UserInfoModel::whereNull('deleted_at')->get();
@@ -70,6 +74,10 @@ class UserInfoController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
+
+        if ($user->id_hash == '' || $user->id_hash == null) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         $decryptedUserInfos = [];
 
@@ -121,6 +129,10 @@ class UserInfoController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
+
+        if ($user->id_hash == '' || $user->id_hash == null) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -213,6 +225,10 @@ class UserInfoController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
+
+        if ($user->id_hash == '' || $user->id_hash == null) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -410,9 +426,6 @@ class UserInfoController extends Controller
             'province_name', 'city_or_municipality_name', 'barangay',
         ];
 
-        // Initialize the array to store user information details for logs
-        $userInfoDetails = ['message' => 'Store a user information with the following details:'];
-
         // Loop through the fields and add them to userInfoDetails
         foreach ($fieldsToInclude as $field) {
             $userInfoDetails[$field] = $userInfoData->$field;
@@ -424,7 +437,7 @@ class UserInfoController extends Controller
         $logEntry = LogsModel::create([
             'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'CREATE USER INFORMATION',
+            'user_action' => 'STORE USER INFORMATION',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
@@ -441,7 +454,6 @@ class UserInfoController extends Controller
 
         // Create a log entry for changed fields
         $logDetails = [
-            'message' => 'Update user information with the following changes:',
             'user_id_hash' => $userInfoData->user_id_hash,
             'fields' => [],
         ];
