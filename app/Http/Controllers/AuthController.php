@@ -175,7 +175,7 @@ class AuthController extends Controller
     {
         // Declare Value
         $verificationNumber = mt_rand(100000, 999999);
-        $roleUser = 'USER';
+        $accountRole = 'ude30e726b-3a77-4366-bdb9-6f06505f6015';
         $status = 'PENDING';
         do {
             $idHash = Str::uuid()->toString();
@@ -204,14 +204,14 @@ class AuthController extends Controller
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->emailRegister($request, $idHash, $verificationNumber, $roleUser, $status, $request->input('email'), $request->input('password'));
+            return $this->emailRegister($request, $idHash, $verificationNumber, $accountRole, $status, $request->input('email'), $request->input('password'));
         } else {
             return response()->json(['message' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
         }
     }
 
     // CHILD REGISTER EMAIL
-    public function emailRegister($request, $idHash, $verificationNumber, $roleUser, $status, $email, $password)
+    public function emailRegister($request, $idHash, $verificationNumber, $accountRole, $status, $email, $password)
     {
         // Get All Users and Decrypt
         $users = AuthModel::all();
@@ -299,7 +299,7 @@ class AuthController extends Controller
             'id_hash' => $idHash,
             'email' => Crypt::encrypt($email),
             'password' => Hash::make($password),
-            'role' => $roleUser,
+            'role' => $accountRole,
             'status' => $status,
             'verification_number' => $verificationNumber,
         ]);
