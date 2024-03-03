@@ -173,9 +173,11 @@ class AuthController extends Controller
     // PARENT REGISTER
     public function register(Request $request)
     {
+        // Import files
+        $roleConfig = config('account-role.role');
+
         // Declare Value
         $verificationNumber = mt_rand(100000, 999999);
-        $roleConfig = config('account-role.role');
         $accountRole = $roleConfig['client'];
         $status = 'PENDING';
         do {
