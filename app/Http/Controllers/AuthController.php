@@ -175,7 +175,8 @@ class AuthController extends Controller
     {
         // Declare Value
         $verificationNumber = mt_rand(100000, 999999);
-        $accountRole = 'ude30e726b-3a77-4366-bdb9-6f06505f6015';
+        $roleConfig = config('account-role.role');
+        $accountRole = $roleConfig['client'];
         $status = 'PENDING';
         do {
             $idHash = Str::uuid()->toString();
@@ -356,33 +357,40 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
+        $roleConfig = config('account-role.role');
         $verificationNumber = mt_rand(100000, 999999);
 
         // Token Validation
         $user = $this->authorizeUserVerifyEmail($request);
-
-        // Validate
-        $validator = Validator::make($request->all(), [
-            'verification_number' => 'required|numeric|min:6',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+        if ($user->id_hash == '' || $user->id_hash == null) {
+            return response()->json([
+                'role_db' => $user->role,
+                'config' => $roleConfig['client'],
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Check if the provided verification number matches the stored one
-        if ($user->verification_number != $request->verification_number) {
-            return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        // // Validate
+        // $validator = Validator::make($request->all(), [
+        //     'verification_number' => 'required|numeric|min:6',
+        // ]);
+        // if ($validator->fails()) {
+        //     return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+        // }
 
-        // Update user status and set email_verified_at to the current timestamp
-        $user->update([
-            'status' => 'ACTIVE',
-            'verify_email_token' => Str::uuid(),
-            'email_verified_at' => now(),
-            'verification_number' => $verificationNumber,
-        ]);
+        // // Check if the provided verification number matches the stored one
+        // if ($user->verification_number != $request->verification_number) {
+        //     return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        // }
 
-        return response()->json(['message' => 'Email verified successfully'], Response::HTTP_OK);
+        // // Update user status and set email_verified_at to the current timestamp
+        // $user->update([
+        //     'status' => 'ACTIVE',
+        //     'verify_email_token' => Str::uuid(),
+        //     'email_verified_at' => now(),
+        //     'verification_number' => $verificationNumber,
+        // ]);
+
+        // return response()->json(['message' => 'Email verified successfully'], Response::HTTP_OK);
     }
     public function resendVerificationCode(Request $request)
     {
@@ -646,7 +654,7 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+        if ($user->id_hash == '' || $user->id_hash == null) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -686,7 +694,7 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+        if ($user->id_hash == '' || $user->id_hash == null) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -751,7 +759,7 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+        if ($user->id_hash == '' || $user->id_hash == null) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -802,7 +810,7 @@ class AuthController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null || $user->role != 'ADMIN') {
+        if ($user->id_hash == '' || $user->id_hash == null) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
