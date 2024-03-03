@@ -173,12 +173,9 @@ class AuthController extends Controller
     // PARENT REGISTER
     public function register(Request $request)
     {
-        // Import files
-        $roleConfig = config('account-role.role');
-
         // Declare Value
         $verificationNumber = mt_rand(100000, 999999);
-        $accountRole = $roleConfig['client'];
+        $accountRole = env('ROLE_CLIENT');
         $status = 'PENDING';
         do {
             $idHash = Str::uuid()->toString();
@@ -371,28 +368,28 @@ class AuthController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // // Validate
-        // $validator = Validator::make($request->all(), [
-        //     'verification_number' => 'required|numeric|min:6',
-        // ]);
-        // if ($validator->fails()) {
-        //     return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
-        // }
+        // Validate
+        $validator = Validator::make($request->all(), [
+            'verification_number' => 'required|numeric|min:6',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+        }
 
-        // // Check if the provided verification number matches the stored one
-        // if ($user->verification_number != $request->verification_number) {
-        //     return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        // }
+        // Check if the provided verification number matches the stored one
+        if ($user->verification_number != $request->verification_number) {
+            return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
-        // // Update user status and set email_verified_at to the current timestamp
-        // $user->update([
-        //     'status' => 'ACTIVE',
-        //     'verify_email_token' => Str::uuid(),
-        //     'email_verified_at' => now(),
-        //     'verification_number' => $verificationNumber,
-        // ]);
+        // Update user status and set email_verified_at to the current timestamp
+        $user->update([
+            'status' => 'ACTIVE',
+            'verify_email_token' => Str::uuid(),
+            'email_verified_at' => now(),
+            'verification_number' => $verificationNumber,
+        ]);
 
-        // return response()->json(['message' => 'Email verified successfully'], Response::HTTP_OK);
+        return response()->json(['message' => 'Email verified successfully'], Response::HTTP_OK);
     }
     public function resendVerificationCode(Request $request)
     {
