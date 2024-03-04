@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use App\Models\InventoryModel;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Carbon;
 
 class InventoryController extends Controller
 {
@@ -23,37 +25,85 @@ class InventoryController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null) {
-            return ['message' => 'Not authenticated user', 'status' => Response::HTTP_UNAUTHORIZED];
+        if (empty($user->id_hash)) {
+            return response()->json(
+                [
+                    'message' => 'Not authenticated user',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
 
-        // Validation rules
+        // Check if 'items' key exists in the request
+        if (!$request->has('items')) {
+            return response()->json(
+                [
+                    'message' => 'Missing items in the request',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+
+        // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'category' => 'required|string|max:255',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.category' => 'required|string|max:255',
         ]);
 
         // Check if validation fails
         if ($validator->fails()) {
-            return ['error' => $validator->errors(), 'status' => Response::HTTP_UNPROCESSABLE_ENTITY];
+            return response()->json(
+                [
+                    'message' => $validator->errors(),
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
-        // Generate UUID
-        $uuid = Str::uuid();
 
-        // Create record in the InventoryModel
-        $userInfoCreate = InventoryModel::create([
-            'group_product_id' => $uuid,
-            'name' => $request->input('name'), // Access input directly from the request
-            'category' => $request->input('category'), // Access input directly from the request
-        ]);
+        // Initialize an array to store all created items
+        $createdItems = [];
 
-        if ($userInfoCreate) {
-            return ['message' => 'Inventory record created successfully', 'status' => Response::HTTP_CREATED];
+        foreach ($request['items'] as $productUserInput) {
+            $created = InventoryModel::create([
+                'group_id' => Str::uuid(),
+                'name' => $productUserInput['name'],
+                'category' => $productUserInput['category'],
+            ]);
+
+            if ($created) {
+                // Retrieve the last inserted ID from the created record
+                $lastInsertedId = $created->id;
+
+                // Update the inventory_id based on the retrieved ID
+                $created->update([
+                    'inventory_id' => 'inv#' . $lastInsertedId,
+                ]);
+
+                $createdItems[] = $created; // Add the created item to the array
+            } else {
+                return response()->json(
+                    [
+                        'message' => 'Failed to store Inventory Parents',
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
         }
 
-        return ['message' => 'Failed to store Inventory Parent', 'status' => Response::HTTP_INTERNAL_SERVER_ERROR];
+
+        $this->storeParentLogs($request, $user->id_hash, $createdItems);
+
+
+        return response()->json(
+            [
+                'message' => 'Inventory records parent store successfully',
+            ],
+            Response::HTTP_OK
+        );
     }
+
+
 
     /**
      * Show the form for creating a new resource.
@@ -145,38 +195,41 @@ class InventoryController extends Controller
         }
     }
 
+
     // LOGS
-    public function storeLogs($request, $id, $storeData)
+    public function storeParentLogs(Request $request, $idHash, $storeData)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Define the fields to include in the logs
         $fieldsToInclude = [
-            'user_id_hash', 'image', 'first_name', 'last_name', 'contact_number',
-            'email', 'address_1', 'address_2', 'region_code',
-            'province_code', 'city_or_municipality_code', 'region_name',
-            'province_name', 'city_or_municipality_name', 'barangay',
+            'inventory_id', 'group_id', 'name', 'category',
         ];
 
-        // Loop through the fields and add them to userInfoDetails
-        foreach ($fieldsToInclude as $field) {
-            $userInfoDetails[$field] = $storeData->$field;
+        // Loop through each created item and add them to data
+        $data = [];
+        foreach ($storeData as $item) {
+            $itemData = [];
+            foreach ($fieldsToInclude as $field) {
+                $itemData[$field] = $item->$field;
+            }
+            $data[] = $itemData;
         }
 
-        $details = json_encode($userInfoDetails, JSON_PRETTY_PRINT);
+        $details = json_encode($data, JSON_PRETTY_PRINT);
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
-            'product_id' => $id,
+            'user_id_hash' => $idHash,
             'ip_address' => $request->ip(),
-            'user_action' => 'STORE INVENTORY',
+            'user_action' => 'STORE INVENTORY PARENT',
             'user_device' => $userAgent,
             'details' => $details,
         ]);
 
         if (!$logEntry) {
-            return response()->json(['message' => 'Failed to create logs for create inventory'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

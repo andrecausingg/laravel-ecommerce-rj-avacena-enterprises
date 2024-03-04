@@ -14,8 +14,10 @@ return new class extends Migration
         Schema::create('inventory_tbl', function (Blueprint $table) {
             // I.D
             $table->id();
-            $table->text('group_product_id');
+            $table->text('inventory_id')->nullable();
+            $table->text('group_id');
 
+            // Default
             $table->string('name');
             $table->string('category');
 

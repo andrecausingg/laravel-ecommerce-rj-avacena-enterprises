@@ -14,26 +14,10 @@ class InventoryModel extends Model
 
     protected $primaryKey = 'id';
     protected $fillable = [
-        'product_id',
-        'group_product_id',
-
-        'parent_name',
-        'parent_category',
-        'role',
-        'image',
+        'inventory_id',
+        'group_id',
         'name',
-        'description',
-        'is_refund',
         'category',
-
-        'retail_price',
-        'discounted_price',
-        'stock',
-
-        'supplier',
-        'unit_supplier_price',
-
-        'deleted_at',
         'created_at',
         'updated_at',
     ];
