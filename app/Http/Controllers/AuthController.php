@@ -58,9 +58,10 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
-        $userRole = '1a409bb7-c650-4829-9162-a73555880c43';
-        $adminRole = 'c2dbf655-7fa5-49e0-ba1f-5e35440444d4';
-        $staffRole = '01887426-98ed-4bc5-bbd5-5e7a8462ff83';
+        $clientRole = env('ROLE_CLIENT');
+        $adminRole = env('ROLE_ADMIN');
+        $delivery = env('ROLE_DELIVERY');
+        $cashier = env('ROLE_CASHIER');
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -107,7 +108,7 @@ class AuthController extends Controller
                     $this->loginLogs($request, $user->id_hash);
 
                     return response()->json([
-                        'role' => $user->role === 'USER' ? $userRole : ($user->role === 'ADMIN' ? $adminRole : ($user->role === 'STAFF' ? $staffRole : '')),
+                        'role' => $user->role === $clientRole ? $clientRole : ($user->role === $adminRole ? $adminRole : ($user->role === $delivery ? $delivery : ($user->role === $cashier ? $cashier : ''))),
                         // 'user' => $user,
                         'user_info' => $userInfoExists ? 'Existing User' : 'New User',
                         'token_type' => 'Bearer',

@@ -44,8 +44,8 @@ return new class extends Migration
             $table->longText('description_location')->nullable();
 
             // Date | Time
-            $table->timestamp('deleted_at')->nullable();
             $table->timestamps();
+            $table->softDeletes(); 
         });
     }
 

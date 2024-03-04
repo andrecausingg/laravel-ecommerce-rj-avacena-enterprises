@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserInfoController;
+use App\Http\Controllers\InventoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,7 @@ Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
     $UserInfoController = UserInfoController::class;
+    $InventoryController = InventoryController::class;
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
@@ -59,5 +61,11 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
         Route::post('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
         Route::post('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+    });
+
+    // Inventory
+    Route::prefix('inventory')->group(function () use ($InventoryController) {
+        // Route::get('/index', [$InventoryController, 'index']);
+        Route::post('/store-parent', [$InventoryController, 'storeParent']);
     });
 });

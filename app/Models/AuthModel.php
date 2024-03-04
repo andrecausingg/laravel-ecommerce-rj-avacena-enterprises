@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
 {
     use HasFactory;
+    use SoftDeletes;
+
     protected $table = 'users_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
@@ -29,6 +32,8 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         'created_at',
         'updated_at',
     ];
+    protected $dates = ['deleted_at'];
+
 
     /**
      * Get the identifier that will be stored in the subject claim of the JWT.

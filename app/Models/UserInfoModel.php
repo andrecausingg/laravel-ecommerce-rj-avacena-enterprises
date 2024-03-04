@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UserInfoModel extends Model
 {
     use HasFactory;
+    use SoftDeletes;
     protected $table = 'users_info_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
@@ -31,4 +33,6 @@ class UserInfoModel extends Model
         'created_at',
         'updated_at',
     ];
+    protected $dates = ['deleted_at'];
+
 }
