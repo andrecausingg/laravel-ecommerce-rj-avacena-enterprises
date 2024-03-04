@@ -20,6 +20,7 @@ class InventoryController extends Controller
     {
         //
     }
+
     public function storeParent(Request $request)
     {
         // Authorize the user
@@ -59,7 +60,6 @@ class InventoryController extends Controller
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }
-
 
         // Initialize an array to store all created items
         $createdItems = [];
@@ -102,8 +102,6 @@ class InventoryController extends Controller
             Response::HTTP_OK
         );
     }
-
-
 
     /**
      * Show the form for creating a new resource.
