@@ -61,12 +61,17 @@ class InventoryController extends Controller
             );
         }
 
+        // Generate a unique group_id using Str::uuid()
+        do {
+            $uuid = Str::uuid();
+        } while (InventoryModel::where('group_id', $uuid)->exists());
+
         // Initialize an array to store all created items
         $createdItems = [];
 
         foreach ($request['items'] as $productUserInput) {
             $created = InventoryModel::create([
-                'group_id' => Str::uuid(),
+                'group_id' => $uuid,
                 'name' => $productUserInput['name'],
                 'category' => $productUserInput['category'],
             ]);
@@ -91,9 +96,7 @@ class InventoryController extends Controller
             }
         }
 
-
         $this->storeParentLogs($request, $user->id_hash, $createdItems);
-
 
         return response()->json(
             [
@@ -104,17 +107,9 @@ class InventoryController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function storeProduct(Request $request)
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -133,6 +128,16 @@ class InventoryController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
+    }
+
+
 
     /**
      * Display the specified resource.
