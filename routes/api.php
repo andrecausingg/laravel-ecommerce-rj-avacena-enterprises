@@ -67,5 +67,6 @@ Route::middleware(['jwt.auth'])->group(function () {
     Route::prefix('inventory')->group(function () use ($InventoryController) {
         // Route::get('/index', [$InventoryController, 'index']);
         Route::post('/store-parent', [$InventoryController, 'storeParent']);
+        Route::post('/store-product', [$InventoryController, 'storeProduct']);
     });
 });

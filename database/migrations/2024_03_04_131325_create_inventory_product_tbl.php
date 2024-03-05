@@ -15,7 +15,7 @@ return new class extends Migration
             // I.D
             $table->id();
             $table->text('inventory_group_id');
-            $table->text('product_id');
+            $table->text('product_id')->nullable();
             $table->string('item_code');
 
             // Default 
