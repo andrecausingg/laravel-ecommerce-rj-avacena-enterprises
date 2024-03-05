@@ -63,7 +63,7 @@ class InventoryController extends Controller
 
         // Generate a unique group_id using Str::uuid()
         do {
-            $uuid = Str::uuid();
+            $uuid = Str::uuid();    
         } while (InventoryModel::where('group_id', $uuid)->exists());
 
         // Initialize an array to store all created items
@@ -71,7 +71,7 @@ class InventoryController extends Controller
 
         foreach ($request['items'] as $productUserInput) {
             $created = InventoryModel::create([
-                'group_id' => $uuid,
+                'group_id' => "invgro#" . $uuid,
                 'name' => $productUserInput['name'],
                 'category' => $productUserInput['category'],
             ]);
