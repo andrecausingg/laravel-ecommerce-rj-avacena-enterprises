@@ -75,7 +75,7 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null) {
+        if (empty($user->id_hash)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -130,7 +130,7 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null) {
+        if (empty($user->id_hash)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -226,7 +226,7 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null) {
+        if (empty($user->id_hash)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 

@@ -103,6 +103,10 @@ class InventoryController extends Controller
         );
     }
 
+    public function editParent(string $id){
+        
+    }
+
     /**
      * Store a newly created resource in storage.
      */
