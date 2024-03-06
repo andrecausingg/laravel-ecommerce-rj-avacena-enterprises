@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +32,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
     $UserInfoController = UserInfoController::class;
     $InventoryController = InventoryController::class;
+    $InventoryProductController = InventoryProductController::class;
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
@@ -64,9 +66,15 @@ Route::middleware(['jwt.auth'])->group(function () {
     });
 
     // Inventory
-    Route::prefix('inventory')->group(function () use ($InventoryController) {
-        // Route::get('/index', [$InventoryController, 'index']);
-        Route::post('/store-parent', [$InventoryController, 'storeParent']);
-        Route::post('/store-product', [$InventoryController, 'storeProduct']);
+    Route::prefix('inventory')->group(function () use ($InventoryController, $InventoryProductController) {
+        Route::prefix('parent')->group(function () use ($InventoryController) {
+            Route::get('index', [$InventoryController, 'index']);
+            Route::post('store', [$InventoryController, 'store']);
+            Route::get('edit/{id}', [$InventoryController, 'edit']);
+        });
+
+        Route::prefix('product')->group(function () use ($InventoryProductController) {
+            Route::post('/store', [$InventoryProductController, 'store']);
+        });
     });
 });
