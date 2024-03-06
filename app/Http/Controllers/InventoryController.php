@@ -23,6 +23,15 @@ class InventoryController extends Controller
         //
     }
 
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
+    }
+
     /**
      * Store a newly created resource in storage.
      */
@@ -107,14 +116,6 @@ class InventoryController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
      * Display the specified resource.
      */
     public function show(string $id)
@@ -161,7 +162,7 @@ class InventoryController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request)
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -175,16 +176,71 @@ class InventoryController extends Controller
             );
         }
 
-        $inventory = InventoryModel::where('inventory_id', $id)->first();
-        if (!$inventory) {
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_id' => 'required|string',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.category' => 'required|string|max:255',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
             return response()->json(
                 [
-                    'message' => 'Data not found',
+                    'message' => $validator->errors(),
                 ],
-                Response::HTTP_NOT_FOUND
+                Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }
+
+        // Initialize an array to store all updated items
+        $updatedItems = [];
+
+        foreach ($request['items'] as $productUserInput) {
+            $inventory = InventoryModel::where('inventory_id', $productUserInput['inventory_id'])->first();
+            if (!$inventory) {
+                return response()->json(
+                    [
+                        'message' => 'Data not found',
+                    ],
+                    Response::HTTP_NOT_FOUND
+                );
+            }
+
+            // Set new values dynamically based on input array
+            foreach ($productUserInput as $key => $value) {
+                $inventory->$key = $value;
+            }
+
+            // Check if any attributes have been changed
+            if ($inventory->isDirty()) {
+                // Update the inventory record
+                $update = $inventory->update();
+
+                if ($update) {
+                    $updatedItems[] = $inventory; // Add the updated item to the array
+                } else {
+                    return response()->json(
+                        [
+                            'message' => 'Failed to update Inventory records',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+            }
+        }
+
+
+        $this->storeLogs($request, $user->id_hash, $updatedItems);
+
+        return response()->json(
+            [
+                'message' => 'Inventory records updated successfully',
+            ],
+            Response::HTTP_OK
+        );
     }
+
 
     /**
      * Remove the specified resource from storage.
