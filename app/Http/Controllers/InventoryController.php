@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LogsModel;
 use Illuminate\Support\Str;
+use App\Models\HistoryModel;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
 use Illuminate\Support\Carbon;
@@ -152,7 +153,8 @@ class InventoryController extends Controller
 
         return response()->json(
             [
-                'message' => $inventory,
+                "message" => "Successfully Retrieve Data",
+                'result' => $inventory,
             ],
             Response::HTTP_OK
         );
@@ -167,6 +169,7 @@ class InventoryController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        // Error no value detected
         if (empty($user->id_hash)) {
             return response()->json(
                 [
@@ -179,6 +182,7 @@ class InventoryController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
+            'items.*.group_id' => 'required|string',
             'items.*.name' => 'required|string|max:255',
             'items.*.category' => 'required|string|max:255',
         ]);
@@ -193,7 +197,7 @@ class InventoryController extends Controller
             );
         }
 
-        // Initialize an array to store all updated items
+        // Initialize an array to store all updated items with old and new data
         $updatedItems = [];
 
         foreach ($request['items'] as $productUserInput) {
@@ -207,6 +211,9 @@ class InventoryController extends Controller
                 );
             }
 
+            // Get the old data before updating
+            $oldData = $inventory->getOriginal();
+
             // Set new values dynamically based on input array
             foreach ($productUserInput as $key => $value) {
                 $inventory->$key = $value;
@@ -215,10 +222,15 @@ class InventoryController extends Controller
             // Check if any attributes have been changed
             if ($inventory->isDirty()) {
                 // Update the inventory record
-                $update = $inventory->update();
+                $update = $inventory->save(); // Use save() instead of update()
 
                 if ($update) {
-                    $updatedItems[] = $inventory; // Add the updated item to the array
+                    // Add the updated item with old and new data to the array
+                    $updatedItems[] = [
+                        'inventory_id' => $productUserInput,
+                        'old_data' => $oldData,
+                        'new_data' => $inventory->toArray(),
+                    ];
                 } else {
                     return response()->json(
                         [
@@ -230,8 +242,7 @@ class InventoryController extends Controller
             }
         }
 
-
-        $this->storeLogs($request, $user->id_hash, $updatedItems);
+        $this->updateLogs($request, $user->id_hash, $updatedItems);
 
         return response()->json(
             [
@@ -240,6 +251,7 @@ class InventoryController extends Controller
             Response::HTTP_OK
         );
     }
+
 
 
     /**
@@ -312,6 +324,63 @@ class InventoryController extends Controller
 
         if (!$logEntry) {
             return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updateLogs(Request $request, $idHash, $storeData)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Define the fields to include in the logs
+        $fieldsToInclude = [
+            'inventory_id', 'group_id', 'name', 'category',
+        ];
+
+        // Loop through each created item and add them to data
+        $data = [];
+        foreach ($storeData as $item) {
+            $itemData = [];
+            foreach ($fieldsToInclude as $field) {
+                // Check if $item is an array and has the specified field
+                if (is_array($item) && array_key_exists($field, $item)) {
+                    $itemData[$field] = $item[$field];
+                }
+            }
+            $data[] = $itemData;
+
+            // Create HistoryModel entry for each field in the item
+            foreach ($fieldsToInclude as $field) {
+                // Check if the field exists in the current item
+                if (array_key_exists($field, $item)) {
+                    // Create HistoryModel entry
+                    $historyCreate = HistoryModel::create([
+                        'user_id_hash' => $idHash,
+                        'tbl_name' => 'inventory_tbl',
+                        'column_name' => $field,
+                        'value' => $item[$field], // Use the field value as the column value
+                    ]);
+
+                    if (!$historyCreate) {
+                        return response()->json(['message' => 'Failed to create history for update inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+                }
+            }
+        }
+
+        $details = json_encode($data, JSON_PRETTY_PRINT);
+
+        // Create LogsModel entry
+        $logEntry = LogsModel::create([
+            'user_id_hash' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE INVENTORY PARENT',
+            'user_device' => $userAgent,
+            'details' => $details,
+        ]);
+
+        if (!$logEntry) {
+            return response()->json(['message' => 'Failed to update logs for update inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

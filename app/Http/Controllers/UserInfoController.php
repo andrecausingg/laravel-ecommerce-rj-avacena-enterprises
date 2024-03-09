@@ -130,13 +130,25 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        // Check if authenticated user
         if (empty($user->id_hash)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Check if exist user
+        $existHash = UserInfoModel::where('user_id_hash', $user->id_hash)->exists();
+        if ($existHash) {
+            return response()->json(
+                [
+                    'message' => 'User i.d hash already exist',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'image' => 'image|mimes:jpeg,png,jpg|max:10240',
+            'image' => $request->hasFile('image') ? 'image|mimes:jpeg,png,jpg|max:10240' : 'nullable',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -171,35 +183,24 @@ class UserInfoController extends Controller
             Storage::disk('public')->put($filename, file_get_contents($image));
         }
 
-        $existHash = UserInfoModel::where('user_id_hash', $user->id_hash)->doesntExist();
-        if ($existHash) {
-            // Encrypt the data
-            foreach ($validator->validated() as $key => $value) {
-                if ($key === 'image') {
-                    $validatedData[$key] = Crypt::encrypt($filename);
-                } else {
-                    $validatedData[$key] = Crypt::encrypt($value);
-                }
+        // Encrypt the data
+        foreach ($validator->validated() as $key => $value) {
+            if ($key === 'image') {
+                $validatedData[$key] = Crypt::encrypt($filename);
+            } else {
+                $validatedData[$key] = Crypt::encrypt($value);
             }
-
-            // Create UserInfoModel with encrypted data
-            $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validatedData));
-            if (!$userInfoCreate) {
-                return response()->json(['message' => 'Failed to create user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-
-            // Store Logs
-            $this->storeLogs($request, $user->id_hash, $userInfoCreate);
-
-            return response()->json(['message' => 'Failed to create user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        return response()->json(
-            [
-                'message' => 'User i.d hash already exist',
-            ],
-            Response::HTTP_INTERNAL_SERVER_ERROR
-        );
+        // Create UserInfoModel with encrypted data
+        $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validatedData));
+        if ($userInfoCreate) {
+            // Store Logs
+            $this->storeLogs($request, $user->id_hash, $userInfoCreate);
+            return response()->json(['message' => 'Successfully stored user information'], Response::HTTP_OK);
+        } else {
+            return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -223,6 +224,9 @@ class UserInfoController extends Controller
      */
     public function update(Request $request)
     {
+        // Initialize an array to store changes for logging
+        $changesForLogs = [];
+
         // Authorize the user
         $user = $this->authorizeUser($request);
 
@@ -262,9 +266,6 @@ class UserInfoController extends Controller
         if (!$userInfo) {
             return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
         }
-
-        // Initialize an array to store changes for logging
-        $changesForLogs = [];
 
         // Handle image upload and update
         if ($request->hasFile('image')) {

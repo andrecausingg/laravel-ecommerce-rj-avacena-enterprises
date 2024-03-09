@@ -43,14 +43,14 @@ Route::middleware(['jwt.auth'])->group(function () {
     // User Accounts
     Route::prefix('accounts')->group(function () use ($AuthController) {
         Route::get('/index', [$AuthController, 'index']);
-        Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
-        Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
-        Route::post('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
+        Route::patch('/update-email', [$AuthController, 'updateEmailAdmin']);
+        Route::patch('/update-password', [$AuthController, 'updatePasswordAdmin']);
+        Route::patch('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
     });
 
     // Update Password
     Route::prefix('new-password')->group(function () use ($AuthController) {
-        Route::post('/update-password', [$AuthController, 'updatePassword']);
+        Route::patch('/update-password', [$AuthController, 'updatePassword']);
     });
 
     // Personal User Information
@@ -71,6 +71,7 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::get('index', [$InventoryController, 'index']);
             Route::post('store', [$InventoryController, 'store']);
             Route::get('edit/{id}', [$InventoryController, 'edit']);
+            Route::patch('update', [$InventoryController, 'update']);
         });
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {
