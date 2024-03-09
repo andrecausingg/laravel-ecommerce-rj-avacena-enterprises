@@ -17,7 +17,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     protected $table = 'users_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
-        'id_hash',
+        'user_id',
         'phone_number',
         'email',
         'password',
@@ -42,7 +42,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
      */
     public function getJWTIdentifier()
     {
-        return $this->getAttribute('id_hash');
+        return $this->getAttribute('user_id');
     }
 
     /**
@@ -62,6 +62,6 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
      */
     public function getAuthIdentifierName()
     {
-        return 'id_hash';
+        return 'user_id';
     }
 }

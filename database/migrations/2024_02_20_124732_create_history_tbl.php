@@ -12,11 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('history_tbl', function (Blueprint $table) {
+            // Ids
             $table->id();
-            $table->text('user_id_hash');
+            $table->text('history_id')->unique()->nullable();
+
+            // 
+            $table->text('tbl_id');
             $table->string('tbl_name');
             $table->string('column_name');
             $table->longText('value');
+
+            // Date | Time
             $table->timestamps();
         });
     }

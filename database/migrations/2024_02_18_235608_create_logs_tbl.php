@@ -12,13 +12,20 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('logs_tbl', function (Blueprint $table) {
+            // Ids
             $table->id();
-            $table->text('user_id_hash')->nullable();
+            $table->text('log_id')->unique()->nullable();
+            $table->text('user_id')->nullable();
+            
+            // 
             $table->text('ip_address');
             $table->text('user_action');
             $table->longText('details');
             $table->text('user_device');
+
+            // Date | Time
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

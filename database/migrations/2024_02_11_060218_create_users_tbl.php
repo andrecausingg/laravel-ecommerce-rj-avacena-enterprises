@@ -12,10 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users_tbl', function (Blueprint $table) {
+            // Ids
             $table->id();
+            $table->text('user_id')->unique();
 
             // Authentication
-            $table->text('id_hash')->unique();
             $table->longText('phone_number')->unique()->nullable();
             $table->longText('email')->unique()->nullable();
             $table->longText('password');
@@ -45,7 +46,7 @@ return new class extends Migration
 
             // Date | Time
             $table->timestamps();
-            $table->softDeletes(); 
+            $table->softDeletes();
         });
     }
 

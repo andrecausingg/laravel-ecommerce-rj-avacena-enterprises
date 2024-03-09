@@ -13,7 +13,8 @@ class LogsModel extends Model
     protected $table = 'logs_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
-        'user_id_hash',
+        'log_id',
+        'user_id',
         'ip_address',
         'user_action',
         'details',

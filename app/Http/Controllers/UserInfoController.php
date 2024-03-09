@@ -224,19 +224,21 @@ class UserInfoController extends Controller
      */
     public function update(Request $request)
     {
-        // Initialize an array to store changes for logging
+        // Initialize
         $changesForLogs = [];
+        $fields = config('user-info.user-info');
 
         // Authorize the user
         $user = $this->authorizeUser($request);
 
+        // Check if authenticated user
         if (empty($user->id_hash)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'image' => 'image|mimes:jpeg,png,jpg|max:10240',
+            'image' => $request->file('image') ? 'image|mimes:jpeg,png,jpg|max:10240' : 'nullable',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -279,7 +281,7 @@ class UserInfoController extends Controller
             $newImageEncrypted = Crypt::encrypt($filename);
 
             // Log the changes for the image if it's different
-            if (Crypt::decrypt($userInfo->image) != $filename) {
+            if (Crypt::decrypt($userInfo->image) !== $filename) {
                 $changesForLogs['image'] = [
                     'old' => Crypt::decrypt($userInfo->image),
                     'new' => $filename,
@@ -293,15 +295,6 @@ class UserInfoController extends Controller
             $userInfo->image = $newImageEncrypted;
         }
 
-        // Define the fields to loop through
-        $fields = [
-            'first_name', 'middle_name', 'last_name', 'contact_number',
-            'email', 'address_1', 'address_2', 'region_code',
-            'province_code', 'city_or_municipality_code', 'region_name',
-            'province_name', 'city_or_municipality_name', 'barangay',
-            'description_location',
-        ];
-
         // Loop through the fields for encryption and decryption
         foreach ($fields as $field) {
             try {
@@ -309,7 +302,7 @@ class UserInfoController extends Controller
                 $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
 
                 // Check if the value has changed
-                if ($newValue !== $existingValue) {
+                if ($existingValue != $request->input($field)) {
                     $changesForLogs[$field] = [
                         'old' => $existingValue,
                         'new' => $request->input($field),
@@ -323,11 +316,6 @@ class UserInfoController extends Controller
                 Log::info("Decryption error for field $field: " . $e->getMessage());
             }
         }
-
-        // Remove fields where old and new values are the same
-        $changesForLogs = array_filter($changesForLogs, function ($change) {
-            return $change['old'] !== $change['new'];
-        });
 
         // Save the changes
         if ($userInfo->save()) {
@@ -345,6 +333,7 @@ class UserInfoController extends Controller
         // If the code reaches here, there was an issue saving the changes
         return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
+
 
     /**
      * Remove the specified resource from storage.

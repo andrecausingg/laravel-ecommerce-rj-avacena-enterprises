@@ -12,8 +12,8 @@ class HistoryModel extends Model
     protected $table = 'history_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
-        'user_id_hash',
-        'password',
+        'history_id',
+        'tbl_id',
         'tbl_name',
         'column_name',
         'value',

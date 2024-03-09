@@ -12,8 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users_info_tbl', function (Blueprint $table) {
+            // Ids
             $table->id();
-            $table->text('user_id_hash');
+            $table->text('user_info_id')->unique()->nullable();
+            $table->text('user_id');
             
             // Profile Picture
             $table->longText('image')->nullable();
@@ -25,7 +27,7 @@ return new class extends Migration
 
             // $table->string('suffix')->nullable();
             // $table->string('gender')->nullable();
-            // $table->string('birth_date')->nullable();    
+            // $table->timestamp('birth_date')->nullable();    
 
             // Contacts
             $table->string('contact_number')->nullable();

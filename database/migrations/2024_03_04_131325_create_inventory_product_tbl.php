@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('inventory_product_tbl', function (Blueprint $table) {
-            // I.D
+            // Ids
             $table->id();
+            $table->text('inventory_product_id')->unique()->nullable();
             $table->text('inventory_group_id');
-            $table->text('product_id')->nullable();
             $table->string('item_code');
 
             // Default 
