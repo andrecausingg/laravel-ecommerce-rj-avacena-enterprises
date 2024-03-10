@@ -247,12 +247,16 @@ class AuthController extends Controller
 
                     // Array Logs
                     $logsData = [
-                        'email' => Crypt::encrypt($email),
-                        'password' => Crypt::encrypt($password),
+                        'user_id' => $user->user_id,
+                        'fields' => [
+                            'email' => Crypt::encrypt($email),
+                            'password' => Crypt::encrypt($password),
+                        ]
                     ];
 
                     // Logs
-                    $logResult = $this->passwordOnRegisterEmailLogs($request, $user->user_id, $logsData, $indicator);
+                    $logResult = $this->emailRegisterLogs($request, $idHash, $indicator, $logsData);
+                   
 
                     // Get the Name of Gmail
                     $emailParts = explode('@', $email);
@@ -331,12 +335,15 @@ class AuthController extends Controller
 
         // Array Logs
         $logsData = [
-            'email' => Crypt::encrypt($email),
-            'password' => Crypt::encrypt($password),
+            'user_id' => $user->user_id,
+            'fields' => [
+                'email' => Crypt::encrypt($email),
+                'password' => Crypt::encrypt($password),
+            ]
         ];
 
         // Logs
-        $logResult = $this->passwordOnRegisterEmailLogs($request, $idHash, $logsData, $indicator);
+        $logResult = $this->emailRegisterLogs($request, $idHash, $indicator, $logsData);
 
         // Get the Name of Gmail
         $emailParts = explode('@', $email);
@@ -362,13 +369,11 @@ class AuthController extends Controller
         $verificationNumber = mt_rand(100000, 999999);
         $logDetails = [];
 
-        // Token Validation
-        $user = $this->authorizeUserVerifyEmail($request);
-        if ($user->user_id == '' || $user->user_id == null) {
-            return response()->json([
-                'role_db' => $user->role,
-                'config' => $roleConfig['client'],
-            ], Response::HTTP_UNAUTHORIZED);
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Validate
@@ -394,10 +399,12 @@ class AuthController extends Controller
 
         $logDetails = [
             'user_id' => $user->user_id,
-            'status' => $user->status,
-            'verify_email_token' => $user->verify_email_token,
-            'email_verified_at' => $user->email_verified_at,
-            'verification_number' => $user->verification_number,
+            'fields' => [
+                'status' => $user->status,
+                'verify_email_token' => $user->verify_email_token,
+                'email_verified_at' => $user->email_verified_at,
+                'verification_number' => $user->verification_number,
+            ]
         ];
 
         $logResult = $this->verifyEmailLogs($request, $user->user_id, $logDetails);
@@ -409,8 +416,13 @@ class AuthController extends Controller
     {
         $verificationNumber = mt_rand(100000, 999999);
 
-        // Token Validation
-        $user = $this->authorizeUserResendCode($request);
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
 
         if ($user->update([
             'verification_number' => $verificationNumber,
@@ -430,6 +442,8 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request)
     {
+        $logDetails = [];
+
         // Validate
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -466,19 +480,40 @@ class AuthController extends Controller
                 if (!$mail) {
                     return response()->json(['message' => 'Failed to send reset password link on your email'], Response::HTTP_OK);
                 }
-                return response()->json(['message' => 'Successfully sent reset password link on your email' . $decryptedEmail], Response::HTTP_OK);
+
+                $logDetails = [
+                    'user_id' => $user->user_id,
+                    'fields' => [
+                        'email' => $user->email,
+                    ]
+                ];
+
+                $logResult = $this->forgotPasswordLogs($request, $user->user_id, $logDetails);
+
+                return response()->json([
+                    'message' => 'Successfully sent a reset password link to your email ' . $decryptedEmail,
+                    'log_message' => $logResult
+                ], Response::HTTP_OK);
             }
             // If same email exist and email_verified_at equal null send error message
             else if ($decryptedEmail === $request->email && $user->email_verified_at === null) {
                 return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
             }
         }
+
+        return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
     }
 
     public function updatePassword(Request $request)
     {
-        // Token Validation
-        $user = $this->authorizeUserUpdatePassword($request);
+        $logDetails = [];
+
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validate Password
         $validator = Validator::make($request->all(), [
@@ -500,30 +535,31 @@ class AuthController extends Controller
 
         if (Hash::check($request->input('password'), $userAuth->password)) {
             return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $logsData = [
+            'user_id' => $user->user_id,
+            'fe'
+            'password' => Crypt::encrypt($request->input('password')),
+        ];
+
+        // 2hrs expiration to verified Email
+        $expirationTime = Carbon::now()->addSecond();
+        $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+
+        // Update the user's password
+        $userAuth->password =  Hash::make($request->input('password'));
+        $userAuth->reset_password_token =  $newToken;
+        $userAuth->reset_password_token_expire_at =  $expirationTime;
+
+        // Saving
+        if ($userAuth->save()) {
+            // Logs
+            $this->updatePasswordLogs($request, $user->user_id, $logsData);
+
+            return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
         } else {
-            // Store password
-            $logsData = [
-                'password' => Crypt::encrypt($request->input('password')),
-            ];
-
-            // 2hrs expiration to verified Email
-            $expirationTime = Carbon::now()->addSecond();
-            $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
-
-            // Update the user's password
-            $userAuth->password =  Hash::make($request->input('password'));
-            $userAuth->reset_password_token =  $newToken;
-            $userAuth->reset_password_token_expire_at =  $expirationTime;
-
-            // Saving
-            if ($userAuth->save()) {
-                // Logs
-                $this->updatePasswordLogs($request, $user->user_id, $logsData);
-
-                return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
-            } else {
-                return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
+            return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -913,87 +949,8 @@ class AuthController extends Controller
         }
     }
 
-    public function authorizeUserUpdatePassword($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-
-            if (!$bearerToken || $user->reset_password_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
-                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public function authorizeUserResendCode($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-
-            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
-                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public function authorizeUserVerifyEmail($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
-                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
     // Logs
-    public function passwordOnRegisterEmailLogs($request, $idHash, $data, $indicator)
+    public function emailRegisterLogs($request, $idHash,  $indicator, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
@@ -1066,6 +1023,32 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
     }
+
+    public function forgotPasswordLogs($request, $idHash, $logDetails)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create LogsModel entry
+        $log = LogsModel::create([
+            'user_id' => $idHash,
+            'ip_address' => $request->ip(),
+            'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
+            'user_device' => $userAgent,
+            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
+        ]);
+
+        if ($log) {
+            $log->update([
+                'log_id' => 'log-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs for successfully sent reset link for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response()->json(['message' => 'Successfully stored logs and history for successfully sent reset link for password update'], Response::HTTP_OK);
+    }
+
 
     public function updatePasswordLogs($request, $idHash, $data)
     {
