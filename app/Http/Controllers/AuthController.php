@@ -552,10 +552,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $history = HistoryModel::where('tbl_id', $userAuth->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
         $logDetails = [
             'user_id' => $user->user_id,
             'fields' => [
-                'password' => Crypt::encrypt($request->input('password')),
+                'old_password' => $history->value,
+                'new_password' => Crypt::encrypt($request->input('password')),
             ]
         ];
 
@@ -618,6 +620,8 @@ class AuthController extends Controller
         } else if ($userAuth->verification_number != $request->input('verification_number')) {
             return response()->json(['message' => 'Incorrect Verification Number'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else {
+
+            $indicator = 'userSettingUpdatePassword';
             // Store old and new passwords
             $logsData = [
                 'old_password' => Crypt::encrypt($request->input('current_password')),
@@ -643,6 +647,7 @@ class AuthController extends Controller
     // UPDATE EMAIL | CLIENT SIDE
     public function updateEmailOnSettingUser(Request $request)
     {
+        $logDetails = [];
         $verificationNumber = mt_rand(100000, 999999);
 
         // Authorize the user
@@ -675,22 +680,28 @@ class AuthController extends Controller
         } else if (Crypt::decrypt($userAuth->email) != $request->new_email && Hash::check($request->input('current_password'), $userAuth->password) && $userAuth->verification_number != $request->verification_number) {
             return response()->json(['message' => 'Incorrect verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else {
-            // Store old and new emails
-            $logsData = [
-                'old_email' => Crypt::encrypt($userAuth->email),
-                'new_email' => Crypt::encrypt($request->new_email),
+
+            $logDetails = [
+                'user_id' => $user->user_id,
+                'fields' => [
+                    'old_email' => $userAuth->email,
+                    'new_email' => Crypt::encrypt($request->new_email),
+                ]
             ];
 
             // Update the user's email
-            $userAuth->email = $logsData['new_email'];
+            $userAuth->email = $logDetails['fields']['new_email'];
             $userAuth->verification_number = $verificationNumber;
 
             // Saving
             if ($userAuth->save()) {
                 // Logs
-                $this->updateEmailOnSettingUserLogs($request, $user->user_id, $logsData);
+                $logResult = $this->updateEmailOnSettingUserLogs($request, $user->user_id, $logDetails);
 
-                return response()->json(['message' => 'Email updated successfully'], Response::HTTP_OK);
+                return response()->json([
+                    'message' => 'Email updated successfully',
+                    'log_message' => $logResult,
+                ], Response::HTTP_OK);
             } else {
                 return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
@@ -719,8 +730,20 @@ class AuthController extends Controller
             if (!$email) {
                 return response()->json(['message' => 'Failed to send verification number on your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
+
+            $indicator = 'userSettingUpdateEmail';
+            $logDetails = [
+                'user_id' => $user->user_id,
+                'fields' => [
+                    'verification_number' => $user->verification_number
+                ]
+            ];
+
+            $logResult = $this->resendVerificationCodeLogs($request, $user->user_id, $indicator, $logDetails);
+
             return response()->json([
-                'message' => 'New verification code sent to your email'
+                'message' => 'A new verification code has been sent to your email',
+                'log_message' => $logResult
             ], Response::HTTP_OK);
         }
     }
@@ -1137,7 +1160,7 @@ class AuthController extends Controller
         $log = LogsModel::create([
             'user_id' => $userId,
             'ip_address' => $request->ip(),
-            'user_action' => 'RESEND NEW VERIFICATION CODE',
+            'user_action' =>  'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL',
             'user_device' => $userAgent,
             'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
         ]);
@@ -1147,7 +1170,7 @@ class AuthController extends Controller
                 'log_id' => 'log-'  . $log->id,
             ]);
         } else {
-            return response()->json(['message' => 'Failed to store logs for successful email verification'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to store logs for successful'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
@@ -1187,7 +1210,7 @@ class AuthController extends Controller
             'tbl_id' => $userId,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
-            'value' => $logDetails['fields']['password'],
+            'value' => $logDetails['fields']['new_password'],
         ]);
 
         if ($history) {
@@ -1216,6 +1239,47 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'Successfully stored logs and history for password update'], Response::HTTP_OK);
+    }
+
+    public function updateEmailOnSettingUserLogs($request, $userId, $logDetails)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create HistoryModel entry for old password
+        $history = HistoryModel::create([
+            'tbl_id' => $userId,
+            'tbl_name' => 'users_tbl',
+            'column_name' => 'email',
+            'value' => $logDetails['fields']['old_email'],
+        ]);
+
+        if ($history) {
+            $history->update([
+                'history_id' => 'history-'  . $history->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to create history for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        // Create LogsModel entry
+        $log = LogsModel::create([
+            'user_id' => $userId,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE EMAIL ON SETTINGS OF USER',
+            'user_device' => $userAgent,
+            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
+        ]);
+
+        if ($log) {
+            $log->update([
+                'log_id' => 'log-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response()->json(['message' => 'Successfully stored logs and history for update email'], Response::HTTP_OK);
     }
 
     public function updatePasswordOnSettingUserLogs($request, $userId, $data)
@@ -1257,70 +1321,29 @@ class AuthController extends Controller
         }
     }
 
-    public function updateEmailOnSettingUserLogs($request, $userId, $data)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create a log entry for changed fields
-        $logDetails = [
-            'user_id' => $userId,
-            'changed_fields' => $data, // Use the provided data array
-        ];
-
-        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
-
-        // Create HistoryModel entry for old password
-        $history = HistoryModel::create([
-            'user_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'email',
-            'value' => $data['old_email'],
-        ]);
-
-        if (!$history) {
-            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Create LogsModel entry
-        $logEntry = LogsModel::create([
-            'user_id' => $userId,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE USER EMAIL IN SETTINGS',
-            'user_device' => $userAgent,
-            'details' => $details,
-        ]);
-
-        if (!$logEntry) {
-            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
     public function loginLogs($request, $userId)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Create a log entry for changed fields
-        $logDetails = [
-            'user_id' => $userId,
-            'ip_address' => $request->ip(),
-        ];
-
-        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
-
         // Create LogsModel entry
-        $logEntry = LogsModel::create([
+        $log = LogsModel::create([
             'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'LOGIN',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => 'User login on this ip address' . $request->ip(),
         ]);
 
-        if (!$logEntry) {
-            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if ($log) {
+            $log->update([
+                'log_id' => 'log-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully stored logs and history for update email'], Response::HTTP_OK);
     }
 
     public function updateEmailAdminLogs($request, $userIdClient, $userConfigIdHash, $data)
