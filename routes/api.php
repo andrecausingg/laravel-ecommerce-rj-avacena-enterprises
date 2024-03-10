@@ -40,29 +40,29 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/resend-code', [$AuthController, 'resendVerificationCode']);
     });
 
-    // User Accounts
-    Route::prefix('accounts')->group(function () use ($AuthController) {
-        Route::get('/index', [$AuthController, 'index']);
-        Route::patch('/update-email', [$AuthController, 'updateEmailAdmin']);
-        Route::patch('/update-password', [$AuthController, 'updatePasswordAdmin']);
-        Route::patch('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
-    });
-
     // Update Password
     Route::prefix('new-password')->group(function () use ($AuthController) {
         Route::post('/update-password', [$AuthController, 'updatePassword']);
+    });
+
+    // User Accounts
+    Route::prefix('accounts')->group(function () use ($AuthController) {
+        Route::get('/index', [$AuthController, 'index']);
+        Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
+        Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
+        Route::post('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
     });
 
     // Personal User Information
     Route::prefix('user-info')->group(function () use ($UserInfoController, $AuthController) {
         Route::get('/index', [$UserInfoController, 'index']);
         Route::post('/store', [$UserInfoController, 'store']);
-        Route::patch('/update', [$UserInfoController, 'update']);
+        Route::post('/update', [$UserInfoController, 'update']);
         Route::get('/get-personal-info', [$UserInfoController, 'getPersonalInfo']);
 
-        Route::patch('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
-        Route::patch('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
-        Route::patch('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+        Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
+        Route::post('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
+        Route::post('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
     });
 
     // Inventory
@@ -71,7 +71,7 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::get('index', [$InventoryController, 'index']);
             Route::post('store', [$InventoryController, 'store']);
             Route::get('edit/{id}', [$InventoryController, 'edit']);
-            Route::patch('update', [$InventoryController, 'update']);
+            Route::post('update', [$InventoryController, 'update']);
         });
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {

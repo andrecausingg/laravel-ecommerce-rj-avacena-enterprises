@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class HistoryModel extends Model
 {
     use HasFactory;
+    use SoftDeletes;
+
     protected $table = 'history_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
@@ -20,5 +22,7 @@ class HistoryModel extends Model
         'created_at',
         'updated_at',
     ];
-    use SoftDeletes;
+
+    protected $dates = ['deleted_at'];
+
 }

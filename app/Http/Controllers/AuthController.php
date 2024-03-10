@@ -49,7 +49,7 @@ class AuthController extends Controller
             Response::HTTP_OK
         );
     }
-    
+
     public function login(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -742,10 +742,12 @@ class AuthController extends Controller
         foreach ($authUsers as $authUser) {
             $decryptedEmail = $authUser->email ? Crypt::decrypt($authUser->email) : null;
             $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first(); // Assuming it returns one record
+            $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
 
             $decryptedAuthUser[] = [
                 'id' => $authUser->id ?? null,
                 'user_id' => $authUser->user_id ?? null,
+                'password' => Crypt::decrypt($history->value) ?? null,
                 'phone_number' => $authUser->phone_number ?? null,
                 'email' => $decryptedEmail,
                 'role' => $authUser->role ?? null,
