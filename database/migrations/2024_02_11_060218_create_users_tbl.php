@@ -28,10 +28,10 @@ return new class extends Migration
             $table->longText('verification_key')->nullable();
 
             // Token
-            $table->text('session_token')->nullable();
-            $table->text('verify_email_token')->nullable();
-            $table->text('verify_phone_token')->nullable();
-            $table->text('reset_password_token')->nullable();
+            $table->longText('session_token')->nullable();
+            $table->longText('verify_email_token')->nullable();
+            $table->longText('verify_phone_token')->nullable();
+            $table->longText('reset_password_token')->nullable();
 
             // Expire Time
             $table->timestamp('session_expire_at')->nullable();

@@ -50,19 +50,19 @@ Route::middleware(['jwt.auth'])->group(function () {
 
     // Update Password
     Route::prefix('new-password')->group(function () use ($AuthController) {
-        Route::patch('/update-password', [$AuthController, 'updatePassword']);
+        Route::post('/update-password', [$AuthController, 'updatePassword']);
     });
 
     // Personal User Information
     Route::prefix('user-info')->group(function () use ($UserInfoController, $AuthController) {
         Route::get('/index', [$UserInfoController, 'index']);
         Route::post('/store', [$UserInfoController, 'store']);
-        Route::post('/update', [$UserInfoController, 'update']);
+        Route::patch('/update', [$UserInfoController, 'update']);
         Route::get('/get-personal-info', [$UserInfoController, 'getPersonalInfo']);
 
-        Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
-        Route::post('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
-        Route::post('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+        Route::patch('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
+        Route::patch('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
+        Route::patch('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
     });
 
     // Inventory

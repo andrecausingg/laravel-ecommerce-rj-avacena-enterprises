@@ -24,6 +24,7 @@ return new class extends Migration
 
             // Date | Time
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

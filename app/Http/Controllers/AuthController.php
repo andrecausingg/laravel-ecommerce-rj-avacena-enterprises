@@ -31,8 +31,8 @@ class AuthController extends Controller
 
         foreach ($historys as $history) {
             $decryptedHistory = [
-                'id' => $history && $history->id ? $history->id : null,
-                'user_id' => $history && $history->user_id ? $history->user_id : null,
+                'history_id' => $history && $history->history_id ? $history->history_id : null,
+                'tbl_id' => $history && $history->tbl_id ? $history->tbl_id : null,
                 'table_name' => $history && $history->tbl_name ? $history->tbl_name : null,
                 'column_name' => $history && $history->column_name ? $history->column_name : null,
                 'value' => $history && $history->value ? Crypt::decrypt($history->value) : null,
@@ -49,12 +49,7 @@ class AuthController extends Controller
             Response::HTTP_OK
         );
     }
-    // return response()->json([
-    //     'id' => $user->id,
-    //     'email_db' => $decryptedEmail,
-    //     'email_input' => $request->input('email'),
-    //     'user' => $user,
-    // ], Response::HTTP_OK);
+    
     public function login(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -179,8 +174,8 @@ class AuthController extends Controller
         $accountRole = env('ROLE_CLIENT');
         $status = 'PENDING';
         do {
-            $idHash = Str::uuid()->toString();
-        } while (AuthModel::where('user_id', $idHash)->exists());
+            $userId = Str::uuid()->toString();
+        } while (AuthModel::where('user_id', $userId)->exists());
 
         // Check if phone number is not empty
         if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
@@ -205,14 +200,14 @@ class AuthController extends Controller
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->emailRegister($request, $idHash, $verificationNumber, $accountRole, $status, $request->input('email'), $request->input('password'));
+            return $this->emailRegister($request, $userId, $verificationNumber, $accountRole, $status, $request->input('email'), $request->input('password'));
         } else {
             return response()->json(['message' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
         }
     }
 
     // CHILD REGISTER EMAIL
-    public function emailRegister($request, $idHash, $verificationNumber, $accountRole, $status, $email, $password)
+    public function emailRegister($request, $userId, $verificationNumber, $accountRole, $status, $email, $password)
     {
         // Get All Users and Decrypt
         $users = AuthModel::all();
@@ -255,8 +250,8 @@ class AuthController extends Controller
                     ];
 
                     // Logs
-                    $logResult = $this->emailRegisterLogs($request, $idHash, $indicator, $logsData);
-                   
+                    $logResult = $this->emailRegisterLogs($request, $userId, $indicator, $logsData);
+
 
                     // Get the Name of Gmail
                     $emailParts = explode('@', $email);
@@ -301,7 +296,7 @@ class AuthController extends Controller
 
         // User with the given email does not exist, create a new user
         $userCreate = AuthModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'email' => Crypt::encrypt($email),
             'password' => Hash::make($password),
             'role' => $accountRole,
@@ -335,7 +330,7 @@ class AuthController extends Controller
 
         // Array Logs
         $logsData = [
-            'user_id' => $user->user_id,
+            'user_id' => $userCreate->user_id,
             'fields' => [
                 'email' => Crypt::encrypt($email),
                 'password' => Crypt::encrypt($password),
@@ -343,7 +338,7 @@ class AuthController extends Controller
         ];
 
         // Logs
-        $logResult = $this->emailRegisterLogs($request, $idHash, $indicator, $logsData);
+        $logResult = $this->emailRegisterLogs($request, $userId, $indicator, $logsData);
 
         // Get the Name of Gmail
         $emailParts = explode('@', $email);
@@ -365,12 +360,11 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
-        $roleConfig = config('account-role.role');
         $verificationNumber = mt_rand(100000, 999999);
         $logDetails = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
+        $user = $this->authorizeUserVerifyEmail($request);
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
@@ -389,10 +383,14 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Expiration to verified Email
+        $expirationTime = Carbon::now()->addSecond();
+        $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+
         // Update user status and set email_verified_at to the current timestamp
         $user->update([
             'status' => 'ACTIVE',
-            'verify_email_token' => Str::uuid(),
+            'verify_email_token' => $newToken,
             'email_verified_at' => now(),
             'verification_number' => $verificationNumber,
         ]);
@@ -403,26 +401,32 @@ class AuthController extends Controller
                 'status' => $user->status,
                 'verify_email_token' => $user->verify_email_token,
                 'email_verified_at' => $user->email_verified_at,
-                'verification_number' => $user->verification_number,
+                'verification_number' => $request->verification_number,
             ]
         ];
 
         $logResult = $this->verifyEmailLogs($request, $user->user_id, $logDetails);
 
-        return response()->json(['message' => 'Email verified successfully', 'log_message' => $logResult], Response::HTTP_OK);
+        return response()->json(
+            [
+                'message' => 'Email verified successfully',
+                'log_message' => $logResult
+            ],
+            Response::HTTP_OK
+        );
     }
 
     public function resendVerificationCode(Request $request)
     {
+        $logDetails = [];
         $verificationNumber = mt_rand(100000, 999999);
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
+        $user = $this->authorizeUserResendCode($request);
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
 
         if ($user->update([
             'verification_number' => $verificationNumber,
@@ -434,8 +438,19 @@ class AuthController extends Controller
             if (!$email) {
                 return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
+
+            $logDetails = [
+                'user_id' => $user->user_id,
+                'fields' => [
+                    'verification_number' => $user->verification_number
+                ]
+            ];
+
+            $logResult = $this->resendVerificationCodeLogs($request, $user->user_id, $logDetails);
+
             return response()->json([
                 'message' => 'A new verification code has been sent to your email',
+                'log_message' => $logResult
             ], Response::HTTP_OK);
         }
     }
@@ -484,7 +499,7 @@ class AuthController extends Controller
                 $logDetails = [
                     'user_id' => $user->user_id,
                     'fields' => [
-                        'email' => $user->email,
+                        'email' => Crypt::encrypt($request->email),
                     ]
                 ];
 
@@ -509,7 +524,7 @@ class AuthController extends Controller
         $logDetails = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
+        $user = $this->authorizeUserUpdatePassword($request);
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
@@ -537,13 +552,14 @@ class AuthController extends Controller
             return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $logsData = [
+        $logDetails = [
             'user_id' => $user->user_id,
-            'fe'
-            'password' => Crypt::encrypt($request->input('password')),
+            'fields' => [
+                'password' => Crypt::encrypt($request->input('password')),
+            ]
         ];
 
-        // 2hrs expiration to verified Email
+        // Expiration to verified Email
         $expirationTime = Carbon::now()->addSecond();
         $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
 
@@ -555,7 +571,7 @@ class AuthController extends Controller
         // Saving
         if ($userAuth->save()) {
             // Logs
-            $this->updatePasswordLogs($request, $user->user_id, $logsData);
+            $this->updatePasswordLogs($request, $user->user_id, $logDetails);
 
             return response()->json(['message' => 'Password updated successfully'], Response::HTTP_OK);
         } else {
@@ -570,6 +586,10 @@ class AuthController extends Controller
 
         // Authorize the user
         $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -627,6 +647,10 @@ class AuthController extends Controller
 
         // Authorize the user
         $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -678,8 +702,12 @@ class AuthController extends Controller
     {
         $verificationNumber = mt_rand(100000, 999999);
 
-        // Token Validation
-        $user = $this->authorizeUserResendCode($request);
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         if ($user->update([
             'verification_number' => $verificationNumber,
@@ -702,11 +730,10 @@ class AuthController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
-
-        if ($user->user_id == '' || $user->user_id == null) {
+        // Check if authenticated user
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
         // Decrypt all emails and other attributes
         $decryptedAuthUser = [];
 
@@ -742,6 +769,10 @@ class AuthController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
         if ($user->user_id == '' || $user->user_id == null) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
@@ -807,8 +838,8 @@ class AuthController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
-
-        if ($user->user_id == '' || $user->user_id == null) {
+        // Check if authenticated user
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -858,8 +889,8 @@ class AuthController extends Controller
     {
         // Authorize the user
         $user = $this->authorizeUser($request);
-
-        if ($user->user_id == '' || $user->user_id == null) {
+        // Check if authenticated user
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -922,8 +953,7 @@ class AuthController extends Controller
         }
     }
 
-    // GLOBAL FUNCTIONS
-    // Code to check if authenticate users
+    // Authenticate Token
     public function authorizeUser($request)
     {
         try {
@@ -949,26 +979,98 @@ class AuthController extends Controller
         }
     }
 
+    public function authorizeUserVerifyEmail($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
+                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function authorizeUserResendCode($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+
+            if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
+                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function authorizeUserUpdatePassword($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+
+            if (!$bearerToken || $user->reset_password_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
+                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+
     // Logs
-    public function emailRegisterLogs($request, $idHash,  $indicator, $data)
+    public function emailRegisterLogs($request, $userId, $indicator, $logDetails)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Create a log entry for changed fields
-        $logDetails = [
-            'user_id' => $idHash,
-            'fields' => $data, // Use the provided data array
-        ];
-
-        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
-
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'tbl_id' => $idHash,
+            'tbl_id' => $userId,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
-            'value' => $data['password'],
+            'value' => $logDetails['fields']['password'],
         ]);
 
         if ($history) {
@@ -981,11 +1083,11 @@ class AuthController extends Controller
 
         // Create LogsModel entry
         $log = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => $indicator == 'freshAccCreate' ? 'REGISTER AN ACCOUNT USING EMAIL' : 'EXISTING ACCOUNT REDIRECTED TO VERIFICATION PAGE',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
         ]);
 
         if ($log) {
@@ -999,14 +1101,14 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for email registration'], Response::HTTP_OK);
     }
 
-    public function verifyEmailLogs($request, $idHash, $logDetails)
+    public function verifyEmailLogs($request, $userId, $logDetails)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create LogsModel entry
         $log = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'SUCCESS VERIFY EMAIL',
             'user_device' => $userAgent,
@@ -1024,14 +1126,39 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
     }
 
-    public function forgotPasswordLogs($request, $idHash, $logDetails)
+    public function resendVerificationCodeLogs($request, $userId, $logDetails)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create LogsModel entry
         $log = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
+            'ip_address' => $request->ip(),
+            'user_action' => 'RESEND NEW VERIFICATION CODE',
+            'user_device' => $userAgent,
+            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
+        ]);
+
+        if ($log) {
+            $log->update([
+                'log_id' => 'log-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs for successful email verification'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
+    }
+
+    public function forgotPasswordLogs($request, $userId, $logDetails)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
+
+        // Create LogsModel entry
+        $log = LogsModel::create([
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
             'user_device' => $userAgent,
@@ -1049,54 +1176,54 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for successfully sent reset link for password update'], Response::HTTP_OK);
     }
 
-
-    public function updatePasswordLogs($request, $idHash, $data)
+    public function updatePasswordLogs($request, $userId, $logDetails)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Create a log entry for changed fields
-        $logDetails = [
-            'user_id' => $idHash,
-            'changed_fields' => $data, // Use the provided data array
-        ];
-
-        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
-
-        // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id' => $idHash,
+            'tbl_id' => $userId,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
-            'value' => $data['password'],
+            'value' => $logDetails['fields']['password'],
         ]);
 
-        if (!$history) {
-            return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if ($history) {
+            $history->update([
+                'history_id' => 'history-'  . $history->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to create history for password storage during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Create LogsModel entry
-        $logEntry = LogsModel::create([
-            'user_id' => $idHash,
+        $log = LogsModel::create([
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'UPDATE PASSWORD ON FORGOT PASSWORD',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
         ]);
 
-        if (!$logEntry) {
-            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if ($log) {
+            $log->update([
+                'log_id' => 'log-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully stored logs and history for password update'], Response::HTTP_OK);
     }
 
-    public function updatePasswordOnSettingUserLogs($request, $idHash, $data)
+    public function updatePasswordOnSettingUserLogs($request, $userId, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'changed_fields' => $data, // Use the provided data array
         ];
 
@@ -1104,7 +1231,7 @@ class AuthController extends Controller
 
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
             'value' => $data['new_password'],
@@ -1116,7 +1243,7 @@ class AuthController extends Controller
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'UPDATE USER PASSWORD IN SETTINGS',
             'user_device' => $userAgent,
@@ -1128,14 +1255,14 @@ class AuthController extends Controller
         }
     }
 
-    public function updateEmailOnSettingUserLogs($request, $idHash, $data)
+    public function updateEmailOnSettingUserLogs($request, $userId, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'changed_fields' => $data, // Use the provided data array
         ];
 
@@ -1143,7 +1270,7 @@ class AuthController extends Controller
 
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'tbl_name' => 'users_tbl',
             'column_name' => 'email',
             'value' => $data['old_email'],
@@ -1155,7 +1282,7 @@ class AuthController extends Controller
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'UPDATE USER EMAIL IN SETTINGS',
             'user_device' => $userAgent,
@@ -1167,14 +1294,14 @@ class AuthController extends Controller
         }
     }
 
-    public function loginLogs($request, $idHash)
+    public function loginLogs($request, $userId)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
         ];
 
@@ -1182,7 +1309,7 @@ class AuthController extends Controller
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'LOGIN',
             'user_device' => $userAgent,
@@ -1194,14 +1321,14 @@ class AuthController extends Controller
         }
     }
 
-    public function updateEmailAdminLogs($request, $idHashClient, $userConfigIdHash, $data)
+    public function updateEmailAdminLogs($request, $userIdClient, $userConfigIdHash, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHashClient,
+            'user_id' => $userIdClient,
             'changed_fields' => $data, // Use the provided data array
         ];
 
@@ -1209,7 +1336,7 @@ class AuthController extends Controller
 
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id' => $idHashClient,
+            'user_id' => $userIdClient,
             'tbl_name' => 'users_tbl',
             'column_name' => 'email',
             'value' => $data['old_email'],
@@ -1233,14 +1360,14 @@ class AuthController extends Controller
         }
     }
 
-    public function updatePasswordAdminLogs($request, $idHashClient, $userConfigIdHash, $data)
+    public function updatePasswordAdminLogs($request, $userIdClient, $userConfigIdHash, $data)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHashClient,
+            'user_id' => $userIdClient,
             'changed_fields' => $data, // Use the provided data array
         ];
 
@@ -1248,7 +1375,7 @@ class AuthController extends Controller
 
         // Create HistoryModel entry for old password
         $history = HistoryModel::create([
-            'user_id' => $idHashClient,
+            'user_id' => $userIdClient,
             'tbl_name' => 'users_tbl',
             'column_name' => 'password',
             'value' => $data['old_password'],
@@ -1272,14 +1399,14 @@ class AuthController extends Controller
         }
     }
 
-    public function updateRoleAndStatusLogs($request, $idHash, $userConfigIdHash, $changesForLogs)
+    public function updateRoleAndStatusLogs($request, $userId, $userConfigIdHash, $changesForLogs)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         // Create a log entry for changed fields
         $logDetails = [
-            'user_id' => $idHash,
+            'user_id' => $userId,
             'changed_fields' => [],
         ];
 
@@ -1292,7 +1419,7 @@ class AuthController extends Controller
 
             // Create HistoryModel entry
             $history = HistoryModel::create([
-                'tbl_id' => $idHash,
+                'tbl_id' => $userId,
                 'tbl_name' => 'users_tbl',
                 'column_name' => $field, // Use the field name as the column name
                 'value' => $change['old'],
