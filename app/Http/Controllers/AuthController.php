@@ -416,7 +416,7 @@ class AuthController extends Controller
         );
     }
 
-    public function resendVerificationCode(Request $request)
+    public function resendVerificationCodeAll(Request $request)
     {
         $logDetails = [];
         $verificationNumber = mt_rand(100000, 999999);
@@ -428,15 +428,40 @@ class AuthController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Validate 
+        $validator = Validator::make($request->all(), [
+            'indicator' => 'required|string|max:255',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
+
+
         if ($user->update([
             'verification_number' => $verificationNumber,
         ])) {
             $emailParts = explode('@', Crypt::decrypt($user->email));
             $name = [$emailParts[0]];
 
-            $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
-            if (!$email) {
-                return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            if ($request->indicator == env('VERIFY_EMAIL_NUM_CODE')) {
+                $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+                if (!$email) {
+                    return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+            } else if ($request->indicator == env('UPDATE_EMAIL_NUM_CODE')) {
+                // TODO UI SEND CODE FOR UPDATE EMAIL
+                $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+                if (!$email) {
+                    return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+            } else if ($request->indicator == env('UPDATE_PASSWORD_NUM_CODE')) {
+                // TODO UI SEND CODE FOR UPDATE PASSWORD
+                $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+                if (!$email) {
+                    return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
             }
 
             $logDetails = [
@@ -446,7 +471,7 @@ class AuthController extends Controller
                 ]
             ];
 
-            $logResult = $this->resendVerificationCodeLogs($request, $user->user_id, $logDetails);
+            $logResult = $this->resendVerificationCodeLogs($request, $user->user_id, $request->indicator, $logDetails);
 
             return response()->json([
                 'message' => 'A new verification code has been sent to your email',
@@ -1151,7 +1176,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
     }
 
-    public function resendVerificationCodeLogs($request, $userId, $logDetails)
+    public function resendVerificationCodeLogs($request, $userId, $indicator, $logDetails)
     {
         // Get Device Information
         $userAgent = $request->header('User-Agent');
@@ -1160,7 +1185,7 @@ class AuthController extends Controller
         $log = LogsModel::create([
             'user_id' => $userId,
             'ip_address' => $request->ip(),
-            'user_action' =>  'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL',
+            'user_action' => $indicator ==  env('VERIFY_EMAIL_NUM_CODE')? 'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'RESEND NEW VERIFICATION CODE AT USER SETTING UPDATE EMAIL' : 'RESEND NEW VERIFICATION CODE AT USER SETTING UPDATE PASSWORD'),
             'user_device' => $userAgent,
             'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
         ]);
@@ -1170,7 +1195,7 @@ class AuthController extends Controller
                 'log_id' => 'log-'  . $log->id,
             ]);
         } else {
-            return response()->json(['message' => 'Failed to store logs for successful'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to store logs for ' . ($indicator == env('VERIFY_EMAIL_NUM_CODE') ? 'resending new verification code at email verification' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'resending new verification code at user setting email update' : 'resending new verification code at user setting password update'))], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
