@@ -37,6 +37,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
         Route::post('/verify-email', [$AuthController, 'verifyEmail']);
+        Route::post('/resend-code', [$AuthController, 'resendVerificationCodeAll']);
     });
 
     // Update Password
@@ -61,7 +62,7 @@ Route::middleware(['jwt.auth'])->group(function () {
 
         Route::post('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
         Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
-        Route::post('/update-password/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+        Route::post('/update-password-and-email/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
     });
 
     // Inventory
@@ -77,7 +78,4 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::post('/store', [$InventoryProductController, 'store']);
         });
     });
-
-    // GLOBAL
-    Route::post('/resend-code', [$AuthController, 'resendVerificationCodeAll']);
 });
