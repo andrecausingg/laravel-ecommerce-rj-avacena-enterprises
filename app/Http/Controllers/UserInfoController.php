@@ -28,13 +28,14 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if ($user->id_hash == '' || $user->id_hash == null) {
+        // Check if authenticated user
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         $decryptedUserInfos = [];
 
-        $userInfos = UserInfoModel::whereNull('deleted_at')->get();
+        $userInfos = UserInfoModel::get();
 
         foreach ($userInfos as $userInfo) {
             $decryptedUserInfo = [
@@ -75,7 +76,8 @@ class UserInfoController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if (empty($user->id_hash)) {
+        // Check if authenticated user
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -131,12 +133,12 @@ class UserInfoController extends Controller
         $user = $this->authorizeUser($request);
 
         // Check if authenticated user
-        if (empty($user->id_hash)) {
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Check if exist user
-        $existHash = UserInfoModel::where('user_id_hash', $user->id_hash)->exists();
+        $existHash = UserInfoModel::where('user_id', $user->user_id)->exists();
         if ($existHash) {
             return response()->json(
                 [
@@ -193,10 +195,10 @@ class UserInfoController extends Controller
         }
 
         // Create UserInfoModel with encrypted data
-        $userInfoCreate = UserInfoModel::create(array_merge(['user_id_hash' => $user->id_hash], $validatedData));
+        $userInfoCreate = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validatedData));
         if ($userInfoCreate) {
             // Store Logs
-            $this->storeLogs($request, $user->id_hash, $userInfoCreate);
+            $this->storeLogs($request, $user->user_id, $userInfoCreate);
             return response()->json(['message' => 'Successfully stored user information'], Response::HTTP_OK);
         } else {
             return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
