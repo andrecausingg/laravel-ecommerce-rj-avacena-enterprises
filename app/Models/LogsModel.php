@@ -12,7 +12,7 @@ class LogsModel extends Model
     use SoftDeletes;
     protected $table = 'logs_tbl';
     protected $primaryKey = 'id';
-    protected $fillable = [
+    protected  $fillable = [
         'log_id',
         'user_id',
         'ip_address',
@@ -24,4 +24,5 @@ class LogsModel extends Model
         'updated_at',
     ];
     protected $dates = ['deleted_at'];
+
 }

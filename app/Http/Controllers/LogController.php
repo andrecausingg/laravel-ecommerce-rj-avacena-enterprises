@@ -13,8 +13,9 @@ class LogController extends Controller
 {
     public function index(Request $request)
     {
-        // Get the fields that need to be decrypted from the configuration
-        $fields = config('encrypted-fields');
+        $fields = config('encrypted-fields.encryptedFields');
+        $decryptedLogs = [];
+        $arrWithParentId = [];
 
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -23,46 +24,64 @@ class LogController extends Controller
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
         // Retrieve logs
         $logs = LogsModel::get();
 
-        $decryptedDatas = [];
-
+        // Iterate over each log
         foreach ($logs as $log) {
-            $decryptedData = [];
-        
-            // Check if the log has details and if it's a valid JSON
-            if (isset($log->details)) {
-                $details = json_decode($log->details, true);
-        
-                // Iterate through each field that needs decryption
-                foreach ($fields as $field) {
-                    // Check if the field exists in the details and is a string
-                    if (isset($details['fields'][$field]) && is_string($details['fields'][$field])) {
-                        // Decrypt the field and add it to the decrypted data array
-                        $decryptedData[$field] = Crypt::decrypt($details['fields'][$field]);
-                    } else {
-                        // Field not found or not a string, store the field itself
-                        $decryptedData[$field] = $field;
-                    }
-                }
-            }
-            
-            // Add the decrypted log data to the result array
-            $decryptedDatas[] = $decryptedData;
-        }
-        
+            // Decode the JSON string stored in the 'details' field
+            $detailsJson = json_decode($log['details'], true);
 
+            // Check if the 'fields' key exists in the details
+            if (isset($detailsJson['fields'])) {
+                // Check if the fields need to be decrypted
+                $decryptedData = $this->isDecryptedData($detailsJson['fields'], $fields);
+
+                // Store user_id and decrypted fields in a new array
+                $arrWithParentId = [
+                    'user_id' => $detailsJson['user_id'],
+                    'fields' => $decryptedData
+                ];
+            }
+
+            // Add the decrypted data to the result for this log
+            $decryptedLogs[] = [
+                'id' => $log['id'],
+                'log_id' => $log['log_id'],
+                'user_id' => $log['user_id'],
+                'ip_address' => $log['ip_address'],
+                'user_action' => $log['user_action'],
+                'details' => $arrWithParentId,
+                'user_device' =>  $log['user_device'],
+                'created_at' =>  $log['created_at'],
+                'updated_at' =>  $log['updated_at'],
+                'deleted_at' =>  $log['deleted_at'],
+            ];
+        }
 
         return response()->json([
             'message' => 'Successfully Retrieve Data',
-            'result' => $decryptedDatas,
+            'result' => $decryptedLogs,
         ], Response::HTTP_OK);
+    }
 
-        // return response()->json([
-        //     'message' => 'Successfully Retrieve Data',
-        //     'result' => $logs,
-        // ], Response::HTTP_OK);
+    public function isDecryptedData($fields, $fieldsToDecrypt)
+    {
+        $decryptedData = [];
+
+        // Iterate over each field in the log details
+        foreach ($fields as $fieldName => $fieldValue) {
+            // Check if the field needs to be decrypted
+            if (in_array($fieldName, $fieldsToDecrypt)) {
+                // Decrypt the field value and store it in the result array
+                $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+            } else {
+                $decryptedData[$fieldName] = $fieldValue;
+            }
+        }
+
+        return $decryptedData;
     }
 
     public function authorizeUser($request)
