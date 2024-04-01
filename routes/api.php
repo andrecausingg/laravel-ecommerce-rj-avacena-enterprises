@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryProductController;
+use App\Http\Controllers\LogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +34,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     $UserInfoController = UserInfoController::class;
     $InventoryController = InventoryController::class;
     $InventoryProductController = InventoryProductController::class;
+    $LogController = LogController::class;
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
@@ -79,5 +81,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         });
     });
 
-    
+    Route::prefix('log')->group(function () use ($LogController) {
+        Route::get('index', [$LogController, 'index']);
+    });
 });

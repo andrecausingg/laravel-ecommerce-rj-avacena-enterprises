@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\LogsModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Crypt;
 use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
     public function index(Request $request)
     {
+        // Get the fields that need to be decrypted from the configuration
         $fields = config('encrypted-fields');
 
         // Authorize the user
@@ -19,45 +23,70 @@ class LogController extends Controller
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
-        $decryptedUserInfos = [];
-
+        // Retrieve logs
         $logs = LogsModel::get();
 
+        $decryptedDatas = [];
+
         foreach ($logs as $log) {
-            foreach ($fields as $field) {
-            
+            $decryptedData = [];
+        
+            // Check if the log has details and if it's a valid JSON
+            if (isset($log->details)) {
+                $details = json_decode($log->details, true);
+        
+                // Iterate through each field that needs decryption
+                foreach ($fields as $field) {
+                    // Check if the field exists in the details and is a string
+                    if (isset($details['fields'][$field]) && is_string($details['fields'][$field])) {
+                        // Decrypt the field and add it to the decrypted data array
+                        $decryptedData[$field] = Crypt::decrypt($details['fields'][$field]);
+                    } else {
+                        // Field not found or not a string, store the field itself
+                        $decryptedData[$field] = $field;
+                    }
+                }
             }
-            // $decryptedUserInfo = [
-            //     'id' => $userInfo && $userInfo->id ? $userInfo->id : null,
-            //     'user_id_hash' => $userInfo && $userInfo->user_id_hash ? $userInfo->user_id_hash : null,
-            //     'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
-            //     'first_name' => $userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : null,
-            //     'middle_name' => $userInfo && $userInfo->middle_name ? Crypt::decrypt($userInfo->middle_name) : null,
-            //     'last_name' => $userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null,
-            //     'contact_number' => $userInfo && $userInfo->contact_number ? Crypt::decrypt($userInfo->contact_number) : null,
-            //     'email' => $userInfo && $userInfo->email ? Crypt::decrypt($userInfo->email) : null,
-            //     'address_1' => $userInfo && $userInfo->address_1 ? Crypt::decrypt($userInfo->address_1) : null,
-            //     'address_2' => $userInfo && $userInfo->address_2 ? Crypt::decrypt($userInfo->address_2) : null,
-            //     'region_code' => $userInfo && $userInfo->region_code ? Crypt::decrypt($userInfo->region_code) : null,
-            //     'province_code' => $userInfo && $userInfo->province_code ? Crypt::decrypt($userInfo->province_code) : null,
-            //     'city_or_municipality_code' => $userInfo && $userInfo->city_or_municipality_code ? Crypt::decrypt($userInfo->city_or_municipality_code) : null,
-            //     'region_name' => $userInfo && $userInfo->region_name ? Crypt::decrypt($userInfo->region_name) : null,
-            //     'province_name' => $userInfo && $userInfo->province_name ? Crypt::decrypt($userInfo->province_name) : null,
-            //     'city_or_municipality_name' => $userInfo && $userInfo->city_or_municipality_name ? Crypt::decrypt($userInfo->city_or_municipality_name) : null,
-            //     'barangay' => $userInfo && $userInfo->barangay ? Crypt::decrypt($userInfo->barangay) : null,
-            //     'description_location' => $userInfo && $userInfo->description_location ? Crypt::decrypt($userInfo->description_location) : null,
-            // ];
-
-            // $decryptedUserInfos[] = $decryptedUserInfo;
+            
+            // Add the decrypted log data to the result array
+            $decryptedDatas[] = $decryptedData;
         }
+        
 
-        return response()->json(
-            [
-                'message' => 'Successfully Retrieve Data',
-                'result' => $logs,
-            ],
-            Response::HTTP_OK
-        );
+
+        return response()->json([
+            'message' => 'Successfully Retrieve Data',
+            'result' => $decryptedDatas,
+        ], Response::HTTP_OK);
+
+        // return response()->json([
+        //     'message' => 'Successfully Retrieve Data',
+        //     'result' => $logs,
+        // ], Response::HTTP_OK);
+    }
+
+    public function authorizeUser($request)
+    {
+        try {
+            // Authenticate the user with the provided token
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Get the bearer token from the headers
+            $bearerToken = $request->bearerToken();
+            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
+                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            return $user;
+        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }
