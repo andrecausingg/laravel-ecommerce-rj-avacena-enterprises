@@ -13,6 +13,7 @@ class UserInfoModel extends Model
     protected $table = 'users_info_tbl';
     protected $primaryKey = 'id';
     protected $fillable = [
+        'user_info_id',
         'user_id',
         'image',
         'first_name',
@@ -35,4 +36,8 @@ class UserInfoModel extends Model
     ];
     protected $dates = ['deleted_at'];
 
+    public function getFillableAttributes(): array
+    {
+        return $this->fillable;
+    }
 }

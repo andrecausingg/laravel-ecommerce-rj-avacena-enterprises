@@ -25,4 +25,8 @@ class LogsModel extends Model
     ];
     protected $dates = ['deleted_at'];
 
+    public function getFillableAttributes(): array
+    {
+        return $this->fillable;
+    }
 }
