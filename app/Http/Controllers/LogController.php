@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Log;
 use App\Models\LogsModel;
-use App\Models\UserInfoModel;
 use Illuminate\Http\Request;
+use App\Models\UserInfoModel;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Crypt;
@@ -18,18 +19,10 @@ class LogController extends Controller
 
         // Logs Array
         $decryptedLogs = [];
-        $arrWithParentId = [];
-
-        // User Info Array
-        $arrDecryptedUserInfo = [];
-
-        $resultJson = [];
 
         // Get the Attribute
         $logsModel = new LogsModel();
         $fillableAttributesLogs = $logsModel->getFillableAttributes();
-        $userInfoModel = new UserInfoModel();
-        $fillableAttributesUserInfos = $userInfoModel->getFillableAttributes();
 
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -39,22 +32,13 @@ class LogController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Retrieve logs
         $logs = LogsModel::get();
 
-        // Iterate over each log
         foreach ($logs as $log) {
-            $userInfo = UserInfoModel::where('user_id', $log['user_id'])->first(); // Add ->first() to get the result
-
-            // Decode the JSON string stored in the 'details' field
             $detailsJson = json_decode($log['details'], true);
 
-            // Check if the 'fields' key exists in the details
             if (isset($detailsJson['fields'])) {
-                // Check if the fields need to be decrypted
                 $decryptedData = $this->isDecryptedData($detailsJson['fields'], $fields);
-
-                // Store user_id and decrypted fields in a new array
                 $arrWithParentId = [
                     'user_id' => $detailsJson['user_id'],
                     'fields' => $decryptedData
@@ -67,33 +51,23 @@ class LogController extends Controller
                 } else {
                     $decryptedLogs[$fillableAttributeLog] = $log->$fillableAttributeLog;
                 }
-
-                if ($fillableAttributeLog == 'user_id') {
-                    foreach ($fillableAttributesUserInfos as $fillableAttributesUserInfo) {
-                        $arrDecryptedUserInfo[$fillableAttributesUserInfo] = $fillableAttributesUserInfo != 'user_id' && $fillableAttributesUserInfo != null ? Crypt::decrypt($userInfo->$fillableAttributesUserInfo) : $userInfo->$fillableAttributesUserInfo;
-                    }
-                }
             }
 
-            $decryptedLogs['userInfo'] = $arrDecryptedUserInfo;
+            // Retrieve userInfo model
+            $userInfo = UserInfoModel::where('user_id', $log['user_id'])->first();
+            if ($userInfo) {
+                $userInfoArray = $userInfo->toArray();
+
+                foreach ($fields as $field) {
+                    if (isset($userInfoArray[$field])) {
+                        $userInfoArray[$field] = $userInfo->{$field} ? Crypt::decrypt($userInfo->{$field}) : null;
+                    }
+                }
+                $decryptedLogs['userInfo'] = $userInfoArray;
+            } else {
+                $decryptedLogs['userInfo'] = []; 
+            }
             $resultJson[] = $decryptedLogs;
-
-            // Add the decrypted data to the result for this log
-            // $decryptedLogs[] = [
-            //     'log_id' => $log['log_id'],
-            //     'user_id' => $log['user_id'],
-            //     'ip_address' => $log['ip_address'],
-            //     'user_action' => $log['user_action'],
-            //     'details' => $arrWithParentId,
-            //     'user_device' =>  $log['user_device'],
-            //     'created_at' =>  $log['created_at'],
-            //     'updated_at' =>  $log['updated_at'],
-            //     'deleted_at' =>  $log['deleted_at'],
-
-            //     'userInfo' => [
-            //         $userInfo    
-            //     ]
-            // ];
         }
 
         return response()->json([
@@ -102,60 +76,7 @@ class LogController extends Controller
         ], Response::HTTP_OK);
     }
 
-    // public function index(Request $request)
-    // {
-    //     $fields = config('encrypted-fields.EncryptedFields');
-    //     $decryptedLogs = [];
-    //     $arrWithParentId = [];
-
-    //     // Authorize the user
-    //     $user = $this->authorizeUser($request);
-
-    //     // Check if authenticated user
-    //     if (empty($user->user_id)) {
-    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-    //     }
-
-    //     // Retrieve logs
-    //     $logs = LogsModel::get();
-
-    //     // Iterate over each log
-    //     foreach ($logs as $log) {
-    //         // Decode the JSON string stored in the 'details' field
-    //         $detailsJson = json_decode($log['details'], true);
-
-    //         // Check if the 'fields' key exists in the details
-    //         if (isset($detailsJson['fields'])) {
-    //             // Check if the fields need to be decrypted
-    //             $decryptedData = $this->isDecryptedData($detailsJson['fields'], $fields);
-
-    //             // Store user_id and decrypted fields in a new array
-    //             $arrWithParentId = [
-    //                 'user_id' => $detailsJson['user_id'],
-    //                 'fields' => $decryptedData
-    //             ];
-    //         }
-
-    //         // Add the decrypted data to the result for this log
-    //         $decryptedLogs[] = [
-    //             'log_id' => $log['log_id'],
-    //             'user_id' => $log['user_id'],
-    //             'ip_address' => $log['ip_address'],
-    //             'user_action' => $log['user_action'],
-    //             'details' => $arrWithParentId,
-    //             'user_device' =>  $log['user_device'],
-    //             'created_at' =>  $log['created_at'],
-    //             'updated_at' =>  $log['updated_at'],
-    //             'deleted_at' =>  $log['deleted_at'],
-    //         ];
-    //     }
-
-    //     return response()->json([
-    //         'message' => 'Successfully Retrieve Data',
-    //         'result' => $decryptedLogs,
-    //     ], Response::HTTP_OK);
-    // }
-
+    // HELPER FUNCTION
     public function isDecryptedData($fields, $fieldsToDecrypt)
     {
         $decryptedData = [];
