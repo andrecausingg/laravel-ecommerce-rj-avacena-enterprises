@@ -387,16 +387,6 @@ class AuthController extends Controller
         $expirationTime = Carbon::now()->addSecond();
         $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
 
-        $logDetails = [
-            'user_id' => $user->user_id,
-            'fields' => [
-                'status' => $user->status,
-                'verify_email_token' => $user->verify_email_token,
-                'email_verified_at' => $user->email_verified_at,
-                'verification_number' => $request->verification_number,
-            ]
-        ];
-
         // Update user status and set email_verified_at to the current timestamp
         $user->status = 'ACTIVE';
         $user->verify_email_token = $newToken;
@@ -404,6 +394,15 @@ class AuthController extends Controller
         $user->verification_number = $verificationNumber;
 
         if ($user->save()) {
+            $logDetails = [
+                'user_id' => $user->user_id,
+                'fields' => [
+                    'status' => $user->status,
+                    'verify_email_token' => $user->verify_email_token,
+                    'email_verified_at' => $user->email_verified_at,
+                    'verification_number' => $request->verification_number,
+                ]
+            ];
             $logResult = $this->verifyEmailLogs($request, $user->user_id, $logDetails);
 
             return response()->json(
@@ -440,10 +439,10 @@ class AuthController extends Controller
         }
 
 
-        if ($request->indicator == env('VERIFY_EMAIL_NUM_CODE') && $request->indicator == env('UPDATE_EMAIL_NUM_CODE') && $request->indicator == env('UPDATE_PASSWORD_NUM_CODE')) {
+        if ($request->indicator != env('VERIFY_EMAIL_NUM_CODE')) {
             return response()->json([
                 'message' => 'Invalid indicator',
-            ], Response::HTTP_OK);
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
         if ($user->update([
@@ -458,20 +457,6 @@ class AuthController extends Controller
                     return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 }
             }
-
-            // else if ($request->indicator == env('UPDATE_EMAIL_NUM_CODE')) {
-            //     // TODO UI SEND CODE FOR UPDATE EMAIL
-            //     $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
-            //     if (!$email) {
-            //         return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            //     }
-            // } else if ($request->indicator == env('UPDATE_PASSWORD_NUM_CODE')) {
-            //     // TODO UI SEND CODE FOR UPDATE PASSWORD
-            //     $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
-            //     if (!$email) {
-            //         return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            //     }
-            // }
 
             $logDetails = [
                 'user_id' => $user->user_id,
@@ -771,7 +756,7 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Invalid indicator',
             ], Response::HTTP_OK);
-        } 
+        }
 
         if ($user->update([
             'verification_number' => $verificationNumber,
@@ -1411,8 +1396,8 @@ class AuthController extends Controller
         $log = LogsModel::create([
             'user_id' => $userId,
             'ip_address' => $request->ip(),
-            'user_action' => $indicator == env('UPDATE_EMAIL_NUM_CODE') 
-                ? 'RESEND NEW VERIFICATION CODE AT USER SETTING (UPDATE EMAIL)' 
+            'user_action' => $indicator == env('UPDATE_EMAIL_NUM_CODE')
+                ? 'RESEND NEW VERIFICATION CODE AT USER SETTING (UPDATE EMAIL)'
                 : 'RESEND NEW VERIFICATION CODE AT USER SETTING (UPDATE PASSWORD)',
             'user_device' => $userAgent,
             'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
