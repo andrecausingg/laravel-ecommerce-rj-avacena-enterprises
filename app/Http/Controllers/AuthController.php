@@ -397,8 +397,6 @@ class AuthController extends Controller
             $logDetails = [
                 'user_id' => $user->user_id,
                 'fields' => [
-                    'status' => $user->status,
-                    'verify_email_token' => $user->verify_email_token,
                     'email_verified_at' => $user->email_verified_at,
                     'verification_number' => $request->verification_number,
                 ]
@@ -1165,7 +1163,7 @@ class AuthController extends Controller
 
         if ($history) {
             $history->update([
-                'history_id' => 'history-'  . $history->id,
+                'history_id' => 'history_id-'  . $history->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to create history for storing password during email registration'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1182,7 +1180,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs during email registration'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1207,7 +1205,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs for successful email verification'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1232,7 +1230,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs for ' . ($indicator == env('VERIFY_EMAIL_NUM_CODE') ? 'resending new verification code at email verification' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'resending new verification code at user setting email update' : 'resending new verification code at user setting password update'))], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1257,7 +1255,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs for successfully sent reset link for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1280,7 +1278,7 @@ class AuthController extends Controller
 
         if ($history) {
             $history->update([
-                'history_id' => 'history-'  . $history->id,
+                'history_id' => 'history_id-'  . $history->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to create history for password storage during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1297,7 +1295,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1321,7 +1319,7 @@ class AuthController extends Controller
 
         if ($history) {
             $history->update([
-                'history_id' => 'history-'  . $history->id,
+                'history_id' => 'history_id-'  . $history->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to create history for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1338,7 +1336,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1361,7 +1359,7 @@ class AuthController extends Controller
 
         if ($history) {
             $history->update([
-                'history_id' => 'history-'  . $history->id,
+                'history_id' => 'history_id-'  . $history->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to create history for update password on user setting'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1378,7 +1376,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to update logs for update password on user setting'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1405,7 +1403,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs for ' . ($indicator == env('VERIFY_EMAIL_NUM_CODE') ? 'resending new verification code at email verification' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'resending new verification code at user setting email update' : 'resending new verification code at user setting password update'))], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1435,7 +1433,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-' . $log->id,
+                'log_id' => 'log_id-' . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1550,7 +1548,7 @@ class AuthController extends Controller
 
             if ($history) {
                 $history->update([
-                    'history_id' => 'history-'  . $history->id,
+                    'history_id' => 'history_id-'  . $history->id,
                 ]);
             } else {
                 return response()->json(['message' => 'Failed to create history for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -1570,7 +1568,7 @@ class AuthController extends Controller
 
         if ($log) {
             $log->update([
-                'log_id' => 'log-'  . $log->id,
+                'log_id' => 'log_id-'  . $log->id,
             ]);
         } else {
             return response()->json(['message' => 'Failed to update logs for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);

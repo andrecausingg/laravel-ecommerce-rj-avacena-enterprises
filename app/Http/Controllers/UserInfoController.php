@@ -195,8 +195,12 @@ class UserInfoController extends Controller
         }
 
         // Create UserInfoModel with encrypted data
-        $userInfoCreate = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validatedData));
+        $userInfoCreate = UserInfoModel::create(array_merge( ['user_id' => $user->user_id], $validatedData));
         if ($userInfoCreate) {
+            $userInfoCreate->update([
+                'user_info_id' => 'user_info_id-'  . $userInfoCreate->id,
+            ]);
+
             // Store Logs
             $this->storeLogs($request, $user->user_id, $userInfoCreate);
             return response()->json(['message' => 'Successfully stored user information'], Response::HTTP_OK);
