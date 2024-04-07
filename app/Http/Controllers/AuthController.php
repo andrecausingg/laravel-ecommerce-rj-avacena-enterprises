@@ -262,16 +262,13 @@ class AuthController extends Controller
                     if (!$email) {
                         return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
                     }
-                    return response()->json(
-                        [
+                    return response()->json([
                             'message' => 'Successfully create token',
                             // 'data' => $user,
                             'url_token' => '/signup/verify-email?tj=' . $newToken,
                             'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
                             'log_message' => $logResult
-                        ],
-                        Response::HTTP_OK
-                    );
+                        ], Response::HTTP_OK);
                 }
 
                 return response()->json(
@@ -1309,21 +1306,6 @@ class AuthController extends Controller
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Create HistoryModel entry for old password
-        $history = HistoryModel::create([
-            'tbl_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'email',
-            'value' => $logDetails['fields']['old_email'],
-        ]);
-
-        if ($history) {
-            $history->update([
-                'history_id' => 'history_id-'  . $history->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to create history for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
 
         // Create LogsModel entry
         $log = LogsModel::create([
@@ -1455,17 +1437,6 @@ class AuthController extends Controller
 
         $details = json_encode($logDetails, JSON_PRETTY_PRINT);
 
-        // Create HistoryModel entry for old password
-        $history = HistoryModel::create([
-            'user_id' => $userIdClient,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'email',
-            'value' => $data['old_email'],
-        ]);
-
-        if (!$history) {
-            return response()->json(['message' => 'Failed to create history for update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
 
         // Create LogsModel entry
         $logEntry = LogsModel::create([
@@ -1537,22 +1508,6 @@ class AuthController extends Controller
                 'old' => $change['old'],
                 'new' => $change['new'],
             ];
-
-            // Create HistoryModel entry
-            $history = HistoryModel::create([
-                'tbl_id' => $userId,
-                'tbl_name' => 'users_tbl',
-                'column_name' => $field, // Use the field name as the column name
-                'value' => $change['old'],
-            ]);
-
-            if ($history) {
-                $history->update([
-                    'history_id' => 'history_id-'  . $history->id,
-                ]);
-            } else {
-                return response()->json(['message' => 'Failed to create history for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
         }
 
         $details = json_encode($logDetails, JSON_PRETTY_PRINT);

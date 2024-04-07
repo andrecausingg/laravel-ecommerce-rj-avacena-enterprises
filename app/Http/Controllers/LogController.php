@@ -6,6 +6,7 @@ use Log;
 use App\Models\LogsModel;
 use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
+use Hamcrest\Arrays\IsArray;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Crypt;
@@ -65,7 +66,7 @@ class LogController extends Controller
                 }
                 $decryptedLogs['userInfo'] = $userInfoArray;
             } else {
-                $decryptedLogs['userInfo'] = []; 
+                $decryptedLogs['userInfo'] = [];
             }
             $resultJson[] = $decryptedLogs;
         }
@@ -80,18 +81,27 @@ class LogController extends Controller
     public function isDecryptedData($fields, $fieldsToDecrypt)
     {
         $decryptedData = [];
-
+    
         // Iterate over each field in the log details
         foreach ($fields as $fieldName => $fieldValue) {
-            // Check if the field needs to be decrypted
-            if (in_array($fieldName, $fieldsToDecrypt)) {
-                // Decrypt the field value and store it in the result array
-                $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+
+            if (is_array($fieldValue)) {
+                // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
+                $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : null;
+                $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : null;
+                $decryptedData[$fieldName]['oldEnc'] = $decOld;
+                $decryptedData[$fieldName]['newEnc'] = $decNew;
             } else {
-                $decryptedData[$fieldName] = $fieldValue;
+                // If $fieldValue is not an array, decrypt it if needed
+                if (in_array($fieldName, $fieldsToDecrypt)) {
+                    // Decrypt the field value and store it in the result array
+                    $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+                } else {
+                    $decryptedData[$fieldName] = $fieldValue;
+                }
             }
         }
-
+    
         return $decryptedData;
     }
 

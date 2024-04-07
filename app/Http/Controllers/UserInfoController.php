@@ -25,6 +25,9 @@ class UserInfoController extends Controller
      */
     public function index(Request $request)
     {
+        $fields = config('user-info-fields.EncUserInfoFields');
+        $decryptedUserInfos = [];
+
         // Authorize the user
         $user = $this->authorizeUser($request);
 
@@ -33,33 +36,19 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $decryptedUserInfos = [];
-
         $userInfos = UserInfoModel::get();
 
         foreach ($userInfos as $userInfo) {
-            $decryptedUserInfo = [
-                'id' => $userInfo && $userInfo->id ? $userInfo->id : null,
-                'user_id_hash' => $userInfo && $userInfo->user_id_hash ? $userInfo->user_id_hash : null,
-                'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
-                'first_name' => $userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : null,
-                'middle_name' => $userInfo && $userInfo->middle_name ? Crypt::decrypt($userInfo->middle_name) : null,
-                'last_name' => $userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null,
-                'contact_number' => $userInfo && $userInfo->contact_number ? Crypt::decrypt($userInfo->contact_number) : null,
-                'email' => $userInfo && $userInfo->email ? Crypt::decrypt($userInfo->email) : null,
-                'address_1' => $userInfo && $userInfo->address_1 ? Crypt::decrypt($userInfo->address_1) : null,
-                'address_2' => $userInfo && $userInfo->address_2 ? Crypt::decrypt($userInfo->address_2) : null,
-                'region_code' => $userInfo && $userInfo->region_code ? Crypt::decrypt($userInfo->region_code) : null,
-                'province_code' => $userInfo && $userInfo->province_code ? Crypt::decrypt($userInfo->province_code) : null,
-                'city_or_municipality_code' => $userInfo && $userInfo->city_or_municipality_code ? Crypt::decrypt($userInfo->city_or_municipality_code) : null,
-                'region_name' => $userInfo && $userInfo->region_name ? Crypt::decrypt($userInfo->region_name) : null,
-                'province_name' => $userInfo && $userInfo->province_name ? Crypt::decrypt($userInfo->province_name) : null,
-                'city_or_municipality_name' => $userInfo && $userInfo->city_or_municipality_name ? Crypt::decrypt($userInfo->city_or_municipality_name) : null,
-                'barangay' => $userInfo && $userInfo->barangay ? Crypt::decrypt($userInfo->barangay) : null,
-                'description_location' => $userInfo && $userInfo->description_location ? Crypt::decrypt($userInfo->description_location) : null,
-            ];
+            if ($userInfo) {
+                $userInfoArray = $userInfo->toArray();
 
-            $decryptedUserInfos[] = $decryptedUserInfo;
+                foreach ($fields as $field) {
+                    if (isset($userInfoArray[$field])) {
+                        $userInfoArray[$field] = $userInfo->{$field} ? Crypt::decrypt($userInfo->{$field}) : null;
+                    }
+                }
+                $decryptedUserInfos = $userInfoArray;
+            }
         }
 
         return response()->json(
@@ -73,6 +62,8 @@ class UserInfoController extends Controller
 
     public function getPersonalInfo(Request $request)
     {
+        $fields = config('user-info-fields.EncUserInfoFields');
+
         // Authorize the user
         $user = $this->authorizeUser($request);
 
@@ -83,30 +74,17 @@ class UserInfoController extends Controller
 
         $decryptedUserInfos = [];
 
-        $userInfos = UserInfoModel::where('user_id_hash', $user->id_hash)->first();
+        $userInfos = UserInfoModel::where('user_id', $user->user_id)->first();
+        if ($userInfos) {
+            $userInfoArray = $userInfos->toArray();
 
-        $decryptedUserInfo = [
-            'id' => $userInfos && $userInfos->id ? $userInfos->id : null,
-            'user_id_hash' => $userInfos && $userInfos->user_id_hash ? $userInfos->user_id_hash : null,
-            'image' => $userInfos && $userInfos->image ? Crypt::decrypt($userInfos->image) : null,
-            'first_name' => $userInfos && $userInfos->first_name ? Crypt::decrypt($userInfos->first_name) : null,
-            'middle_name' => $userInfos && $userInfos->middle_name ? Crypt::decrypt($userInfos->middle_name) : null,
-            'last_name' => $userInfos && $userInfos->last_name ? Crypt::decrypt($userInfos->last_name) : null,
-            'contact_number' => $userInfos && $userInfos->contact_number ? Crypt::decrypt($userInfos->contact_number) : null,
-            'email' => $userInfos && $userInfos->email ? Crypt::decrypt($userInfos->email) : null,
-            'address_1' => $userInfos && $userInfos->address_1 ? Crypt::decrypt($userInfos->address_1) : null,
-            'address_2' => $userInfos && $userInfos->address_2 ? Crypt::decrypt($userInfos->address_2) : null,
-            'region_code' => $userInfos && $userInfos->region_code ? Crypt::decrypt($userInfos->region_code) : null,
-            'province_code' => $userInfos && $userInfos->province_code ? Crypt::decrypt($userInfos->province_code) : null,
-            'city_or_municipality_code' => $userInfos && $userInfos->city_or_municipality_code ? Crypt::decrypt($userInfos->city_or_municipality_code) : null,
-            'region_name' => $userInfos && $userInfos->region_name ? Crypt::decrypt($userInfos->region_name) : null,
-            'province_name' => $userInfos && $userInfos->province_name ? Crypt::decrypt($userInfos->province_name) : null,
-            'city_or_municipality_name' => $userInfos && $userInfos->city_or_municipality_name ? Crypt::decrypt($userInfos->city_or_municipality_name) : null,
-            'barangay' => $userInfos && $userInfos->barangay ? Crypt::decrypt($userInfos->barangay) : null,
-            'description_location' => $userInfos && $userInfos->description_location ? Crypt::decrypt($userInfos->description_location) : null,
-        ];
-
-        $decryptedUserInfos[] = $decryptedUserInfo;
+            foreach ($fields as $field) {
+                if (isset($userInfoArray[$field])) {
+                    $userInfoArray[$field] = $userInfos->{$field} ? Crypt::decrypt($userInfos->{$field}) : null;
+                }
+            }
+            $decryptedUserInfos = $userInfoArray;
+        }
 
         return response()->json(
             [
@@ -195,15 +173,18 @@ class UserInfoController extends Controller
         }
 
         // Create UserInfoModel with encrypted data
-        $userInfoCreate = UserInfoModel::create(array_merge( ['user_id' => $user->user_id], $validatedData));
+        $userInfoCreate = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validatedData));
         if ($userInfoCreate) {
             $userInfoCreate->update([
                 'user_info_id' => 'user_info_id-'  . $userInfoCreate->id,
             ]);
 
             // Store Logs
-            $this->storeLogs($request, $user->user_id, $userInfoCreate);
-            return response()->json(['message' => 'Successfully stored user information'], Response::HTTP_OK);
+            $logResult = $this->storeLogs($request, $user->user_id, $userInfoCreate);
+            return response()->json([
+                'message' => 'Successfully stored user information',
+                'log_message' => $logResult
+            ], Response::HTTP_OK);
         } else {
             return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -232,19 +213,19 @@ class UserInfoController extends Controller
     {
         // Initialize
         $changesForLogs = [];
-        $fields = config('user-info.user-info');
+        $fields = config('user-info-fields.EncUserInfoFields');
 
         // Authorize the user
         $user = $this->authorizeUser($request);
 
         // Check if authenticated user
-        if (empty($user->id_hash)) {
+        if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'image' => $request->file('image') ? 'image|mimes:jpeg,png,jpg|max:10240' : 'nullable',
+            'image' => $request->hasFile('image') ? 'image|mimes:jpeg,png,jpg|max:10240' : 'nullable',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -268,11 +249,11 @@ class UserInfoController extends Controller
         }
 
         // Retrieve the user information
-        $userInfo = UserInfoModel::where('user_id_hash', $user->id_hash)->first();
+        $userInfo = UserInfoModel::where('user_id', $user->user_id)->first();
 
         // Check if user information exists
         if (!$userInfo) {
-            return response()->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
 
         // Handle image upload and update
@@ -297,21 +278,25 @@ class UserInfoController extends Controller
             // Save on Storage
             Storage::disk('public')->put($filename, file_get_contents($image));
 
-            // Update the user info with the new image name
             $userInfo->image = $newImageEncrypted;
         }
 
         // Loop through the fields for encryption and decryption
         foreach ($fields as $field) {
             try {
+                // Check if the field is 'image' and it's null, skip it from the log
+                if ($field == 'image' && !$request->hasFile('image')) {
+                    continue;
+                }
+
                 $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
                 $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
 
                 // Check if the value has changed
-                if ($existingValue != $request->input($field)) {
+                if ($existingValue != $request->input($field) && $request->input($field) != null) {
                     $changesForLogs[$field] = [
-                        'old' => $existingValue,
-                        'new' => $request->input($field),
+                        'oldEnc' => $existingValue,
+                        'newEnc' => $request->input($field),
                     ];
                 }
 
@@ -328,11 +313,13 @@ class UserInfoController extends Controller
             // Check if there are changes before logging
             if (!empty($changesForLogs)) {
                 // Update successful, log the changes
-                $this->updateLogs($request, $user->id_hash, $userInfo, $changesForLogs);
+                $logResult = $this->updateLogs($request, $user->user_id, $changesForLogs);
 
-                return response()->json(['message' => 'User information updated successfully'], Response::HTTP_OK);
+                return response()->json([
+                    'message' => 'Successfully update user information',
+                    'log_message' => $logResult
+                ], Response::HTTP_OK);
             }
-
             return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -408,90 +395,74 @@ class UserInfoController extends Controller
         // ]);
     }
 
-    // LOGS
-    public function storeLogs($request, $idHash, $userInfoData)
+    // Store Logs
+    public function storeLogs($request, $userId, $logDetails)
     {
+        $arr = [];
+        $arr['user_id'] = $userId;
+        $arr['fields'] = $logDetails;
+
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Define the fields to include in the logs
-        $fieldsToInclude = [
-            'user_id_hash', 'image', 'first_name', 'last_name', 'contact_number',
-            'email', 'address_1', 'address_2', 'region_code',
-            'province_code', 'city_or_municipality_code', 'region_name',
-            'province_name', 'city_or_municipality_name', 'barangay',
-        ];
-
-        // Loop through the fields and add them to userInfoDetails
-        foreach ($fieldsToInclude as $field) {
-            $userInfoDetails[$field] = $userInfoData->$field;
-        }
-
-        $details = json_encode($userInfoDetails, JSON_PRETTY_PRINT);
-
         // Create LogsModel entry
-        $logEntry = LogsModel::create([
-            'user_id_hash' => $idHash,
+        $log = LogsModel::create([
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
-            'user_action' => 'STORE USER INFORMATION',
+            'user_action' => 'STORE PERSONAL INFORMATION',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => json_encode($arr, JSON_PRETTY_PRINT),
         ]);
 
-        if (!$logEntry) {
-            return response()->json(['message' => 'Failed to create logs for create user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if ($log) {
+            $log->update([
+                'log_id' => 'log_id-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to store logs for personal information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully stored logs for personal information'], Response::HTTP_OK);
     }
 
-    public function updateLogs(Request $request, $idHash, $userInfoData, $changesForLogs)
+    public function updateLogs($request, $userId, $logDetails)
     {
+        $arr = [];
+        $arr['user_id'] = $userId;
+        $arr['fields'] = [];
+
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Create a log entry for changed fields
-        $logDetails = [
-            'user_id_hash' => $userInfoData->user_id_hash,
-            'fields' => [],
-        ];
+        foreach ($logDetails as $field => $change) {
+            // Check if 'oldEnc' and 'newEnc' exist in $change before encrypting
+            $encryptedOldValue = isset($change['oldEnc']) ? Crypt::encrypt($change['oldEnc']) : null;
+            $encryptedNewValue = isset($change['newEnc']) ? Crypt::encrypt($change['newEnc']) : null;
 
-        // Loop through changesForLogs and encrypt old and new values before adding to logDetails
-        foreach ($changesForLogs as $field => $change) {
-            $encryptedOldValue = $change['old'] ? Crypt::encrypt($change['old']) : null;
-            $encryptedNewValue = $change['new'] ? Crypt::encrypt($change['new']) : null;
-
-            $logDetails['fields'][$field] = [
-                'old' => $encryptedOldValue,
-                'new' => $encryptedNewValue,
+            // Store the original field name and its encrypted values in $arr['fields']
+            $arr['fields'][$field] = [
+                'oldEnc' => $encryptedOldValue,
+                'newEnc' => $encryptedNewValue,
             ];
-
-            // Create HistoryModel entry
-            $historyCreate = HistoryModel::create([
-                'user_id_hash' => $idHash,
-                'tbl_name' => 'history_tbl',
-                'column_name' => $field, // Use the field name as the column name
-                'value' => $encryptedOldValue,
-            ]);
-
-            if (!$historyCreate) {
-                return response()->json(['message' => 'Failed to create history for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
         }
-
-        $details = json_encode($logDetails, JSON_PRETTY_PRINT);
 
         // Create LogsModel entry
-        $logEntry = LogsModel::create([
-            'user_id_hash' => $idHash,
+        $log = LogsModel::create([
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE USER INFORMATION',
+            'user_action' => 'UPDATE PERSONAL INFORMATION',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => json_encode($arr, JSON_PRETTY_PRINT),
         ]);
-        if (!$logEntry) {
-            return response()->json(['message' => 'Failed to update logs for update user info'], Response::HTTP_INTERNAL_SERVER_ERROR);
+
+        if ($log) {
+            $log->update([
+                'log_id' => 'log_id-'  . $log->id,
+            ]);
+        } else {
+            return response()->json(['message' => 'Failed to update logs for personal information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-
-        return response()->json(['message' => 'Successfully update logs for update user info'], Response::HTTP_OK);
+        return response()->json(['message' => 'Successfully update logs for personal information'], Response::HTTP_OK);
     }
 }
