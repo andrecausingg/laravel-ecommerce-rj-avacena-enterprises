@@ -44,7 +44,7 @@ class InventoryController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if (empty($user->id_hash)) {
+        if (empty($user->user_id)) {
             return response()->json(
                 [
                     'message' => 'Not authenticated user',
@@ -96,24 +96,18 @@ class InventoryController extends Controller
                     'inventory_id' => 'inv-' . $lastInsertedId,
                 ]);
 
-                $createdItems[] = $created; // Add the created item to the array
+                $this->storeLogs($request, $user->user_id, $created);
             } else {
-                return response()->json(
-                    [
+                return response()->json([
                         'message' => 'Failed to store Inventory Parents',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
+                    ],Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
         }
 
-        $this->storeLogs($request, $user->id_hash, $createdItems);
-
-        return response()->json(
-            [
+        return response()->json([
                 'message' => 'Inventory records parent store successfully',
-            ],
-            Response::HTTP_OK
+            ],Response::HTTP_OK
         );
     }
 
@@ -278,40 +272,70 @@ class InventoryController extends Controller
 
 
     // LOGS
-    public function storeLogs(Request $request, $idHash, $storeData)
+    // public function storeLogs(Request $request, $userId, $storeData)
+    // {
+    //     // Get Device Information
+    //     $userAgent = $request->header('User-Agent');
+
+    //     // Define the fields to include in the logs
+    //     $fieldsToInclude = [
+    //         'inventory_id', 'group_id', 'name', 'category',
+    //     ];
+
+    //     // Loop through each created item and add them to data
+    //     $data = [];
+    //     foreach ($storeData as $item) {
+    //         $itemData = [];
+    //         foreach ($fieldsToInclude as $field) {
+    //             $itemData[$field] = $item->$field;
+    //         }
+    //         $data[] = $itemData;
+    //     }
+
+    //     $details = json_encode($data, JSON_PRETTY_PRINT);
+
+    //     // Create LogsModel entry
+    //     $logEntry = LogsModel::create([
+    //         'user_id_hash' => $userId,
+    //         'ip_address' => $request->ip(),
+    //         'user_action' => 'STORE INVENTORY PARENT',
+    //         'user_device' => $userAgent,
+    //         'details' => $details,
+    //     ]);
+
+    //     if (!$logEntry) {
+    //         return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
+    //     }
+    // }
+
+    public function storeLogs($request, $userId, $logDetails)
     {
+
+        $arr = [];
+        $arr['user_id'] = $userId;
+        $arr['fields'] = is_array($logDetails) ? json_encode($logDetails) : $logDetails;
+
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Define the fields to include in the logs
-        $fieldsToInclude = [
-            'inventory_id', 'group_id', 'name', 'category',
-        ];
-
-        // Loop through each created item and add them to data
-        $data = [];
-        foreach ($storeData as $item) {
-            $itemData = [];
-            foreach ($fieldsToInclude as $field) {
-                $itemData[$field] = $item->$field;
-            }
-            $data[] = $itemData;
-        }
-
-        $details = json_encode($data, JSON_PRETTY_PRINT);
-
         // Create LogsModel entry
-        $logEntry = LogsModel::create([
-            'user_id_hash' => $idHash,
+        $log = LogsModel::create([
+            'user_id' => $userId,
             'ip_address' => $request->ip(),
             'user_action' => 'STORE INVENTORY PARENT',
             'user_device' => $userAgent,
-            'details' => $details,
+            'details' => json_encode($arr, JSON_PRETTY_PRINT),
         ]);
 
-        if (!$logEntry) {
+        if ($log) {
+            $log->update([
+                'log_id' => 'log_id-'  . $log->id,
+            ]);
+        } else {
             return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully stored inventory parent'], Response::HTTP_OK);
     }
 
     public function updateLogs(Request $request, $idHash, $changesForLogs)

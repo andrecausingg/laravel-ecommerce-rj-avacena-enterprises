@@ -100,7 +100,7 @@ class AuthController extends Controller
                         ->exists();
 
                     // Logs
-                    $this->loginLogs($request, $user->user_id);
+                    $resultLogs = $this->loginLogs($request, $user->user_id);
 
                     return response()->json([
                         'role' => $user->role === $clientRole ? $clientRole : ($user->role === $adminRole ? $adminRole : ($user->role === $delivery ? $delivery : ($user->role === $cashier ? $cashier : ''))),
@@ -109,7 +109,8 @@ class AuthController extends Controller
                         'token_type' => 'Bearer',
                         'access_token' => $newToken,
                         'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                        'message' => 'Login Successfully'
+                        'message' => 'Login Successfully',
+                        'log_message' => $resultLogs
                     ], Response::HTTP_OK);
                 }
 
@@ -923,10 +924,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
         } else {
             $history = HistoryModel::where('column_name', 'password')
-            ->where('tbl_name', 'users_tbl')
-            ->where('tbl_id', $request->user_id)
-            ->latest() // Order by created_at column in descending order (latest first)
-            ->first(); // Retrieve the first result
+                ->where('tbl_name', 'users_tbl')
+                ->where('tbl_id', $request->user_id)
+                ->latest() // Order by created_at column in descending order (latest first)
+                ->first(); // Retrieve the first result
 
             // Store old and new passwords
             $logsData = [
@@ -1413,36 +1414,36 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
     }
 
-    public function loginLogs($request, $userId)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
+        public function loginLogs($request, $userId)
+        {
+            // Get Device Information
+            $userAgent = $request->header('User-Agent');
 
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 0,
-            'ip_address' => $request->ip(),
-            'user_action' => 'LOGIN',
-            'user_device' => $userAgent,
-            'details' => json_encode([
+            // Create LogsModel entry
+            $log = LogsModel::create([
                 'user_id' => $userId,
-                'fields' => [
-                    'ip_address' => $request->ip(),
-                ]
-            ], JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-' . $log->id,
+                'is_sensitive' => 0,
+                'ip_address' => $request->ip(),
+                'user_action' => 'LOGIN',
+                'user_device' => $userAgent,
+                'details' => json_encode([
+                    'user_id' => $userId,
+                    'fields' => [
+                        'ip_address' => $request->ip(),
+                    ]
+                ], JSON_PRETTY_PRINT),
             ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
 
-        return response()->json(['message' => 'Successfully stored logs and history login'], Response::HTTP_OK);
-    }
+            if ($log) {
+                $log->update([
+                    'log_id' => 'log_id-' . $log->id,
+                ]);
+            } else {
+                return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            return response()->json(['message' => 'Successfully stored logs login'], Response::HTTP_OK);
+        }
 
     public function updateEmailAdminLogs($request, $userId, $logDetails)
     {
