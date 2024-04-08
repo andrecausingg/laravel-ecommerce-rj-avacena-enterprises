@@ -81,16 +81,16 @@ class LogController extends Controller
     public function isDecryptedData($fields, $fieldsToDecrypt)
     {
         $decryptedData = [];
-    
+
         // Iterate over each field in the log details
         foreach ($fields as $fieldName => $fieldValue) {
 
             if (is_array($fieldValue)) {
-                // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
-                $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : null;
-                $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : null;
-                $decryptedData[$fieldName]['oldEnc'] = $decOld;
-                $decryptedData[$fieldName]['newEnc'] = $decNew;
+                 // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
+                 $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
+                 $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
+                 $decryptedData[$fieldName]['old'] = $decOld;
+                 $decryptedData[$fieldName]['new'] = $decNew;
             } else {
                 // If $fieldValue is not an array, decrypt it if needed
                 if (in_array($fieldName, $fieldsToDecrypt)) {
@@ -101,7 +101,7 @@ class LogController extends Controller
                 }
             }
         }
-    
+
         return $decryptedData;
     }
 

@@ -15,6 +15,7 @@ class LogsModel extends Model
     protected  $fillable = [
         'log_id',
         'user_id',
+        'is_sensitive',
         'ip_address',
         'user_action',
         'details',
