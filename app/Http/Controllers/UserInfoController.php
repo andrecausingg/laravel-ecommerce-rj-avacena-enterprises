@@ -65,13 +65,10 @@ class UserInfoController extends Controller
             }
         }
 
-        return response()->json(
-            [
+        return response()->json([
                 'message' => 'Successfully Retrieve Data',
                 'result' => $decryptedUserInfos,
-            ],
-            Response::HTTP_OK
-        );
+            ],Response::HTTP_OK);
     }
 
     public function getPersonalInfo(Request $request)

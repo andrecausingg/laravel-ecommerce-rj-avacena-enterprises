@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 class InventoryController extends Controller
 {
 
-    protected $fillableAttributes, $unsets;
+    protected $fillableAttributes, $unsets, $userInputFields;
 
     public function __construct()
     {
@@ -31,9 +31,25 @@ class InventoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        // Authorize the user
+        $user = $this->authorizeUser($request);
+
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $items = InventoryModel::get();
+
+        return response()->json(
+            [
+                'message' => 'Successfully Retrieve Data',
+                'result' => $items
+            ],
+            Response::HTTP_OK
+        );
     }
 
 
@@ -104,8 +120,8 @@ class InventoryController extends Controller
 
                 // Update the inventory_id based on the retrieved ID
                 $created->update([
-                    'inventory_id' => 'inv-' . $lastInsertedId,
-                    'group_id' => "invgro-" . $lastInsertedId,
+                    'inventory_id' => 'inv_id-' . $lastInsertedId,
+                    'group_id' => "inv_gro_id-" . $lastInsertedId,
                 ]);
 
                 $createdItems[] = $created;
@@ -143,8 +159,13 @@ class InventoryController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        if (empty($user->id_hash)) {
-            return response()->json(['message' => 'Not authenticated user',], Response::HTTP_UNAUTHORIZED);
+        if (empty($user->user_id)) {
+            return response()->json(
+                [
+                    'message' => 'Not authenticated user',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
 
         $inventory = InventoryModel::where('inventory_id', $id)->first();
@@ -187,6 +208,11 @@ class InventoryController extends Controller
             );
         }
 
+        // Check if 'items' key exists in the request
+        if (!$request->has('items') || empty($request['items'])) {
+            return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
+        }
+
         foreach ($this->unsets as $unset) {
             // Find the key associated with the field and unset it
             $key = array_search($unset, $this->fillableAttributes);
@@ -194,6 +220,7 @@ class InventoryController extends Controller
                 unset($this->fillableAttributes[$key]);
             }
         }
+
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -305,7 +332,6 @@ class InventoryController extends Controller
     {
 
         $arr = [];
-        $arr['user_id'] = $userId;
         $arr['fields'] = $logDetails;
 
         // Get Device Information

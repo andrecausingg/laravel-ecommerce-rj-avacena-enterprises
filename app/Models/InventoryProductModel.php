@@ -14,10 +14,10 @@ class InventoryProductModel extends Model
 
     protected $primaryKey = 'id';
     protected $fillable = [
+        'inventory_product_id',
         'inventory_group_id',
-        'product_id',
+        
         'item_code',
-
         'image',
         'name',
         'description',
@@ -28,11 +28,16 @@ class InventoryProductModel extends Model
         'discounted_price',
         'stock',
 
-        'supplier',
+        'supplier_name',
         'unit_supplier_price',
 
         'created_at',
         'updated_at',
     ];
     protected $dates = ['deleted_at'];
+
+    public function getFillableAttributes(): array
+    {
+        return $this->fillable;
+    }
 }

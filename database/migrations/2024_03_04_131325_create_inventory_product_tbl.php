@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('category')->nullable();
 
             // Original Price
-            $table->string('retail_price')->nullable();
+            $table->double('retail_price', 30, 2)->default(0.00);
             $table->double('discounted_price', 30, 2)->default(0.00);
             $table->bigInteger('stock')->default(0);
 
