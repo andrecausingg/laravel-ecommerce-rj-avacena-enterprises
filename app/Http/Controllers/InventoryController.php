@@ -178,14 +178,6 @@ class InventoryController extends Controller
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        foreach ($this->unsets as $unset) {
-            // Find the key associated with the field and unset it
-            $key = array_search($unset, $this->fillableAttributes);
-            if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
-            }
-        }
-
         if (empty($user->user_id)) {
             return response()->json(
                 [
@@ -193,6 +185,14 @@ class InventoryController extends Controller
                 ],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
+        }
+
+        foreach ($this->unsets as $unset) {
+            // Find the key associated with the field and unset it
+            $key = array_search($unset, $this->fillableAttributes);
+            if ($key !== false) {
+                unset($this->fillableAttributes[$key]);
+            }
         }
 
         // Validation rules for each item in the array
@@ -256,7 +256,7 @@ class InventoryController extends Controller
                 return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         }
-        
+
         // Log all changes
         $resultLogs = $this->updateLogs($request, $user->user_id, $changesForLogs);
 
