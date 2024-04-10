@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\HistoryModel;
 use App\Models\LogsModel;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -20,12 +19,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
+    protected $fillableAttributes, $UnsetDecrypts, $Encfields;
+    public function __construct()
+    {
+        $this->UnsetDecrypts = config('user-info.UnsetDecrypt');
+
+        $userInfoModel = new UserInfoModel();
+        $this->fillableAttributes = $userInfoModel->getFillableAttributes();
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $fields = config('user-info-fields.EncUserInfoFields');
         $decryptedUserInfos = [];
 
         // Authorize the user
@@ -36,15 +43,22 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $userInfos = UserInfoModel::get();
+        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
+            // Find the key associated with the field and unset it
+            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
+            if ($key !== false) {
+                unset($this->fillableAttributes[$key]);
+            }
+        }
 
+        $userInfos = UserInfoModel::get();
         foreach ($userInfos as $userInfo) {
             if ($userInfo) {
                 $userInfoArray = $userInfo->toArray();
 
-                foreach ($fields as $field) {
-                    if (isset($userInfoArray[$field])) {
-                        $userInfoArray[$field] = $userInfo->{$field} ? Crypt::decrypt($userInfo->{$field}) : null;
+                foreach ($this->fillableAttributes as $fillableAttribute) {
+                    if (isset($userInfoArray[$fillableAttribute])) {
+                        $userInfoArray[$fillableAttribute] = $userInfo->{$fillableAttribute} ? Crypt::decrypt($userInfo->{$fillableAttribute}) : null;
                     }
                 }
                 $decryptedUserInfos = $userInfoArray;
@@ -62,25 +76,30 @@ class UserInfoController extends Controller
 
     public function getPersonalInfo(Request $request)
     {
-        $fields = config('user-info-fields.EncUserInfoFields');
-
         // Authorize the user
         $user = $this->authorizeUser($request);
+        $decryptedUserInfos = [];
 
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $decryptedUserInfos = [];
+        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
+            // Find the key associated with the field and unset it
+            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
+            if ($key !== false) {
+                unset($this->fillableAttributes[$key]);
+            }
+        }
 
         $userInfos = UserInfoModel::where('user_id', $user->user_id)->first();
         if ($userInfos) {
             $userInfoArray = $userInfos->toArray();
 
-            foreach ($fields as $field) {
-                if (isset($userInfoArray[$field])) {
-                    $userInfoArray[$field] = $userInfos->{$field} ? Crypt::decrypt($userInfos->{$field}) : null;
+            foreach ($this->fillableAttributes as $fillableAttribute) {
+                if (isset($userInfoArray[$fillableAttribute])) {
+                    $userInfoArray[$fillableAttribute] = $userInfos->{$fillableAttribute} ? Crypt::decrypt($userInfos->{$fillableAttribute}) : null;
                 }
             }
             $decryptedUserInfos = $userInfoArray;
@@ -213,14 +232,18 @@ class UserInfoController extends Controller
     {
         // Initialize
         $changesForLogs = [];
-        $fields = config('user-info-fields.EncUserInfoFields');
-
         // Authorize the user
         $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
+            // Find the key associated with the field and unset it
+            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
+            if ($key !== false) {
+                unset($this->fillableAttributes[$key]);
+            }
         }
 
         // Validation rules
@@ -264,40 +287,52 @@ class UserInfoController extends Controller
             // Generate File Name
             $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
 
-            // Encrypt the new image name before saving it
-            $newImageEncrypted = Crypt::encrypt($filename);
-
             // Log the changes for the image if it's different
-            if (Crypt::decrypt($userInfo->image) !== $filename) {
+            if ($userInfo->image !== null) {
+                if (Crypt::decrypt($userInfo->image) !== $filename) {
+                    $changesForLogs['image'] = [
+                        'old' => Crypt::decrypt($userInfo->image),
+                        'new' => $filename,
+                    ];
+                }
+            } else {
                 $changesForLogs['image'] = [
-                    'old' => Crypt::decrypt($userInfo->image),
+                    'old' => '',
                     'new' => $filename,
                 ];
             }
-
             // Save on Storage
             Storage::disk('public')->put($filename, file_get_contents($image));
 
-            $userInfo->image = $newImageEncrypted;
+            // Encrypt the new image name before saving it
+            $userInfo->image = Crypt::encrypt($filename);
         }
 
         // Loop through the fields for encryption and decryption
-        foreach ($fields as $field) {
+        foreach ($this->fillableAttributes as $field) {
             try {
-                // Check if the field is 'image' and it's null, skip it from the log
-                if ($field == 'image' && !$request->hasFile('image')) {
-                    continue;
-                }
-
                 $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
-                $newValue = $request->filled($field) ? Crypt::encrypt($request->input($field)) : $existingValue;
-
+                if ($request->filled($field)) {
+                    $newValue = Crypt::encrypt($request->input($field));
+                } else {
+                    if ($field === 'image') {
+                        $newValue = Crypt::encrypt($existingValue);
+                    } else {
+                        $newValue = $existingValue;
+                    }
+                }
+                
                 // Check if the value has changed
                 if ($existingValue != $request->input($field) && $request->input($field) != null) {
                     $changesForLogs[$field] = [
                         'oldEnc' => $existingValue,
                         'newEnc' => $request->input($field),
                     ];
+                }else{
+                    $changesForLogs[$field] = [
+                        'oldEnc' => 'null',
+                        'newEnc' => $existingValue,
+                    ]; 
                 }
 
                 // Update the user info

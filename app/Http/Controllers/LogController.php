@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Log;
 use App\Models\LogsModel;
 use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
-use Hamcrest\Arrays\IsArray;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Crypt;
@@ -14,43 +12,43 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
-    public function index(Request $request)
-    {
-        $fields = config('encrypted-fields.EncryptedFields');
+    protected $encryptedFields, $fillableAttributes;
 
-        // Logs Array
-        $decryptedLogs = [];
+    public function __construct()
+    {
+        $this->encryptedFields = config('encrypted-fields.EncryptedFields');
 
         // Get the Attribute
         $logsModel = new LogsModel();
-        $fillableAttributesLogs = $logsModel->getFillableAttributes();
+        $this->fillableAttributes = $logsModel->getFillableAttributes();
+    }
 
-        // Authorize the user
+    public function index(Request $request)
+    {
+        $decryptedLogs = [];
+
         $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         $logs = LogsModel::get();
-
         foreach ($logs as $log) {
             $detailsJson = json_decode($log['details'], true);
 
             if (isset($detailsJson['fields'])) {
-                $decryptedData = $this->isDecryptedData($detailsJson['fields'], $fields);
+                $decryptedData = $this->isDecryptedData($detailsJson['fields'], $this->encryptedFields);
                 $arrWithParentId = [
                     'user_id' => $detailsJson['user_id'],
                     'fields' => $decryptedData
                 ];
             }
 
-            foreach ($fillableAttributesLogs as $fillableAttributeLog) {
-                if ($fillableAttributeLog == 'details') {
-                    $decryptedLogs[$fillableAttributeLog] = $arrWithParentId;
+            foreach ($this->fillableAttributes as $fillableAttribute) {
+                if ($fillableAttribute == 'details') {
+                    $decryptedLogs[$fillableAttribute] = $arrWithParentId;
                 } else {
-                    $decryptedLogs[$fillableAttributeLog] = $log->$fillableAttributeLog;
+                    $decryptedLogs[$fillableAttribute] = $log->$fillableAttribute;
                 }
             }
 
@@ -59,7 +57,7 @@ class LogController extends Controller
             if ($userInfo) {
                 $userInfoArray = $userInfo->toArray();
 
-                foreach ($fields as $field) {
+                foreach ($this->encryptedFields as $field) {
                     if (isset($userInfoArray[$field])) {
                         $userInfoArray[$field] = $userInfo->{$field} ? Crypt::decrypt($userInfo->{$field}) : null;
                     }
@@ -86,11 +84,11 @@ class LogController extends Controller
         foreach ($fields as $fieldName => $fieldValue) {
 
             if (is_array($fieldValue)) {
-                 // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
-                 $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
-                 $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
-                 $decryptedData[$fieldName]['old'] = $decOld;
-                 $decryptedData[$fieldName]['new'] = $decNew;
+                // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
+                $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
+                $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
+                $decryptedData[$fieldName]['old'] = $decOld;
+                $decryptedData[$fieldName]['new'] = $decNew;
             } else {
                 // If $fieldValue is not an array, decrypt it if needed
                 if (in_array($fieldName, $fieldsToDecrypt)) {

@@ -16,6 +16,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class InventoryController extends Controller
 {
+
+    protected $fillableAttributes, $unsets;
+
+    public function __construct()
+    {
+        $this->unsets = config('inventory.Unset');
+
+        $InventoryModel = new InventoryModel();
+        $this->fillableAttributes = $InventoryModel->getFillableAttributes();
+    }
+
+
     /**
      * Display a listing of the resource.
      */
@@ -92,23 +104,27 @@ class InventoryController extends Controller
 
                 // Update the inventory_id based on the retrieved ID
                 $created->update([
-                    'group_id' => "invgro-" . $lastInsertedId,
                     'inventory_id' => 'inv-' . $lastInsertedId,
+                    'group_id' => "invgro-" . $lastInsertedId,
                 ]);
 
-                $this->storeLogs($request, $user->user_id, $created);
+                $createdItems[] = $created;
             } else {
-                return response()->json([
+                return response()->json(
+                    [
                         'message' => 'Failed to store Inventory Parents',
-                    ],Response::HTTP_INTERNAL_SERVER_ERROR
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
         }
 
+        $logResult = $this->storeLogs($request, $user->user_id, $createdItems);
+
         return response()->json([
-                'message' => 'Inventory records parent store successfully',
-            ],Response::HTTP_OK
-        );
+            'message' => 'Inventory records parent store successfully',
+            'log_message' => $logResult
+        ], Response::HTTP_OK);
     }
 
     /**
@@ -128,12 +144,7 @@ class InventoryController extends Controller
         $user = $this->authorizeUser($request);
 
         if (empty($user->id_hash)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_UNAUTHORIZED
-            );
+            return response()->json(['message' => 'Not authenticated user',], Response::HTTP_UNAUTHORIZED);
         }
 
         $inventory = InventoryModel::where('inventory_id', $id)->first();
@@ -163,14 +174,25 @@ class InventoryController extends Controller
     {
         // Initialize
         $changesForLogs = [];
-        $fields = config('inventory.inventory');
 
         // Authorize the user
         $user = $this->authorizeUser($request);
 
-        // Check if authenticated user
-        if (empty($user->id_hash)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        foreach ($this->unsets as $unset) {
+            // Find the key associated with the field and unset it
+            $key = array_search($unset, $this->fillableAttributes);
+            if ($key !== false) {
+                unset($this->fillableAttributes[$key]);
+            }
+        }
+
+        if (empty($user->user_id)) {
+            return response()->json(
+                [
+                    'message' => 'Not authenticated user',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
 
         // Validation rules for each item in the array
@@ -199,13 +221,13 @@ class InventoryController extends Controller
             // Field to check if not same value on database then record it on logs
             $changesForLogsItem = [];
 
-            foreach ($fields as $field) {
-                $existingValue = $inventory->$field ?? null;
-                $newValue = $productUserInput[$field] ?? null;
+            foreach ($this->fillableAttributes as $fillableAttribute) {
+                $existingValue = $inventory->$fillableAttribute ?? null;
+                $newValue = $productUserInput[$fillableAttribute] ?? null;
 
                 // Check if the value has changed
                 if ($existingValue !== $newValue) {
-                    $changesForLogsItem[$field] = [
+                    $changesForLogsItem[$fillableAttribute] = [
                         'old' => $existingValue,
                         'new' => $newValue,
                     ];
@@ -215,12 +237,13 @@ class InventoryController extends Controller
             // Log the changes for the current item
             $changesForLogs[] = [
                 'inventory_id' => $productUserInput['inventory_id'],
+                'group_id' => $productUserInput['group_id'],
                 'fields' => $changesForLogsItem,
             ];
 
             // Update the inventory info
-            foreach ($fields as $field) {
-                $inventory->$field = $productUserInput[$field];
+            foreach ($this->fillableAttributes as $fillableAttribute) {
+                $inventory->$fillableAttribute = $productUserInput[$fillableAttribute];
             }
 
             if (!$inventory->save()) {
@@ -228,11 +251,19 @@ class InventoryController extends Controller
             }
         }
 
-        return response()->json(['message' => $changesForLogs], Response::HTTP_OK);
+        foreach ($changesForLogs as $item) {
+            if (array_key_exists('fields', $item) && is_array($item['fields']) && empty($item['fields'])) {
+                return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+        
         // Log all changes
-        $this->updateLogs($request, $user->id_hash, $changesForLogs);
+        $resultLogs = $this->updateLogs($request, $user->user_id, $changesForLogs);
 
-        return response()->json(['message' => 'All inventory parent records updated successfully'], Response::HTTP_OK);
+        return response()->json([
+            'message' => 'All inventory parent records updated successfully',
+            'log_message' => $resultLogs
+        ], Response::HTTP_OK);
     }
 
     /**
@@ -270,50 +301,12 @@ class InventoryController extends Controller
         }
     }
 
-
-    // LOGS
-    // public function storeLogs(Request $request, $userId, $storeData)
-    // {
-    //     // Get Device Information
-    //     $userAgent = $request->header('User-Agent');
-
-    //     // Define the fields to include in the logs
-    //     $fieldsToInclude = [
-    //         'inventory_id', 'group_id', 'name', 'category',
-    //     ];
-
-    //     // Loop through each created item and add them to data
-    //     $data = [];
-    //     foreach ($storeData as $item) {
-    //         $itemData = [];
-    //         foreach ($fieldsToInclude as $field) {
-    //             $itemData[$field] = $item->$field;
-    //         }
-    //         $data[] = $itemData;
-    //     }
-
-    //     $details = json_encode($data, JSON_PRETTY_PRINT);
-
-    //     // Create LogsModel entry
-    //     $logEntry = LogsModel::create([
-    //         'user_id_hash' => $userId,
-    //         'ip_address' => $request->ip(),
-    //         'user_action' => 'STORE INVENTORY PARENT',
-    //         'user_device' => $userAgent,
-    //         'details' => $details,
-    //     ]);
-
-    //     if (!$logEntry) {
-    //         return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
-    //     }
-    // }
-
     public function storeLogs($request, $userId, $logDetails)
     {
 
         $arr = [];
         $arr['user_id'] = $userId;
-        $arr['fields'] = is_array($logDetails) ? json_encode($logDetails) : $logDetails;
+        $arr['fields'] = $logDetails;
 
         // Get Device Information
         $userAgent = $request->header('User-Agent');
@@ -338,56 +331,32 @@ class InventoryController extends Controller
         return response()->json(['message' => 'Successfully stored inventory parent'], Response::HTTP_OK);
     }
 
-    public function updateLogs(Request $request, $idHash, $changesForLogs)
+    public function updateLogs($request, $userId, $logDetails)
     {
+
+        $arr = [];
+        $arr['fields'] = $logDetails;
+
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
-        // Define the fields to include in the logs
-        $fieldsToInclude = [
-            'inventory_id', 'group_id', 'name', 'category',
-        ];
+        // Create LogsModel entry
+        $log = LogsModel::create([
+            'user_id' => $userId,
+            'ip_address' => $request->ip(),
+            'user_action' => 'UPDATE INVENTORY PARENT',
+            'user_device' => $userAgent,
+            'details' => json_encode($arr, JSON_PRETTY_PRINT),
+        ]);
 
-        // Create LogsModel entry for each change in $changesForLogs
-        foreach ($changesForLogs as $change) {
-            // Loop through fields for the current inventory item
-            foreach ($change['fields'] as $field => $changeDetails) {
-                $logDetails['fields'][$field] = [
-                    'old' => $changeDetails['old'],
-                    'new' => $changeDetails['new'],
-                ];
-
-                // Create HistoryModel entry
-                $historyCreate = HistoryModel::create([
-                    'user_id_hash' => $idHash, // User Perform Changes
-                    'tbl_name' => 'inventory_tbl',
-                    'column_name' => $field,
-                    'value' => $changeDetails['old'],
-                    'inventory_id' => $inventoryId,
-                ]);
-
-                if (!$historyCreate) {
-                    return response()->json(['message' => 'Failed to create history for inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
-            }
-
-            $details = json_encode($logDetails, JSON_PRETTY_PRINT);
-
-            // Create LogsModel entry for the current inventory item
-            $logEntry = LogsModel::create([
-                'user_id_hash' => $idHash,
-                'inventory_id' => $inventoryId,
-                'ip_address' => $request->ip(),
-                'user_action' => 'UPDATE PARENT INVENTORY',
-                'user_device' => $userAgent,
-                'details' => $details,
+        if ($log) {
+            $log->update([
+                'log_id' => 'log_id-'  . $log->id,
             ]);
-
-            if (!$logEntry) {
-                return response()->json(['message' => 'Failed to update logs for inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
+        } else {
+            return response()->json(['message' => 'Failed to update logs for update inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        return response()->json(['message' => 'Successfully updated logs for inventory parent'], Response::HTTP_OK);
+        return response()->json(['message' => 'Successfully update inventory parent'], Response::HTTP_OK);
     }
 }

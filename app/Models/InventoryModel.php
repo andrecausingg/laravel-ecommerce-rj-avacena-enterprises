@@ -22,4 +22,9 @@ class InventoryModel extends Model
         'updated_at',
     ];
     protected $dates = ['deleted_at'];
+
+    public function getFillableAttributes(): array
+    {
+        return $this->fillable;
+    }
 }
