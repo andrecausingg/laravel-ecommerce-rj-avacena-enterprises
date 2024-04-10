@@ -79,7 +79,7 @@ class InventoryProductController extends Controller
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'nullable',
-            'items.*.name' => 'required|string|max:500',
+            'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
             'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
@@ -189,7 +189,7 @@ class InventoryProductController extends Controller
 
         $changesForLogs = [];
         $changesForLogsItem = [];
-        
+
         // Authorize the user
         $user = $this->authorizeUser($request);
         if (empty($user->user_id)) {
