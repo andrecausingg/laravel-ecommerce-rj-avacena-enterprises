@@ -77,6 +77,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         });
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {
+            Route::get('/index', [$InventoryProductController, 'index']);
             Route::post('/store', [$InventoryProductController, 'store']);
             Route::post('/update', [$InventoryProductController, 'update']);
         });

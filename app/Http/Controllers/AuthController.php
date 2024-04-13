@@ -1414,36 +1414,36 @@ class AuthController extends Controller
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
     }
 
-        public function loginLogs($request, $userId)
-        {
-            // Get Device Information
-            $userAgent = $request->header('User-Agent');
+    public function loginLogs($request, $userId)
+    {
+        // Get Device Information
+        $userAgent = $request->header('User-Agent');
 
-            // Create LogsModel entry
-            $log = LogsModel::create([
+        // Create LogsModel entry
+        $log = LogsModel::create([
+            'user_id' => $userId,
+            'is_sensitive' => 0,
+            'ip_address' => $request->ip(),
+            'user_action' => 'LOGIN',
+            'user_device' => $userAgent,
+            'details' => json_encode([
                 'user_id' => $userId,
-                'is_sensitive' => 0,
-                'ip_address' => $request->ip(),
-                'user_action' => 'LOGIN',
-                'user_device' => $userAgent,
-                'details' => json_encode([
-                    'user_id' => $userId,
-                    'fields' => [
-                        'ip_address' => $request->ip(),
-                    ]
-                ], JSON_PRETTY_PRINT),
+                'fields' => [
+                    'ip_address' => $request->ip(),
+                ]
+            ], JSON_PRETTY_PRINT),
+        ]);
+
+        if ($log) {
+            $log->update([
+                'log_id' => 'log_id-' . $log->id,
             ]);
-
-            if ($log) {
-                $log->update([
-                    'log_id' => 'log_id-' . $log->id,
-                ]);
-            } else {
-                return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-
-            return response()->json(['message' => 'Successfully stored logs login'], Response::HTTP_OK);
+        } else {
+            return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        return response()->json(['message' => 'Successfully stored logs login'], Response::HTTP_OK);
+    }
 
     public function updateEmailAdminLogs($request, $userId, $logDetails)
     {

@@ -29,11 +29,26 @@ class InventoryProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
-    }
+        // Authorize the user
+        $user = $this->authorizeUser($request);
 
+        // Check if authenticated user
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $inventoryProduct = InventoryProductModel::get();
+
+        return response()->json(
+            [
+                'message' => 'Successfully Retrieve Data',
+                'result' => $inventoryProduct
+            ],
+            Response::HTTP_OK
+        );
+    }
     /**
      * Show the form for creating a new resource.
      */
