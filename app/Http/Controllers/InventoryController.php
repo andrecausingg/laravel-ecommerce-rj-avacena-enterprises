@@ -34,8 +34,6 @@ class InventoryController extends Controller
     public function index(Request $request)
     {
         $arrInventory = [];
-        $variant = 1;
-        $sumStock = 0; 
 
         // Authorize the user
         $user = $this->authorizeUser($request);
@@ -51,11 +49,8 @@ class InventoryController extends Controller
             $arrInventoryItem['inventory_parent'] = $inventoryParent;
 
             $inventoryChilds = InventoryProductModel::where('inventory_group_id', $inventoryParent->group_id)->get();
-            foreach ($inventoryChilds as $inventoryChild) {
-                $arrInventoryItem['inventory_parent']['variant'] = $variant++;
-                $arrInventoryItem['inventory_parent']['stock'] = $sumStock += $inventoryChild->stock;
-            }
-
+            $arrInventoryItem['inventory_parent']['variant'] =  $inventoryChilds->count();
+            $arrInventoryItem['inventory_parent']['stock'] = $inventoryChilds->sum('stock');
             $arrInventoryItem['inventory_parent']['inventory_children'] = $inventoryChilds->toArray();
 
             $arrInventory[] = $arrInventoryItem;

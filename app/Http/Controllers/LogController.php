@@ -26,6 +26,7 @@ class LogController extends Controller
     public function index(Request $request)
     {
         $decryptedLogs = [];
+        $resultJson = [];
 
         $user = $this->authorizeUser($request);
         if (empty($user->user_id)) {

@@ -294,7 +294,7 @@ class UserInfoController extends Controller
                 }
             } else {
                 $changesForLogs['image'] = [
-                    'old' => '',
+                    'old' => null,
                     'new' => $filename,
                 ];
             }
