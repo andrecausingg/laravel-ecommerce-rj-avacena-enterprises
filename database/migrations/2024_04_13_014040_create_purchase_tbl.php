@@ -17,10 +17,12 @@ return new class extends Migration
             $table->text('purchase_id')->unique()->nullable();
             $table->text('purchase_group_id');
 
-            $table->text('user_id')->nullable();
+            $table->text('user_id_costumer')->nullable();
+            $table->text('user_id_ecom')->nullable();
+            $table->text('user_id_menu')->nullable();
+            
             $table->text('inventory_product_id');
-
-            $table->status('status');
+            $table->string('status');
 
             // Date | Time
             $table->timestamps();

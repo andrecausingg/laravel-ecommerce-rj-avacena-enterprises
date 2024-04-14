@@ -7,6 +7,7 @@ use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryProductController;
 use App\Http\Controllers\LogController;
+use App\Http\Controllers\PurchaseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +36,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     $InventoryController = InventoryController::class;
     $InventoryProductController = InventoryProductController::class;
     $LogController = LogController::class;
+    $PurchaseController = PurchaseController::class;
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
@@ -82,6 +84,12 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::post('/update', [$InventoryProductController, 'update']);
         });
     });
+
+    // Purchase
+    Route::prefix('purchase')->group(function () use ($PurchaseController) {
+        Route::post('/store', [$PurchaseController, 'store']);
+    });
+
 
     Route::prefix('log')->group(function () use ($LogController) {
         Route::get('index', [$LogController, 'index']);

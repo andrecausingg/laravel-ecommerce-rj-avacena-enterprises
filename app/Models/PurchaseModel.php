@@ -15,7 +15,9 @@ class PurchaseModel extends Model
         'purchase_id',
         'purchase_group_id',
 
-        'user_id',
+        'user_id_costumer',
+        'user_id_ecom',
+        'user_id_menu',
         'inventory_product_id',
         'status',
 

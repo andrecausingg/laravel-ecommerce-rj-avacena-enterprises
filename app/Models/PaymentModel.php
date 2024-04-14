@@ -17,9 +17,13 @@ class PaymentModel extends Model
         'user_id',
         'purchase_group_id',
 
-        'payment_method',
-        'discount_amount',
-        'amount',
+        'payment_method', 
+        'voucher',
+        'discounted_amount',
+        'total_amount',
+        'money',
+        'change',
+        'status',
 
         'deleted_at',
         'created_at',

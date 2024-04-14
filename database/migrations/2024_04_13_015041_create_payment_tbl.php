@@ -16,12 +16,16 @@ return new class extends Migration
 
             $table->text('payment_id')->unique()->nullable();
 
-            $table->text('user_id')->nullable();
+            $table->text('user_id');
             $table->text('purchase_group_id');
+            $table->string('voucher_id')->nullable();
 
             $table->string('payment_method');
-            $table->double('discount_amount', 30, 2);
-            $table->double('amount', 30, 2);
+            $table->double('discounted_amount', 30, 2)->default(0.00);
+            $table->double('total_amount', 30, 2)->default(0.00);
+            $table->double('money', 30, 2)->default(0.00);
+            $table->double('change', 30, 2)->default(0.00);
+            $table->string('status')->default('NOT PAID');
 
             // Date | Time
             $table->timestamps();
