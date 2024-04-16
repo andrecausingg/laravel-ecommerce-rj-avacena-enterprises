@@ -18,21 +18,26 @@ return new class extends Migration
             $table->text('inventory_group_id');
             $table->string('item_code');
 
-            // Default 
+            // Name 
             $table->longText('image')->nullable();
             $table->text('name');
-            $table->longText('description')->nullable();
-            $table->string('is_refund')->default('no');
             $table->string('category')->nullable();
+            $table->longText('description')->nullable();
+            $table->text('supplier_name')->nullable();
+            $table->text('design')->nullable();
+            $table->string('size')->nullable();
+            $table->string('color')->nullable();
 
-            // Original Price
+            // Prices
             $table->double('retail_price', 30, 2)->default(0.00);
             $table->double('discounted_price', 30, 2)->default(0.00);
+            $table->double('unit_supplier_price', 30, 2)->default(0.00);
+
+            // Stock
             $table->bigInteger('stock')->default(0);
 
-            // Supplier
-            $table->text('supplier_name')->nullable();
-            $table->double('unit_supplier_price', 30, 2)->default(0.00);
+            // Refund
+            $table->string('is_refund')->default('no')->comment('1 = YES | 0 = NO');;
 
             // Date | Time
             $table->timestamps();

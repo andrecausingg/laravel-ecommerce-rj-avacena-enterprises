@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('user_id')->nullable();
             
             // 
-            $table->tinyInteger('is_sensitive')->default(0);
+            $table->tinyInteger('is_sensitive')->default(0)->comment('1 = YES | 0 = NO');;
             $table->text('ip_address');
             $table->text('user_action');
             $table->longText('details');
