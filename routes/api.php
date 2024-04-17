@@ -87,6 +87,7 @@ Route::middleware(['jwt.auth'])->group(function () {
 
     // Purchase
     Route::prefix('purchase')->group(function () use ($PurchaseController) {
+        Route::get('/get-user-id-menu-costumer', [$PurchaseController, 'getUserIdMenuCustomer']);
         Route::post('/store', [$PurchaseController, 'store']);
     });
 

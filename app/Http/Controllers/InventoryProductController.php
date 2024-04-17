@@ -20,7 +20,7 @@ class InventoryProductController extends Controller
 
     public function __construct()
     {
-        $this->unsets = config('inventory-product.Unset');
+        $this->unsets = config('a-global.Unset-Timestamp');
 
         $InventoryProductModel = new InventoryProductModel();
         $this->fillableAttributes = $InventoryProductModel->getFillableAttributes();

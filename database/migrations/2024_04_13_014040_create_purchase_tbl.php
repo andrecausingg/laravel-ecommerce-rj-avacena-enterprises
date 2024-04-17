@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('user_id_menu')->nullable();
 
             // Inventory I.Ds
-            $table->text('inventory_product_id')->unique()->nullable();
+            $table->text('inventory_product_id');
             $table->text('inventory_group_id');
             $table->string('item_code');
 
@@ -41,16 +41,9 @@ return new class extends Migration
             // Prices
             $table->double('retail_price', 30, 2)->default(0.00);
             $table->double('discounted_price', 30, 2)->default(0.00);
-            $table->double('unit_supplier_price', 30, 2)->default(0.00);
-
-            // Stock
-            $table->bigInteger('stock')->default(0);
-
-            // Refund
-            $table->string('is_refund')->default('no')->comment('1 = YES | 0 = NO');;
 
             // Status
-            $table->string('status')->comment('NOT PAID | VOID | DONE');
+            $table->string('status')->default('NOT PAID')->comment('NOT PAID | VOID | DONE');
 
             // Date | Time
             $table->timestamps();

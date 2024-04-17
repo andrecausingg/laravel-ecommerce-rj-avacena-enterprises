@@ -36,9 +36,6 @@ return new class extends Migration
             // Stock
             $table->bigInteger('stock')->default(0);
 
-            // Refund
-            $table->string('is_refund')->default('no')->comment('1 = YES | 0 = NO');;
-
             // Date | Time
             $table->timestamps();
             $table->softDeletes();

@@ -16,20 +16,22 @@ class InventoryProductModel extends Model
     protected $fillable = [
         'inventory_product_id',
         'inventory_group_id',
-        
         'item_code',
+
         'image',
         'name',
-        'description',
-        'is_refund',
         'category',
+        'description',
+        'supplier_name',
+        'design',
+        'size',
+        'color',
 
         'retail_price',
         'discounted_price',
-        'stock',
-
-        'supplier_name',
         'unit_supplier_price',
+
+        'stock',
 
         'created_at',
         'updated_at',

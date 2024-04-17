@@ -18,7 +18,23 @@ class PurchaseModel extends Model
         'user_id_customer',
         'user_id_ecom',
         'user_id_menu',
+
         'inventory_product_id',
+        'inventory_group_id',
+        'item_code',
+
+        'image',
+        'name',
+        'category',
+        'description',
+        'supplier_name',
+        'design',
+        'size',
+        'color',
+
+        'retail_price',
+        'discounted_price',
+        
         'status',
 
         'deleted_at',
