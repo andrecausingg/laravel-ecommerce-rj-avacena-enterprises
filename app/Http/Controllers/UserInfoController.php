@@ -164,14 +164,8 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Transform input data to uppercase for specified fields
-        $validatedData = $validator->validated();
-        foreach ($validatedData as $key => $value) {
-            // Check if the field should be transformed to uppercase
-            if (in_array($key, $this->Uppercase)) {
-                $validatedData[$key] = strtoupper($value);
-            }
-        }
+        // UpperCase Specific Field
+        $validatedData = $this->helper->upperCaseSpecific($validator->validated(), $this->Uppercase);
 
         // Handle image upload and update
         if ($request->hasFile('image')) {
@@ -285,14 +279,8 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Transform input data to uppercase for specified fields
-        $validatedData = $validator->validated();
-        foreach ($validatedData as $key => $value) {
-            // Check if the field should be transformed to uppercase
-            if (in_array($key, $this->Uppercase)) {
-                $validatedData[$key] = strtoupper($value);
-            }
-        }
+        // UpperCase Specific Field
+        $validatedData = $this->helper->upperCaseSpecific($validator->validated(), $this->Uppercase);
 
         // Retrieve the user information
         $userInfo = UserInfoModel::where('user_id', $user->user_id)->first();

@@ -45,4 +45,16 @@ class Helper
             return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    public function upperCaseSpecific($validatedData, $colUpperCase)
+    {
+        foreach ($validatedData as $key => $value) {
+            // Check if the field should be transformed to uppercase
+            if (in_array($key, $colUpperCase)) {
+                $validatedData[$key] = strtoupper($value);
+            }
+        }
+
+        return $validatedData;
+    }
 }

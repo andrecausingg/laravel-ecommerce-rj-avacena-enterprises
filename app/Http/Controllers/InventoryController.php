@@ -125,9 +125,7 @@ class InventoryController extends Controller
         }
 
 
-
         foreach ($request['items'] as $productUserInput) {
-
             // Unset Columns
             $unsetResults = $this->helper->unsetColumn($this->unsetsStore, $this->fillableAttrInventorys);
             foreach ($unsetResults as $unsetResult) {
@@ -215,6 +213,7 @@ class InventoryController extends Controller
     {
         // Initialize
         $changesForLogs = [];
+        $arrUpdate = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -228,13 +227,9 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
-        foreach ($this->unsetsTimeStamps as $unsetsTimeStamp) {
-            // Find the key associated with the field and unset it
-            $key = array_search($unsetsTimeStamp, $this->fillableAttrInventorys);
-            if ($key !== false) {
-                unset($this->fillableAttrInventorys[$key]);
-            }
-        }
+        // Unset Columns
+        $unsetResults = $this->helper->unsetColumn($this->unsetsTimeStamps, $this->fillableAttrInventorys);
+        $this->fillableAttrInventorys = $unsetResults;
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
