@@ -7,27 +7,27 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 
 use App\Models\UserInfoModel;
-use Illuminate\Support\Carbon;
-use Tymon\JWTAuth\Facades\JWTAuth;
-
-use Illuminate\Support\Facades\Log;
 use Jenssegers\Agent\Facades\Agent;
 use Illuminate\Support\Facades\Crypt;
+use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
-    protected $fillableAttributes, $UnsetDecrypts, $Encfields, $Uppercase;
-    public function __construct()
+    protected $fillableAttributes, $UnsetDecrypts, $Uppercase, $helper;
+    public function __construct(Helper $helper)
     {
-        $this->UnsetDecrypts = config('user-info.UnsetDecrypt');
-        $this->Uppercase = config('user-info.Uppercase');
-
         $userInfoModel = new UserInfoModel();
         $this->fillableAttributes = $userInfoModel->getFillableAttributes();
+
+        $this->UnsetDecrypts = config('system.user-info.UnsetDecrypt');
+        $this->Uppercase = config('system.user-info.Uppercase');
+        $this->helper = $helper;
     }
+
+
 
     /**
      * Display a listing of the resource.
@@ -37,12 +37,11 @@ class UserInfoController extends Controller
         $decryptedUserInfos = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
             // Find the key associated with the field and unset it
@@ -74,14 +73,14 @@ class UserInfoController extends Controller
 
     public function getPersonalInfo(Request $request)
     {
-        // Authorize the user
-        $user = $this->authorizeUser($request);
         $decryptedUserInfos = [];
 
-        // Check if authenticated user
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
             // Find the key associated with the field and unset it
@@ -125,9 +124,7 @@ class UserInfoController extends Controller
     public function store(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -250,10 +247,11 @@ class UserInfoController extends Controller
         $filename = '';
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
             // Find the key associated with the field and unset it
@@ -321,8 +319,6 @@ class UserInfoController extends Controller
             Storage::disk('public')->put($filePath, file_get_contents($image));
         }
 
-        // dd($this->fillableAttributes);
-
         // Loop through the fields for encryption and decryption
         foreach ($this->fillableAttributes as $field) {
             // dd($userInfo->$field);
@@ -343,18 +339,18 @@ class UserInfoController extends Controller
             } else {
                 $newValue =  $filename != '' ? Crypt::encrypt($filename) : null;
 
-                if($existingValue == null && $newValue != null){
+                if ($existingValue == null && $newValue != null) {
                     $changesForLogs['image'] = [
                         'oldEnc' => $existingValue,
                         'newEnc' => $filename,
                     ];
-                }else if($existingValue != null && $newValue != null){
+                } else if ($existingValue != null && $newValue != null) {
                     $changesForLogs['image'] = [
                         'oldEnc' => $existingValue,
                         'newEnc' => $filename,
                     ];
                 }
-                
+
                 $userInfo->{$field} = $newValue; // Set the new value
             }
         }
@@ -388,31 +384,7 @@ class UserInfoController extends Controller
     }
 
     // GLOBAL FUNCTIONS
-    // Code to check if authenticate users
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
 
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
 
     public function showDeviceInfo()
     {

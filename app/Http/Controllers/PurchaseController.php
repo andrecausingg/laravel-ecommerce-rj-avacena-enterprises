@@ -2,33 +2,31 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-use Ramsey\Uuid\Uuid;
-use Illuminate\Support\Str;
 use App\Models\PaymentModel;
 use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\InventoryProductModel;
+use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class PurchaseController extends Controller
 {
 
-    protected $UnsetPurchaseStorePurchaseInventory, $UnsetAddQtyPurchases, $fillAttrPurchases, $fillAttrInventoryProducts, $fillAttrPayment;
+    protected $UnsetPurchaseStorePurchaseInventory, $UnsetAddQtyPurchases, $fillAttrPurchases, $fillAttrInventoryProducts, $fillAttrPayment, $helper;
 
-    public function __construct()
+    public function __construct(Helper $helper)
     {
         $purchaseModel = new PurchaseModel();
         $inventoryProductModel = new InventoryProductModel();
         $paymentModel = new PaymentModel();
 
-        $this->UnsetPurchaseStorePurchaseInventory = config('purchase.UnsetPurchaseStorePurchaseInventory');
-        $this->UnsetAddQtyPurchases = config('purchase.UnsetAddQtyPurchase');
+        $this->UnsetPurchaseStorePurchaseInventory = config('system.purchase.UnsetPurchaseStorePurchaseInventory');
+        $this->UnsetAddQtyPurchases = config('system.purchase.UnsetAddQtyPurchase');
         $this->fillAttrPurchases = $purchaseModel->getFillableAttributes();
         $this->fillAttrInventoryProducts = $inventoryProductModel->getFillableAttributes();
         $this->fillAttrPayment = $paymentModel->getFillableAttributes();
+        $this->helper = $helper;
     }
 
     public function store(Request $request)
@@ -39,16 +37,11 @@ class PurchaseController extends Controller
         $arrStoreFreshCreate = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -338,16 +331,11 @@ class PurchaseController extends Controller
     public function minusQty(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -437,16 +425,11 @@ class PurchaseController extends Controller
     public function addQty(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -563,16 +546,11 @@ class PurchaseController extends Controller
     public function deleteAll(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -661,16 +639,11 @@ class PurchaseController extends Controller
     public function getUserIdMenuCustomer(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Get the user ID
         $user_id = $user->user_id;
@@ -724,32 +697,6 @@ class PurchaseController extends Controller
         ];
 
         return response()->json($responseData, Response::HTTP_OK);
-    }
-
-    // GLOBAL Auth
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
     }
 
     // CHILD store

@@ -6,9 +6,8 @@ use App\Models\LogsModel;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
-use Illuminate\Support\Carbon;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\InventoryProductModel;
+use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,14 +15,16 @@ use Symfony\Component\HttpFoundation\Response;
 class InventoryProductController extends Controller
 {
 
-    protected $fillableAttributes, $unsets, $userInputFields;
+    protected $fillAttrInventoryProducts, $unsetsTimeStamps, $unsetsStore, $helper;
 
-    public function __construct()
+    public function __construct(Helper $helper)
     {
-        $this->unsets = config('a-global.Unset-Timestamp');
-
         $InventoryProductModel = new InventoryProductModel();
-        $this->fillableAttributes = $InventoryProductModel->getFillableAttributes();
+
+        $this->fillAttrInventoryProducts = $InventoryProductModel->getFillableAttributes();
+        $this->unsetsTimeStamps = config('system.a-global.Unset-Timestamp');
+        $this->unsetsStore = config('system.inventory-product.UnsetStore');
+        $this->helper = $helper;
     }
 
     /**
@@ -32,9 +33,7 @@ class InventoryProductController extends Controller
     public function index(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -62,12 +61,13 @@ class InventoryProductController extends Controller
      */
     public function store(Request $request)
     {
+        $filename = '';
         // Initialize an array to store all created items
         $createdItems = [];
+        $arrStore = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(
                 [
@@ -100,9 +100,9 @@ class InventoryProductController extends Controller
             'items.*.discounted_price' => 'nullable|numeric',
             'items.*.stock' => 'required|numeric',
             'items.*.supplier_name' => 'nullable',
-            'items.*.design' => 'nullable',
-            'items.*.size' => 'nullable',
-            'items.*.color' => 'nullable',
+            'items.*.design' => 'nullable|string|max:500',
+            'items.*.size' => 'nullable|string|max:500',
+            'items.*.color' => 'nullable|string|max:500',
             'items.*.unit_supplier_price' => 'nullable|numeric',
         ]);
 
@@ -126,53 +126,47 @@ class InventoryProductController extends Controller
                 return response()->json(['message' => 'Parent inventory I.D not found'], Response::HTTP_NOT_FOUND);
             }
 
-            // Handle image upload and update
+            // Handle image
             if ($productUserInput['image'] && $productUserInput['image']->hasFile('image')) {
+                $customFolder = 'inventory';
                 $image = $productUserInput['image'];
                 $imageActualExt = $image->getClientOriginalExtension();
 
-                // Generate File Name
                 $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
 
-                // Save on Storage
-                Storage::disk('public')->put($filename, file_get_contents($image));
+                $filePath = $customFolder . '/' . $filename;
+
+                Storage::disk('public')->put($filePath, file_get_contents($image));
             }
 
-            $created = InventoryProductModel::create([
-                'inventory_group_id' => $productUserInput['inventory_group_id'],
-                'item_code' => $productUserInput['item_code'],
-                'image' => $filename ?? null,
-                'name' => $productUserInput['name'],
-                'description' => $productUserInput['description'],
-                'is_refund' => $productUserInput['is_refund'],
-                'category' => $productUserInput['category'],
-                'retail_price' => $productUserInput['retail_price'],
-                'discounted_price' => $productUserInput['discounted_price'],
-                'stock' => $productUserInput['stock'],
-                'supplier_name' => $productUserInput['supplier_name'],
-                'unit_supplier_price' => $productUserInput['unit_supplier_price'],
-            ]);
+            // Unset Columns
+            $unsetResults = $this->helper->unsetColumn($this->unsetsStore, $this->fillAttrInventoryProducts);
+            foreach ($unsetResults as $unsetResult) {
+                $arrStore[$unsetResult] = $unsetResult == 'image' ? ($filename ? $filename : null) : $productUserInput[$unsetResult];
+            }
 
-            if ($created) {
-                // Retrieve the last inserted ID from the created record
-                $lastInsertedId = $created->id;
-
-                // Update the inventory_id based on the retrieved ID
-                $created->update([
-                    'inventory_product_id' => 'inv_prod_id-' . $lastInsertedId,
-                ]);
-
-                $createdItems[] = $created; // Add the created item to the array
-            } else {
+            // Store
+            $created = InventoryProductModel::create($arrStore);
+            if (!$created) {
                 return response()->json(
                     [
-                        'message' => 'Failed to store Inventory Parents',
+                        'message' => 'Failed to store Inventory Products',
                     ],
                     Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
+
+            // Update Id
+            $lastId = $created->id;
+            $created->update([
+                'inventory_product_id' => 'inv_prod_id-' . $lastId,
+            ]);
+
+            // Store Created
+            $createdItems[] = $created;
         }
 
+        // Fetch Message Logs
         $logResult = $this->storeLogs($request, $user->user_id, $createdItems);
 
         return response()->json(
@@ -209,7 +203,7 @@ class InventoryProductController extends Controller
         $changesForLogsItem = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -219,12 +213,41 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_group_id' => 'required|string|max:500',
+            'items.*.item_code' => 'required|string|max:255',
+            'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'items.*.description' => 'nullable',
+            'items.*.is_refund' => 'nullable',
+            'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
+            'items.*.category' => 'required|string|max:500',
+            'items.*.retail_price' => 'required|numeric',
+            'items.*.discounted_price' => 'nullable|numeric',
+            'items.*.stock' => 'required|numeric',
+            'items.*.supplier_name' => 'nullable',
+            'items.*.design' => 'nullable|string|max:500',
+            'items.*.size' => 'nullable|string|max:500',
+            'items.*.color' => 'nullable|string|max:500',
+            'items.*.unit_supplier_price' => 'nullable|numeric',
+        ]);
 
-        foreach ($this->unsets as $unset) {
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(
+                [
+                    'message' => $validator->errors(),
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        foreach ($this->unsetsTimeStamps as $unsetsTimeStamp) {
             // Find the key associated with the field and unset it
-            $key = array_search($unset, $this->fillableAttributes);
+            $key = array_search($unsetsTimeStamp, $this->fillAttrInventoryProducts);
             if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
+                unset($this->fillAttrInventoryProducts[$key]);
             }
         }
 
@@ -248,13 +271,13 @@ class InventoryProductController extends Controller
                 $productUserInput['image'] = $filename;
             }
 
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                $existingValue = $inventory->$fillableAttribute ?? null;
-                $newValue = $productUserInput[$fillableAttribute] ?? null;
+            foreach ($this->fillAttrInventoryProducts as $fillAttrInventoryProduct) {
+                $existingValue = $inventory->$fillAttrInventoryProduct ?? null;
+                $newValue = $productUserInput[$fillAttrInventoryProduct] ?? null;
 
                 // Check if the value has changed
                 if ($existingValue !== $newValue) {
-                    $changesForLogsItem[$fillableAttribute] = [
+                    $changesForLogsItem[$fillAttrInventoryProduct] = [
                         'old' => $existingValue,
                         'new' => $newValue,
                     ];
@@ -269,8 +292,8 @@ class InventoryProductController extends Controller
             ];
 
             // Update the inventory info
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                $inventory->$fillableAttribute = $productUserInput[$fillableAttribute];
+            foreach ($this->fillAttrInventoryProducts as $fillAttrInventoryProduct) {
+                $inventory->$fillAttrInventoryProduct = $productUserInput[$fillAttrInventoryProduct];
             }
 
             // Save the updated inventory
@@ -294,41 +317,12 @@ class InventoryProductController extends Controller
         ], Response::HTTP_OK);
     }
 
-
-
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
     {
         //
-    }
-
-
-
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
     }
 
     public function storeLogs($request, $userId, $logDetails)

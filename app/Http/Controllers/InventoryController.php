@@ -3,28 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\LogsModel;
-use Illuminate\Support\Str;
-use App\Models\HistoryModel;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
-use Illuminate\Support\Carbon;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\InventoryProductModel;
-use Illuminate\Support\Facades\Storage;
+use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class InventoryController extends Controller
 {
 
-    protected $fillableAttributes, $unsets, $userInputFields;
+    protected $fillableAttributes, $unsets, $userInputFields, $helper;
 
-    public function __construct()
+    public function __construct(Helper $helper)
     {
-        $this->unsets = config('a-global.Unset-Timestamp');
+        $this->unsets = config('system.a-global.Unset-Timestamp');
 
         $InventoryModel = new InventoryModel();
         $this->fillableAttributes = $InventoryModel->getFillableAttributes();
+        $this->helper = $helper;
     }
 
 
@@ -36,9 +33,7 @@ class InventoryController extends Controller
         $arrInventory = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -83,15 +78,9 @@ class InventoryController extends Controller
         $createdItems = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Check if 'items' key exists in the request
@@ -170,16 +159,11 @@ class InventoryController extends Controller
     public function edit(Request $request, string $id)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         $inventory = InventoryModel::where('inventory_id', $id)->first();
         if (!$inventory) {
@@ -210,16 +194,11 @@ class InventoryController extends Controller
         $changesForLogs = [];
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Check if 'items' key exists in the request
         if (!$request->has('items') || empty($request['items'])) {
@@ -314,32 +293,6 @@ class InventoryController extends Controller
         //
     }
 
-    // GLOBAL FUNCTIONS
-    // Code to check if authenticate users
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
 
     public function storeLogs($request, $userId, $logDetails)
     {

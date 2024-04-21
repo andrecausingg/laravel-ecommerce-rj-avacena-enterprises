@@ -1,14 +1,26 @@
 <?php
 
-namespace App\Http\Authorize;
+namespace App\Http\Controllers\Helper;
 
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use App\Http\Controllers\Controller;
 use Symfony\Component\HttpFoundation\Response;
 
-class Authorize extends Controller
+class Helper
 {
+    public function unsetColumn($unsets, $fillableAttr)
+    {
+        foreach ($unsets as $unset) {
+            // Find the key associated with the field and unset it
+            $key = array_search($unset, $fillableAttr);
+            if ($key !== false) {
+                unset($fillableAttr[$key]);
+            }
+        }
+
+        return $fillableAttr;
+    }
+
     public function authorizeUser($request)
     {
         try {

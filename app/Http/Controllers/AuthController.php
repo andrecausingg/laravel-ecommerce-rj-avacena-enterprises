@@ -18,11 +18,20 @@ use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
+use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
+
+    protected $helper;
+
+    public function __construct(Helper $helper)
+    {
+        $this->helper = $helper;
+    }
+
     public function indexHistory()
     {
         $decryptedData = [];
@@ -604,11 +613,11 @@ class AuthController extends Controller
         $verificationNumber = mt_rand(100000, 999999);
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -671,11 +680,11 @@ class AuthController extends Controller
         $verificationNumber = mt_rand(100000, 999999);
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -734,11 +743,11 @@ class AuthController extends Controller
         $verificationNumber = mt_rand(100000, 999999);
 
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validate 
         $validator = Validator::make($request->all(), [
@@ -787,11 +796,11 @@ class AuthController extends Controller
     public function index(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
         // Decrypt all emails and other attributes
         $decryptedAuthUser = [];
 
@@ -828,12 +837,11 @@ class AuthController extends Controller
     public function updateEmailAdmin(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -897,11 +905,11 @@ class AuthController extends Controller
     public function updatePasswordAdmin(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -956,11 +964,11 @@ class AuthController extends Controller
     public function updateRoleAndStatus(Request $request)
     {
         // Authorize the user
-        $user = $this->authorizeUser($request);
-        // Check if authenticated user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
+
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -1024,31 +1032,6 @@ class AuthController extends Controller
     }
 
     // Authenticate Token
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
     public function authorizeUserVerifyEmail($request)
     {
         try {

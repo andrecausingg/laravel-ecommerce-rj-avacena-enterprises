@@ -8,21 +8,22 @@ use App\Models\UserInfoModel;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Crypt;
+use App\Http\Controllers\Helper\Helper;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Contracts\Encryption\DecryptException;
 
 class LogController extends Controller
 {
-    protected $encryptedFields, $fillableAttributes, $notToDecrypt;
+    protected $encryptedFields, $fillableAttributes, $notToDecrypt, $helper;
 
-    public function __construct()
+    public function __construct(Helper $helper)
     {
-        $this->encryptedFields = config('logs.EncryptedFields');
-        $this->notToDecrypt = config('logs.NotToDecrypt');
 
-        // Get the Attribute
         $logsModel = new LogsModel();
+
+        $this->encryptedFields = config('system.logs.EncryptedFields');
+        $this->notToDecrypt = config('system.logs.NotToDecrypt');
         $this->fillableAttributes = $logsModel->getFillableAttributes();
+        $this->helper = $helper;
     }
 
     public function index(Request $request)
@@ -30,7 +31,8 @@ class LogController extends Controller
         $decryptedLogs = [];
         $resultJson = [];
 
-        $user = $this->authorizeUser($request);
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -89,8 +91,8 @@ class LogController extends Controller
                     // Check if the field is sensitive and needs decryption
                     if ($isSensitive == 1 && in_array($fieldName, $fieldsToDecrypt)) {
                         if (is_array($fieldValue)) {
-                            $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'] ?? null;
-                            $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'] ?? null;
+                            $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : null;
+                            $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : null;
 
                             $decryptedData[$fieldName]['old'] = $decOld;
                             $decryptedData[$fieldName]['new'] = $decNew;
@@ -109,72 +111,5 @@ class LogController extends Controller
 
 
         return $decryptedData;
-    }
-
-
-
-
-    // dd($fields);
-
-    // if (is_array($fieldValue)) {
-    //     // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
-    //     $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
-    //     $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
-    //     $decryptedData[$fieldName]['old'] = $decOld;
-    //     $decryptedData[$fieldName]['new'] = $decNew;
-    // } else {
-    //     $decryptedData[$fieldName] = $fieldValue;
-    // }
-
-    // public function isDecryptedData($isSensitive, $fields, $fieldsToDecrypt)
-    // {
-    //     $decryptedData = [];
-
-    //     // Iterate over each field in the log details
-    //     foreach ($fields as $fieldName => $fieldValue) {
-
-    //         if (is_array($fieldValue)) {
-    //             // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
-    //             $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
-    //             $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
-    //             $decryptedData[$fieldName]['old'] = $decOld;
-    //             $decryptedData[$fieldName]['new'] = $decNew;
-    //         } else {
-    //             // If $fieldValue is not an array, decrypt it if needed
-    //             if (in_array($fieldName, $fieldsToDecrypt)) {
-    //                 // Decrypt the field value and store it in the result array
-    //                 $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
-    //             } else {
-    //                 $decryptedData[$fieldName] = $fieldValue;
-    //             }
-    //         }
-    //     }
-
-    //     return $decryptedData;
-    // }
-
-    public function authorizeUser($request)
-    {
-        try {
-            // Authenticate the user with the provided token
-            $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            return $user;
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
     }
 }
