@@ -157,9 +157,9 @@ class InventoryProductController extends Controller
             }
 
             // Update Id
-            $lastId = $created->id;
+            $lastInsertedId = $created->id;
             $created->update([
-                'inventory_product_id' => 'inv_prod_id-' . $lastId,
+                'inventory_product_id' => 'inv_prod_id-' . $lastInsertedId,
             ]);
 
             // Store Created
@@ -260,15 +260,16 @@ class InventoryProductController extends Controller
                 return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
 
-            // Handle image upload and update
-            if ($request->hasFile('items.*.image')) {
+            if ($productUserInput['image'] && $productUserInput['image']->hasFile('image')) {
+                $customFolder = 'inventory';
                 $image = $productUserInput['image'];
-                $image->validate([
-                    'image' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
-                ]);
-                $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $image->getClientOriginalExtension();
-                Storage::disk('public')->put($filename, file_get_contents($image));
-                $productUserInput['image'] = $filename;
+                $imageActualExt = $image->getClientOriginalExtension();
+
+                $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
+
+                $filePath = $customFolder . '/' . $filename;
+
+                Storage::disk('public')->put($filePath, file_get_contents($image));
             }
 
             foreach ($this->fillAttrInventoryProducts as $fillAttrInventoryProduct) {

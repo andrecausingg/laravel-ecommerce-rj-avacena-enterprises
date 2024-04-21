@@ -13,14 +13,15 @@ use Symfony\Component\HttpFoundation\Response;
 class InventoryController extends Controller
 {
 
-    protected $fillableAttributes, $unsets, $userInputFields, $helper;
+    protected $fillableAttrInventorys, $unsetsTimeStamps, $unsetsStore, $userInputFields, $helper;
 
     public function __construct(Helper $helper)
     {
-        $this->unsets = config('system.a-global.Unset-Timestamp');
-
         $InventoryModel = new InventoryModel();
-        $this->fillableAttributes = $InventoryModel->getFillableAttributes();
+
+        $this->fillableAttrInventorys = $InventoryModel->getFillableAttributes();
+        $this->unsetsTimeStamps = config('system.a-global.Unset-Timestamp');
+        $this->unsetsStore = config('system.inventory-product.UnsetStore');
         $this->helper = $helper;
     }
 
@@ -76,6 +77,7 @@ class InventoryController extends Controller
     {
         // Initialize an array to store all created items
         $createdItems = [];
+        $arrStore = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -99,6 +101,19 @@ class InventoryController extends Controller
             'items.*.category' => 'required|string|max:255',
         ]);
 
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request) {
+            foreach ($request->input('items') as $item) {
+                $exists = InventoryModel::where('name', $item['name'])
+                    ->where('category', $item['category'])
+                    ->exists();
+
+                if ($exists) {
+                    $validator->errors()->add('items', 'The combination of name and category already exists.');
+                }
+            }
+        });
+
         // Check if validation fails
         if ($validator->fails()) {
             return response()->json(
@@ -110,31 +125,39 @@ class InventoryController extends Controller
         }
 
 
+
         foreach ($request['items'] as $productUserInput) {
+
+            // Unset Columns
+            $unsetResults = $this->helper->unsetColumn($this->unsetsStore, $this->fillableAttrInventorys);
+            foreach ($unsetResults as $unsetResult) {
+                $arrStore[$unsetResult] = $productUserInput[$unsetResult] ?? null;
+            }
+
             $created = InventoryModel::create([
                 'name' => $productUserInput['name'],
                 'category' => $productUserInput['category'],
             ]);
 
-            if ($created) {
-                // Retrieve the last inserted ID from the created record
-                $lastInsertedId = $created->id;
-
-                // Update the inventory_id based on the retrieved ID
-                $created->update([
-                    'inventory_id' => 'inv_id-' . $lastInsertedId,
-                    'group_id' => "inv_gro_id-" . $lastInsertedId,
-                ]);
-
-                $createdItems[] = $created;
-            } else {
+            if (!$created) {
                 return response()->json(
                     [
-                        'message' => 'Failed to store Inventory Parents',
+                        'message' => 'Failed to store Inventory Parent',
                     ],
                     Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
+
+            // Retrieve the last inserted ID from the created record
+            $lastInsertedId = $created->id;
+
+            // Update the inventory_id based on the retrieved ID
+            $created->update([
+                'inventory_id' => 'inv_id-' . $lastInsertedId,
+                'group_id' => "inv_gro_id-" . $lastInsertedId,
+            ]);
+
+            $createdItems[] = $created;
         }
 
         $logResult = $this->storeLogs($request, $user->user_id, $createdItems);
@@ -205,14 +228,13 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
-        foreach ($this->unsets as $unset) {
+        foreach ($this->unsetsTimeStamps as $unsetsTimeStamp) {
             // Find the key associated with the field and unset it
-            $key = array_search($unset, $this->fillableAttributes);
+            $key = array_search($unsetsTimeStamp, $this->fillableAttrInventorys);
             if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
+                unset($this->fillableAttrInventorys[$key]);
             }
         }
-
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -240,13 +262,13 @@ class InventoryController extends Controller
             // Field to check if not same value on database then record it on logs
             $changesForLogsItem = [];
 
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                $existingValue = $inventory->$fillableAttribute ?? null;
-                $newValue = $productUserInput[$fillableAttribute] ?? null;
+            foreach ($this->fillableAttrInventorys as $fillableAttrInventory) {
+                $existingValue = $inventory->$fillableAttrInventory ?? null;
+                $newValue = $productUserInput[$fillableAttrInventory] ?? null;
 
                 // Check if the value has changed
                 if ($existingValue !== $newValue) {
-                    $changesForLogsItem[$fillableAttribute] = [
+                    $changesForLogsItem[$fillableAttrInventory] = [
                         'old' => $existingValue,
                         'new' => $newValue,
                     ];
@@ -261,8 +283,8 @@ class InventoryController extends Controller
             ];
 
             // Update the inventory info
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                $inventory->$fillableAttribute = $productUserInput[$fillableAttribute];
+            foreach ($this->fillableAttrInventorys as $fillableAttrInventory) {
+                $inventory->$fillableAttrInventory = $productUserInput[$fillableAttrInventory];
             }
 
             if (!$inventory->save()) {
