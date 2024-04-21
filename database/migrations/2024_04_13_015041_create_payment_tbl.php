@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('voucher_id')->nullable();
 
             $table->string('payment_method');
-            $table->double('discounted_amount', 30, 2)->default(0.00);
+            $table->double('total_discounted_amount', 30, 2)->default(0.00);
             $table->double('total_amount', 30, 2)->default(0.00);
             $table->double('money', 30, 2)->default(0.00);
             $table->double('change', 30, 2)->default(0.00);

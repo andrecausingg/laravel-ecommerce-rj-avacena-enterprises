@@ -19,7 +19,7 @@ class PaymentModel extends Model
 
         'payment_method', 
         'voucher',
-        'discounted_amount',
+        'total_discounted_amount',
         'total_amount',
         'money',
         'change',

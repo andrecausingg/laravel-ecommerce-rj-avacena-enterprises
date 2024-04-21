@@ -2,12 +2,13 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\LogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryProductController;
-use App\Http\Controllers\LogController;
-use App\Http\Controllers\PurchaseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,6 +38,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     $InventoryProductController = InventoryProductController::class;
     $LogController = LogController::class;
     $PurchaseController = PurchaseController::class;
+    $PaymentController = PaymentController::class;
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
@@ -89,8 +91,15 @@ Route::middleware(['jwt.auth'])->group(function () {
     Route::prefix('purchase')->group(function () use ($PurchaseController) {
         Route::get('/get-user-id-menu-costumer', [$PurchaseController, 'getUserIdMenuCustomer']);
         Route::post('/store', [$PurchaseController, 'store']);
+        Route::post('/minus-qty', [$PurchaseController, 'minusQty']);
+        Route::post('/add-qty', [$PurchaseController, 'addQty']);
+        Route::post('/delete-all', [$PurchaseController, 'deleteAll']);
     });
 
+    // Payment
+    Route::prefix('payment')->group(function () use ($PaymentController) {
+        Route::post('/payment', [$PaymentController, 'payment']);
+    });
 
     Route::prefix('log')->group(function () use ($LogController) {
         Route::get('index', [$LogController, 'index']);
