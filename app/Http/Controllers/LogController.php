@@ -9,14 +9,16 @@ use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Crypt;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class LogController extends Controller
 {
-    protected $encryptedFields, $fillableAttributes;
+    protected $encryptedFields, $fillableAttributes, $notToDecrypt;
 
     public function __construct()
     {
-        $this->encryptedFields = config('encrypted-fields.EncryptedFields');
+        $this->encryptedFields = config('logs.EncryptedFields');
+        $this->notToDecrypt = config('logs.NotToDecrypt');
 
         // Get the Attribute
         $logsModel = new LogsModel();
@@ -38,9 +40,8 @@ class LogController extends Controller
             $detailsJson = json_decode($log['details'], true);
 
             if (isset($detailsJson['fields'])) {
-                $decryptedData = $this->isDecryptedData($detailsJson['fields'], $this->encryptedFields);
+                $decryptedData = $this->isDecryptedData($log->is_sensitive, $detailsJson['fields'], $this->encryptedFields, $this->notToDecrypt);
                 $arrWithParentId = [
-                    'user_id' => $detailsJson['user_id'],
                     'fields' => $decryptedData
                 ];
             }
@@ -77,32 +78,80 @@ class LogController extends Controller
     }
 
     // HELPER FUNCTION
-    public function isDecryptedData($fields, $fieldsToDecrypt)
+    public function isDecryptedData($isSensitive, $fields, $fieldsToDecrypt, $notToDecrypts)
     {
         $decryptedData = [];
 
         // Iterate over each field in the log details
         foreach ($fields as $fieldName => $fieldValue) {
+            foreach ($notToDecrypts as $notToDecrypt) {
+                if ($notToDecrypt != $fieldName) {
+                    // Check if the field is sensitive and needs decryption
+                    if ($isSensitive == 1 && in_array($fieldName, $fieldsToDecrypt)) {
+                        if (is_array($fieldValue)) {
+                            $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'] ?? null;
+                            $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'] ?? null;
 
-            if (is_array($fieldValue)) {
-                // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
-                $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
-                $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
-                $decryptedData[$fieldName]['old'] = $decOld;
-                $decryptedData[$fieldName]['new'] = $decNew;
-            } else {
-                // If $fieldValue is not an array, decrypt it if needed
-                if (in_array($fieldName, $fieldsToDecrypt)) {
-                    // Decrypt the field value and store it in the result array
-                    $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+                            $decryptedData[$fieldName]['old'] = $decOld;
+                            $decryptedData[$fieldName]['new'] = $decNew;
+                        } else {
+                            $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+                        }
+                    } else {
+                        $decryptedData[$fieldName] = $fieldValue;
+                    }
                 } else {
+                    // Field is not sensitive or does not need decryption
                     $decryptedData[$fieldName] = $fieldValue;
                 }
             }
         }
 
+
         return $decryptedData;
     }
+
+
+
+
+    // dd($fields);
+
+    // if (is_array($fieldValue)) {
+    //     // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
+    //     $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
+    //     $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
+    //     $decryptedData[$fieldName]['old'] = $decOld;
+    //     $decryptedData[$fieldName]['new'] = $decNew;
+    // } else {
+    //     $decryptedData[$fieldName] = $fieldValue;
+    // }
+
+    // public function isDecryptedData($isSensitive, $fields, $fieldsToDecrypt)
+    // {
+    //     $decryptedData = [];
+
+    //     // Iterate over each field in the log details
+    //     foreach ($fields as $fieldName => $fieldValue) {
+
+    //         if (is_array($fieldValue)) {
+    //             // If $fieldValue is an array, decrypt 'oldEnc' and 'newEnc'
+    //             $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : $fieldValue['old'];
+    //             $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : $fieldValue['new'];
+    //             $decryptedData[$fieldName]['old'] = $decOld;
+    //             $decryptedData[$fieldName]['new'] = $decNew;
+    //         } else {
+    //             // If $fieldValue is not an array, decrypt it if needed
+    //             if (in_array($fieldName, $fieldsToDecrypt)) {
+    //                 // Decrypt the field value and store it in the result array
+    //                 $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+    //             } else {
+    //                 $decryptedData[$fieldName] = $fieldValue;
+    //             }
+    //         }
+    //     }
+
+    //     return $decryptedData;
+    // }
 
     public function authorizeUser($request)
     {

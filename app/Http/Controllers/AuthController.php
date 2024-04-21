@@ -243,8 +243,8 @@ class AuthController extends Controller
 
                     // Array Logs
                     $logsData = [
-                        'user_id' => $user->user_id,
                         'fields' => [
+                            'user_id' => $user->user_id,
                             'email' => Crypt::encrypt($email),
                             'password' => Crypt::encrypt($password),
                         ]
@@ -328,8 +328,8 @@ class AuthController extends Controller
 
         // Array Logs
         $logsData = [
-            'user_id' => $userCreate->user_id,
             'fields' => [
+                'user_id' => $userCreate->user_id,
                 'email' => Crypt::encrypt($email),
                 'password' => Crypt::encrypt($password),
             ]
@@ -393,8 +393,8 @@ class AuthController extends Controller
 
         if ($user->save()) {
             $logDetails = [
-                'user_id' => $user->user_id,
                 'fields' => [
+                    'user_id' => $user->user_id,
                     'email_verified_at' => $user->email_verified_at,
                     'verification_number' => $request->verification_number,
                 ]
@@ -455,8 +455,8 @@ class AuthController extends Controller
             }
 
             $logDetails = [
-                'user_id' => $user->user_id,
                 'fields' => [
+                    'user_id' => $user->user_id,
                     'verification_number' => $user->verification_number
                 ]
             ];
@@ -512,8 +512,8 @@ class AuthController extends Controller
                 }
 
                 $logDetails = [
-                    'user_id' => $user->user_id,
                     'fields' => [
+                        'user_id' => $user->user_id,
                         'email' => Crypt::encrypt($request->email),
                     ]
                 ];
@@ -569,8 +569,8 @@ class AuthController extends Controller
 
         $history = HistoryModel::where('tbl_id', $userAuth->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
         $logDetails = [
-            'user_id' => $user->user_id,
             'fields' => [
+                'user_id' => $user->user_id,
                 'old_password' => $history->value,
                 'new_password' => Crypt::encrypt($request->input('password')),
             ]
@@ -639,8 +639,8 @@ class AuthController extends Controller
         } else {
             // Store old and new passwords
             $logDetails = [
-                'user_id' => $user->user_id,
                 'fields' => [
+                    'user_id' => $user->user_id,
                     'old_password' => Crypt::encrypt($request->input('current_password')),
                     'new_password' => Crypt::encrypt($request->input('password')),
                 ]
@@ -702,8 +702,8 @@ class AuthController extends Controller
         } else {
 
             $logDetails = [
-                'user_id' => $user->user_id,
                 'fields' => [
+                    'user_id' => $user->user_id,
                     'old_email' => $userAuth->email,
                     'new_email' => Crypt::encrypt($request->new_email),
                 ]
@@ -768,8 +768,8 @@ class AuthController extends Controller
             }
 
             $logDetails = [
-                'user_id' => $user->user_id,
                 'fields' => [
+                    'user_id' => $user->user_id,
                     'verification_number' => $user->verification_number
                 ]
             ];
@@ -1260,7 +1260,7 @@ class AuthController extends Controller
         // Create LogsModel entry
         $log = LogsModel::create([
             'user_id' => $userId,
-            'is_sensitive' => 0,
+            'is_sensitive' => 1,
             'ip_address' => $request->ip(),
             'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
             'user_device' => $userAgent,
@@ -1427,8 +1427,8 @@ class AuthController extends Controller
             'user_action' => 'LOGIN',
             'user_device' => $userAgent,
             'details' => json_encode([
-                'user_id' => $userId,
                 'fields' => [
+                    'user_id' => $userId,
                     'ip_address' => $request->ip(),
                 ]
             ], JSON_PRETTY_PRINT),

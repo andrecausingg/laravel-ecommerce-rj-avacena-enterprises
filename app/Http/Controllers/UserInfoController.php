@@ -19,10 +19,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
-    protected $fillableAttributes, $UnsetDecrypts, $Encfields;
+    protected $fillableAttributes, $UnsetDecrypts, $Encfields, $Uppercase;
     public function __construct()
     {
         $this->UnsetDecrypts = config('user-info.UnsetDecrypt');
+        $this->Uppercase = config('user-info.Uppercase');
 
         $userInfoModel = new UserInfoModel();
         $this->fillableAttributes = $userInfoModel->getFillableAttributes();
@@ -66,9 +67,9 @@ class UserInfoController extends Controller
         }
 
         return response()->json([
-                'message' => 'Successfully Retrieve Data',
-                'result' => $decryptedUserInfos,
-            ],Response::HTTP_OK);
+            'message' => 'Successfully Retrieve Data',
+            'result' => $decryptedUserInfos,
+        ], Response::HTTP_OK);
     }
 
     public function getPersonalInfo(Request $request)
@@ -159,7 +160,7 @@ class UserInfoController extends Controller
             'province_name' => 'required|string|max:255',
             'city_or_municipality_name' => 'required|string|max:255',
             'barangay' => 'required|string|max:255',
-            'description_location' => 'nullable|string',
+            'description_location' => 'nullable|string|max:1500',
         ]);
 
         // Check if validation fails
@@ -167,24 +168,40 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Transform input data to uppercase for specified fields
+        $validatedData = $validator->validated();
+        foreach ($validatedData as $key => $value) {
+            // Check if the field should be transformed to uppercase
+            if (in_array($key, $this->Uppercase)) {
+                $validatedData[$key] = strtoupper($value);
+            }
+        }
+
         // Handle image upload and update
         if ($request->hasFile('image')) {
+            $customFolder = 'user-info';
             $image = $request->file('image');
             $imageActualExt = $image->getClientOriginalExtension();
 
             // Generate File Name
             $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
 
+            // Generate the file path within the custom folder
+            $filePath = $customFolder . '/' . $filename;
+
             // Save on Storage
-            Storage::disk('public')->put($filename, file_get_contents($image));
+            Storage::disk('public')->put($filePath, file_get_contents($image));
         }
 
         // Encrypt the data
-        foreach ($validator->validated() as $key => $value) {
+        foreach ($validatedData as $key => $value) {
             if ($key === 'image') {
-                $validatedData[$key] = Crypt::encrypt($filename);
+                $validatedData[$key] = $filename != '' ? Crypt::encrypt($filename) : null;
             } else {
-                $validatedData[$key] = Crypt::encrypt($value);
+                // Check if the value is empty
+                if ($value !== null) {
+                    $validatedData[$key] = Crypt::encrypt($value);
+                }
             }
         }
 
@@ -222,6 +239,7 @@ class UserInfoController extends Controller
         //
     }
 
+
     /**
      * Update the specified resource in storage.
      */
@@ -229,6 +247,8 @@ class UserInfoController extends Controller
     {
         // Initialize
         $changesForLogs = [];
+        $filename = '';
+
         // Authorize the user
         $user = $this->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -260,12 +280,21 @@ class UserInfoController extends Controller
             'province_name' => 'required|string|max:255',
             'city_or_municipality_name' => 'required|string|max:255',
             'barangay' => 'required|string|max:255',
-            'description_location' => 'nullable|string',
+            'description_location' => 'nullable|string|max:1500',
         ]);
 
         // Check if validation fails
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Transform input data to uppercase for specified fields
+        $validatedData = $validator->validated();
+        foreach ($validatedData as $key => $value) {
+            // Check if the field should be transformed to uppercase
+            if (in_array($key, $this->Uppercase)) {
+                $validatedData[$key] = strtoupper($value);
+            }
         }
 
         // Retrieve the user information
@@ -278,65 +307,55 @@ class UserInfoController extends Controller
 
         // Handle image upload and update
         if ($request->hasFile('image')) {
+            $customFolder = 'user-info';
             $image = $request->file('image');
             $imageActualExt = $image->getClientOriginalExtension();
 
             // Generate File Name
             $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
 
-            // Log the changes for the image if it's different
-            if ($userInfo->image !== null) {
-                if (Crypt::decrypt($userInfo->image) !== $filename) {
-                    $changesForLogs['image'] = [
-                        'old' => Crypt::decrypt($userInfo->image),
-                        'new' => $filename,
-                    ];
-                }
-            } else {
-                $changesForLogs['image'] = [
-                    'old' => null,
-                    'new' => $filename,
-                ];
-            }
-            // Save on Storage
-            Storage::disk('public')->put($filename, file_get_contents($image));
+            // Generate the file path within the custom folder
+            $filePath = $customFolder . '/' . $filename;
 
-            // Encrypt the new image name before saving it
-            $userInfo->image = Crypt::encrypt($filename);
+            // Save on Storage
+            Storage::disk('public')->put($filePath, file_get_contents($image));
         }
+
+        // dd($this->fillableAttributes);
 
         // Loop through the fields for encryption and decryption
         foreach ($this->fillableAttributes as $field) {
-            try {
-                $existingValue = $userInfo->$field ? Crypt::decrypt($userInfo->$field) : null;
-                if ($request->filled($field)) {
-                    $newValue = Crypt::encrypt($request->input($field));
-                } else {
-                    if ($field === 'image') {
-                        $newValue = Crypt::encrypt($existingValue);
-                    } else {
-                        $newValue = $existingValue;
-                    }
-                }
-                
-                // Check if the value has changed
-                if ($existingValue != $request->input($field) && $request->input($field) != null) {
+            // dd($userInfo->$field);
+            $existingValue = $userInfo->$field !== null ? Crypt::decrypt($userInfo->$field) : null;
+            // dd($existingValue);
+
+            if ($field != 'image') {
+                $newValue = Crypt::encrypt($validatedData[$field]);
+
+                // Check if the value has changed for logs
+                if ($existingValue != $validatedData[$field]) {
                     $changesForLogs[$field] = [
                         'oldEnc' => $existingValue,
-                        'newEnc' => $request->input($field),
+                        'newEnc' => $validatedData[$field],
                     ];
-                }else{
-                    $changesForLogs[$field] = [
-                        'oldEnc' => 'null',
-                        'newEnc' => $existingValue,
-                    ]; 
+                    $userInfo->{$field} = $newValue; // Set the new value
                 }
+            } else {
+                $newValue =  $filename != '' ? Crypt::encrypt($filename) : null;
 
-                // Update the user info
-                $userInfo->$field = $newValue;
-            } catch (\Exception $e) {
-                // Log or dump information about the exception
-                Log::info("Decryption error for field $field: " . $e->getMessage());
+                if($existingValue == null && $newValue != null){
+                    $changesForLogs['image'] = [
+                        'oldEnc' => $existingValue,
+                        'newEnc' => $filename,
+                    ];
+                }else if($existingValue != null && $newValue != null){
+                    $changesForLogs['image'] = [
+                        'oldEnc' => $existingValue,
+                        'newEnc' => $filename,
+                    ];
+                }
+                
+                $userInfo->{$field} = $newValue; // Set the new value
             }
         }
 
@@ -431,7 +450,6 @@ class UserInfoController extends Controller
     public function storeLogs($request, $userId, $logDetails)
     {
         $arr = [];
-        $arr['user_id'] = $userId;
         $arr['fields'] = $logDetails;
 
         // Get Device Information
@@ -440,6 +458,7 @@ class UserInfoController extends Controller
         // Create LogsModel entry
         $log = LogsModel::create([
             'user_id' => $userId,
+            'is_sensitive' => 1,
             'ip_address' => $request->ip(),
             'user_action' => 'STORE PERSONAL INFORMATION',
             'user_device' => $userAgent,
@@ -459,14 +478,16 @@ class UserInfoController extends Controller
 
     public function updateLogs($request, $userId, $logDetails)
     {
+
         $arr = [];
-        $arr['user_id'] = $userId;
         $arr['fields'] = [];
+        $arr['fields']['user_id'] = $userId;
 
         // Get Device Information
         $userAgent = $request->header('User-Agent');
 
         foreach ($logDetails as $field => $change) {
+
             // Check if 'oldEnc' and 'newEnc' exist in $change before encrypting
             $encryptedOldValue = isset($change['oldEnc']) ? Crypt::encrypt($change['oldEnc']) : null;
             $encryptedNewValue = isset($change['newEnc']) ? Crypt::encrypt($change['newEnc']) : null;
@@ -481,6 +502,7 @@ class UserInfoController extends Controller
         // Create LogsModel entry
         $log = LogsModel::create([
             'user_id' => $userId,
+            'is_sensitive' => 1,
             'ip_address' => $request->ip(),
             'user_action' => 'UPDATE PERSONAL INFORMATION',
             'user_device' => $userAgent,

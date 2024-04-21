@@ -100,6 +100,9 @@ class InventoryProductController extends Controller
             'items.*.discounted_price' => 'nullable|numeric',
             'items.*.stock' => 'required|numeric',
             'items.*.supplier_name' => 'nullable',
+            'items.*.design' => 'nullable',
+            'items.*.size' => 'nullable',
+            'items.*.color' => 'nullable',
             'items.*.unit_supplier_price' => 'nullable|numeric',
         ]);
 
