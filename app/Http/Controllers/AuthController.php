@@ -25,11 +25,15 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthController extends Controller
 {
 
-    protected $helper;
+    protected $helper, $fillableAttrAuths, $UnsetForRetreives, $ArrHaveAtConvertToReadDateTime;
 
-    public function __construct(Helper $helper)
+    public function __construct(Helper $helper, AuthModel $fillableAttrAuths)
     {
+        $this->UnsetForRetreives = config('system.accounts.UnsetForRetreiveIndex');
+        $this->ArrHaveAtConvertToReadDateTime = config('system.accounts.ArrHaveAtConvertToReadDateTime');
+
         $this->helper = $helper;
+        $this->fillableAttrAuths = $fillableAttrAuths;
     }
 
     public function indexHistory()
@@ -364,7 +368,6 @@ class AuthController extends Controller
             'log_message' => $logResult
         ], Response::HTTP_OK);
     }
-
     public function verifyEmail(Request $request)
     {
         $verificationNumber = mt_rand(100000, 999999);
@@ -793,6 +796,53 @@ class AuthController extends Controller
     }
 
     // GET ALL USER ACCOUNT | ADMIN SIDE
+    // public function index(Request $request)
+    // {
+    //     // Authorize the user
+    //     $user = $this->helper->authorizeUser($request);
+    //     if (empty($user->user_id)) {
+    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+    //     }
+
+    //     // Decrypt all emails and other attributes
+    //     $decryptedAuthUser = [];
+
+    //     $authUsers = AuthModel::all();
+
+    //     foreach ($authUsers as $authUser) {
+    //         $decryptedEmail = $authUser->email ? Crypt::decrypt($authUser->email) : null;
+    //         $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first(); // Assuming it returns one record
+    //         $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+
+    //         $decryptedAuthUser[] = [
+    //             'id' => $authUser->id ?? null,
+    //             'user_id' => $authUser->user_id ?? null,
+    //             'password' => Crypt::decrypt($history->value) ?? null,
+    //             'phone_number' => $authUser->phone_number ?? null,
+    //             'email' => $decryptedEmail,
+    //             'role' => $authUser->role ?? null,
+    //             'status' => $authUser->status ?? null,
+    //             'deleted_at' => $authUser->deleted_at ?? null,
+    //             'created_at' => $authUser->created_at ?? null,
+    //             'updated_at' => $authUser->updated_at ?? null,
+
+    //             'userInfo' => [
+    //                 'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+    //             ],
+
+    //             'column' => [
+
+    //             ],
+
+    //             'function' => $this->functionsApi(),
+    //         ];
+    //     }
+
+    //     // Display or use the decrypted attributes as needed
+    //     return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
+    // }
+
+    // ADMIN | ACCOUNTS
     public function index(Request $request)
     {
         // Authorize the user
@@ -803,35 +853,95 @@ class AuthController extends Controller
 
         // Decrypt all emails and other attributes
         $decryptedAuthUser = [];
+        $columnName = [];
 
+        // Unset Column not needed
+        $unsetResults = $this->helper->unsetColumn($this->UnsetForRetreives, $this->fillableAttrAuths->getFillableAttributes());
+
+        // Retrieve all AuthModel records
         $authUsers = AuthModel::all();
 
         foreach ($authUsers as $authUser) {
-            $decryptedEmail = $authUser->email ? Crypt::decrypt($authUser->email) : null;
-            $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first(); // Assuming it returns one record
-            $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+            foreach ($unsetResults as $column) {
+                if ($column == 'user_id') {
+                    $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first();
+                    $decryptedAuthUser['data']['userInfo'] = [
+                        'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+                    ];
+                    $decryptedAuthUser['data'][$column] = $authUser->{$column};
+                    $columnName[] = $this->helper->transformColumnName($column);
+                } else if ($column == 'email') {
+                    $decryptedAuthUser['data'][$column] = $authUser->{$column} ? Crypt::decrypt($authUser->{$column}) : null;
+                    $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+                    $decryptedAuthUser['data']['password'] = $history ? Crypt::decrypt($history->value) : null;
+                    $columnName[] = $this->helper->transformColumnName($column);
+                    $columnName[] = 'password';
+                } else {
+                    // Keep other columns as they are
+                    $columnName[] = $this->helper->transformColumnName($column);
+                    $value = $authUser->{$column};
 
-            $decryptedAuthUser[] = [
-                'id' => $authUser->id ?? null,
-                'user_id' => $authUser->user_id ?? null,
-                'password' => Crypt::decrypt($history->value) ?? null,
-                'phone_number' => $authUser->phone_number ?? null,
-                'email' => $decryptedEmail,
-                'role' => $authUser->role ?? null,
-                'status' => $authUser->status ?? null,
-                'deleted_at' => $authUser->deleted_at ?? null,
-                'created_at' => $authUser->created_at ?? null,
-                'updated_at' => $authUser->updated_at ?? null,
+                    // Check if the column needs formatting and value is not null
+                    if (in_array($column, $this->ArrHaveAtConvertToReadDateTime) && $value !== null) {
+                        // Format the value using Carbon
+                        $carbonDate = Carbon::parse($value);
+                        $value = $carbonDate->format('F j, Y g:i a');
+                    }
 
-                'userInfo' => [
-                    'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
-                ],
-            ];
+                    // Assign the value to the decryptedAuthUser array
+                    $decryptedAuthUser['data'][$column] = $value;
+                }
+            }
         }
 
+        // Add new columns
+        $newColumns = [
+            "User Info",
+            "Action"
+        ];
+        $transformedColumns = array_map(function ($columnName) {
+            return $this->helper->transformColumnName($columnName);
+        }, $columnName);
+        array_unshift($transformedColumns, $this->helper->transformColumnName($newColumns[0]));
+        array_push($transformedColumns, $this->helper->transformColumnName($newColumns[1]));
+
+        $decryptedAuthUser['column'] = $transformedColumns;
+        $decryptedAuthUser['data']['function'] = [$this->functionsApiAccounts()];
+
         // Display or use the decrypted attributes as needed
-        return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
+        return response()->json(['messages' => [$decryptedAuthUser]], Response::HTTP_OK);
     }
+
+
+    // CHILD OF functionsApi
+    private function generateFunction($prefix, $api, $payload)
+    {
+        return [
+            'api' => $prefix . $api,
+            'payload' => $payload,
+        ];
+    }
+
+    // CHILD OF index Accounts
+    private function functionsApiAccounts()
+    {
+        $prefix = 'accounts/';
+
+        $payloads = [
+            'update-email' => ['user_id', 'new_email'],
+            'update-password' => ['user_id', 'password', 'password_confirmation'],
+            'update-role-status' => ['user_id', 'role', 'status'],
+        ];
+
+        $functions = [];
+
+        foreach ($payloads as $key => $payload) {
+            $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
+        }
+
+        return $functions;
+    }
+
 
     // UPDATE EMAIL | ADMIN SIDE
     public function updateEmailAdmin(Request $request)

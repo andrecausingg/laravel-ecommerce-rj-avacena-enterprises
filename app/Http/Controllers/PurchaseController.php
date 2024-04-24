@@ -660,16 +660,6 @@ class PurchaseController extends Controller
             $this->addPurchaseInfoToCustomerArray($arrPurchaseCustomer, $purchase);
         }
 
-        // Add array_purchase_id to each item
-        // foreach ($arrPurchaseCustomer as &$customer) {
-        //     foreach ($customer['items'] as &$item) {
-        //         // Get unique purchase IDs for the item
-        //         $purchaseIds = array_unique($item['array_purchase_id']);
-        //         $item['array_purchase_id'] = array_values($purchaseIds);
-        //         $item['function'] = [$this->minusAddDeleteAllFunction()];
-        //     }
-        // }
-
         foreach ($arrPurchaseCustomer as &$customer) {
             foreach ($customer['items'] as &$item) {
                 // Get unique purchase IDs for the item
@@ -682,8 +672,8 @@ class PurchaseController extends Controller
                 // Assign total discounted price to the item
                 $item['array_discounted_price'] = $totalDiscountedPrice;
 
-                // Assign minusAddDeleteAllFunction to the item's function
-                $item['function'] = [$this->minusAddDeleteAllFunction()];
+                // Assign functionsApi to the item's function
+                $item['function'] = [$this->functionsApi()];
             }
         }
 
@@ -921,152 +911,35 @@ class PurchaseController extends Controller
         return $totalDiscountedPrice;
     }
 
-    // CHILD OF minusAddDeleteAllFunction
-    private function generateFunction($api, $payload)
+    // CHILD OF functionsApi
+    private function generateFunction($prefix, $api, $payload)
     {
         return [
-            'api' => $api,
+            'api' => $prefix . $api,
             'payload' => $payload,
         ];
     }
 
+
     // CHILD OF getUserIdMenuCustomer
-    private function minusAddDeleteAllFunction()
+    private function functionsApi()
     {
-        $arrPayloadMinusAndAdd = [
-            'purchase_id',
-            'purchase_group_id',
-            'inventory_product_id',
-            'inventory_group_id',
-            'user_id_customer',
+        $prefix = 'purchase/';
+
+        $payloads = [
+            'minus-qty' => ['purchase_id', 'purchase_group_id', 'inventory_product_id', 'inventory_group_id', 'user_id_customer'],
+            'add-qty' => ['purchase_id', 'purchase_group_id', 'inventory_product_id', 'inventory_group_id', 'user_id_customer'],
+            'delete-all-qty' => ['purchase_id', 'purchase_group_id', 'user_id_customer'],
         ];
 
-        $arrPayloadDeleteAll = [
-            'purchase_id',
-            'purchase_group_id',
-            'user_id_customer',
-        ];
+        $functions = [];
 
-        $functions = [
-            'minus' => $this->generateFunction('purchase/minus-qty', $arrPayloadMinusAndAdd),
-            'add' => $this->generateFunction('purchase/add-qty', $arrPayloadMinusAndAdd),
-            'delete_all' => $this->generateFunction('purchase/delete-all', $arrPayloadDeleteAll),
-        ];
+        foreach ($payloads as $key => $payload) {
+            $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
+        }
 
         return $functions;
     }
-
-    // public function getUserIdMenuCustomer(Request $request)
-    // {
-    //     // Authorize the user
-    //     $user = $this->authorizeUser($request);
-
-    //     if (empty($user->user_id)) {
-    //         return response()->json(
-    //             [
-    //                 'message' => 'Not authenticated user',
-    //             ],
-    //             Response::HTTP_INTERNAL_SERVER_ERROR
-    //         );
-    //     }
-
-    //     // Get the user ID
-    //     $user_id = $user->user_id;
-
-    //     // Fetch purchases
-    //     $purchases = PurchaseModel::where('user_id_menu', $user_id)->where('status', 'NOT PAID')->get();
-
-    //     // Initialize array to store purchase information
-    //     $arrPurchaseCustomer = [];
-    //     $finalFormat = [];
-
-    //     // Loop through purchases
-    //     foreach ($purchases as $purchase) {
-    //         $this->addPurchaseInfoToCustomerArray($arrPurchaseCustomer, $purchase);
-    //     }
-
-    //     $finalFormat[] = $arrPurchaseCustomer;
-
-    //     // Prepare response
-    //     $responseData = [
-    //         'message' => 'Data retrieved successfully',
-    //         'data' => $finalFormat,
-    //     ];
-
-    //     return response()->json($responseData, Response::HTTP_OK);
-    // }
-
-
-    // // CHILD getUserIdMenuCustomer
-    // private function addPurchaseInfoToCustomerArray(&$arrPurchaseCustomer, $purchase)
-    // {
-    //     // Extract purchase information
-    //     $purchaseData = [
-    //         'purchase_id' => $purchase->purchase_id,
-    //         'inventory_product_id' => $purchase->inventory_product_id,
-    //         'inventory_group_id' => $purchase->inventory_group_id,
-    //         'purchase_group_id' => $purchase->purchase_group_id,
-    //         'item_code' => $purchase->item_code,
-    //         'name' => $purchase->name,
-    //         'category' => $purchase->category,
-    //         'design' => $purchase->design,
-    //         'size' => $purchase->size,
-    //         'color' => $purchase->color,
-    //         'retail_price' => $purchase->retail_price,
-    //         'discounted_price' => $purchase->discounted_price,
-    //         'count' => 1,
-    //     ];
-
-    //     // Get the user ID of the customer
-    //     $user_id_customer = $purchase->user_id_customer;
-
-    //     // Check if customer already exists in the array
-    //     if (!isset($arrPurchaseCustomer[$user_id_customer])) {
-    //         $arrPurchaseCustomer[$user_id_customer] = [
-    //             'payment' => [],
-    //             'items' => [],
-    //         ];
-    //     }
-
-    //     // Add payment information
-    //     $arrPurchaseCustomer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $purchase->purchase_group_id)
-    //         ->where('user_id', $user_id_customer)
-    //         ->get()
-    //         ->toArray();
-
-    //     // Check if the item already exists in the customer's items
-    //     $found = false;
-    //     foreach ($arrPurchaseCustomer[$user_id_customer]['items'] as &$item) {
-    //         if ($this->purchaseMatchesItem($item, $purchase)) {
-    //             $item['count']++;
-    //             $found = true;
-    //             break;
-    //         }
-    //     }
-
-    //     // If not found, add the item
-    //     if (!$found) {
-    //         $arrPurchaseCustomer[$user_id_customer]['items'][] = $purchaseData;
-    //     }
-    // }
-
-    // // CHILD addPurchaseInfoToCustomerArray
-    // private function purchaseMatchesItem($item, $purchase)
-    // {
-    //     return (
-    //         $item['inventory_product_id'] == $purchase->inventory_product_id &&
-    //         $item['inventory_group_id'] == $purchase->inventory_group_id &&
-    //         $item['purchase_group_id'] == $purchase->purchase_group_id &&
-    //         $item['item_code'] == $purchase->item_code &&
-    //         $item['name'] == $purchase->name &&
-    //         $item['category'] == $purchase->category &&
-    //         $item['design'] == $purchase->design &&
-    //         $item['size'] == $purchase->size &&
-    //         $item['color'] == $purchase->color &&
-    //         $item['retail_price'] == $purchase->retail_price &&
-    //         $item['discounted_price'] == $purchase->discounted_price
-    //     );
-    // }
 
 
     /**

@@ -8,19 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class Helper
 {
-    public function unsetColumn($unsets, $fillableAttr)
-    {
-        foreach ($unsets as $unset) {
-            // Find the key associated with the field and unset it
-            $key = array_search($unset, $fillableAttr);
-            if ($key !== false) {
-                unset($fillableAttr[$key]);
-            }
-        }
-
-        return $fillableAttr;
-    }
-
     public function authorizeUser($request)
     {
         try {
@@ -46,6 +33,19 @@ class Helper
         }
     }
 
+    public function unsetColumn($unsets, $fillableAttr)
+    {
+        foreach ($unsets as $unset) {
+            // Find the key associated with the field and unset it
+            $key = array_search($unset, $fillableAttr);
+            if ($key !== false) {
+                unset($fillableAttr[$key]);
+            }
+        }
+
+        return $fillableAttr;
+    }
+
     public function upperCaseSpecific($validatedData, $colUpperCase)
     {
         foreach ($validatedData as $key => $value) {
@@ -56,5 +56,11 @@ class Helper
         }
 
         return $validatedData;
+    }
+
+    public function transformColumnName($column)
+    {
+        return ucwords(str_replace('_', ' ', $column));
+
     }
 }

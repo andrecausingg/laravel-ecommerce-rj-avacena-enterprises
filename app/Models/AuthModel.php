@@ -64,4 +64,9 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     {
         return 'user_id';
     }
+
+    public function getFillableAttributes(): array
+    {
+        return $this->fillable;
+    }
 }

@@ -16,15 +16,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
-    protected $fillableAttributes, $UnsetDecrypts, $Uppercase, $helper;
-    public function __construct(Helper $helper)
+    protected $fillableAttrUserInfos, $UnsetDecrypts, $Uppercase, $helper;
+    public function __construct(Helper $helper, UserInfoModel $fillableAttrUserInfos)
     {
-        $userInfoModel = new UserInfoModel();
-        $this->fillableAttributes = $userInfoModel->getFillableAttributes();
-
         $this->UnsetDecrypts = config('system.user-info.UnsetDecrypt');
         $this->Uppercase = config('system.user-info.Uppercase');
+
         $this->helper = $helper;
+        $this->fillableAttrUserInfos = $fillableAttrUserInfos;
     }
 
 
@@ -41,23 +40,17 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
-        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
-            // Find the key associated with the field and unset it
-            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
-            if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
-            }
-        }
+        // Unset Column not needed to decrypt
+        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
 
         $userInfos = UserInfoModel::get();
         foreach ($userInfos as $userInfo) {
             if ($userInfo) {
                 $userInfoArray = $userInfo->toArray();
 
-                foreach ($this->fillableAttributes as $fillableAttribute) {
-                    if (isset($userInfoArray[$fillableAttribute])) {
-                        $userInfoArray[$fillableAttribute] = $userInfo->{$fillableAttribute} ? Crypt::decrypt($userInfo->{$fillableAttribute}) : null;
+                foreach ($unsetResults as $unsetResult) {
+                    if (isset($userInfoArray[$unsetResult])) {
+                        $userInfoArray[$unsetResult] = $userInfo->{$unsetResult} ? Crypt::decrypt($userInfo->{$unsetResult}) : null;
                     }
                 }
                 $decryptedUserInfos = $userInfoArray;
@@ -80,22 +73,16 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
+        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
 
-        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
-            // Find the key associated with the field and unset it
-            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
-            if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
-            }
-        }
 
         $userInfos = UserInfoModel::where('user_id', $user->user_id)->first();
         if ($userInfos) {
             $userInfoArray = $userInfos->toArray();
 
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                if (isset($userInfoArray[$fillableAttribute])) {
-                    $userInfoArray[$fillableAttribute] = $userInfos->{$fillableAttribute} ? Crypt::decrypt($userInfos->{$fillableAttribute}) : null;
+            foreach ($unsetResults as $unsetResult) {
+                if (isset($userInfoArray[$unsetResult])) {
+                    $userInfoArray[$unsetResult] = $userInfos->{$unsetResult} ? Crypt::decrypt($userInfos->{$unsetResult}) : null;
                 }
             }
             $decryptedUserInfos = $userInfoArray;
@@ -245,14 +232,8 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
-        foreach ($this->UnsetDecrypts as $UnsetDecrypt) {
-            // Find the key associated with the field and unset it
-            $key = array_search($UnsetDecrypt, $this->fillableAttributes);
-            if ($key !== false) {
-                unset($this->fillableAttributes[$key]);
-            }
-        }
+        // Unset Column not needed
+        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -307,21 +288,19 @@ class UserInfoController extends Controller
         }
 
         // Loop through the fields for encryption and decryption
-        foreach ($this->fillableAttributes as $field) {
-            // dd($userInfo->$field);
-            $existingValue = $userInfo->$field !== null ? Crypt::decrypt($userInfo->$field) : null;
-            // dd($existingValue);
+        foreach ($unsetResults as $unsetResult) {
+            $existingValue = $userInfo->$unsetResult !== null ? Crypt::decrypt($userInfo->$unsetResult) : null;
 
-            if ($field != 'image') {
-                $newValue = Crypt::encrypt($validatedData[$field]);
+            if ($unsetResult != 'image') {
+                $newValue = Crypt::encrypt($validatedData[$unsetResult]);
 
                 // Check if the value has changed for logs
-                if ($existingValue != $validatedData[$field]) {
-                    $changesForLogs[$field] = [
+                if ($existingValue != $validatedData[$unsetResult]) {
+                    $changesForLogs[$unsetResult] = [
                         'oldEnc' => $existingValue,
-                        'newEnc' => $validatedData[$field],
+                        'newEnc' => $validatedData[$unsetResult],
                     ];
-                    $userInfo->{$field} = $newValue; // Set the new value
+                    $userInfo->{$unsetResult} = $newValue; // Set the new value
                 }
             } else {
                 $newValue =  $filename != '' ? Crypt::encrypt($filename) : null;
@@ -338,7 +317,7 @@ class UserInfoController extends Controller
                     ];
                 }
 
-                $userInfo->{$field} = $newValue; // Set the new value
+                $userInfo->{$unsetResult} = $newValue; // Set the new value
             }
         }
 
