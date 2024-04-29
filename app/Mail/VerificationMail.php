@@ -11,19 +11,19 @@ class VerificationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $verificationCode;
+    public $verification_code;
     public $name;
 
     /**
      * Create a new message instance.
      *
-     * @param string $verificationCode
+     * @param string $verification_code
      * @param string $name
      * @return void
      */
-    public function __construct($verificationCode, $name)
+    public function __construct($verification_code, $name)
     {
-        $this->verificationCode = $verificationCode;
+        $this->verification_code = $verification_code;
         $this->name = $name;
     }
 
@@ -38,7 +38,7 @@ class VerificationMail extends Mailable
             ->view('auth-mail.verification_mail')
             ->with([
                 'name' => $this->name,
-                'verificationCode' => $this->verificationCode,
+                'verification_code' => $this->verification_code,
             ]);
     }
 }

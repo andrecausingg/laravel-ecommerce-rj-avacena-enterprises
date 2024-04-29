@@ -14,7 +14,7 @@
         <p style="font-weight: 400; font-size: 16px;">Thank you for signing up for our service. To complete the
             verification process, please use the following code: </p>
             <span style="font-size: 32px; font-weight: 600; margin: 0;">{{
-                $verificationCode ?? '' }}</span>
+                $verification_code ?? '' }}</span>
         <p style="font-weight: 400; font-size: 16px;">If you did not request this verification code, please ignore this
             message.</p>
 

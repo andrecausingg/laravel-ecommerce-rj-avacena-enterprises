@@ -25,12 +25,13 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthController extends Controller
 {
 
-    protected $helper, $fillableAttrAuths, $UnsetForRetreives, $ArrHaveAtConvertToReadDateTime;
+    protected $helper, $fillableAttrAuths, $UnsetForRetreives, $ArrHaveAtConvertToReadDateTime, $ArrEnvRoles;
 
     public function __construct(Helper $helper, AuthModel $fillableAttrAuths)
     {
         $this->UnsetForRetreives = config('system.accounts.UnsetForRetreiveIndex');
         $this->ArrHaveAtConvertToReadDateTime = config('system.accounts.ArrHaveAtConvertToReadDateTime');
+        $this->ArrEnvRoles = config('system.accounts.ArrEnvRole');
 
         $this->helper = $helper;
         $this->fillableAttrAuths = $fillableAttrAuths;
@@ -180,16 +181,31 @@ class AuthController extends Controller
         ], Response::HTTP_OK);
     }
 
-    // PARENT REGISTER
+    /**
+     * PARENT REGISTER
+     * Register a new user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function register(Request $request)
     {
         // Declare Value
-        $verificationNumber = mt_rand(100000, 999999);
-        $accountRole = env('ROLE_CLIENT');
+        $verification_number = mt_rand(100000, 999999);
+        $account_role = env('ROLE_CLIENT');
         $status = 'PENDING';
+        $arr_data = [];
+
         do {
-            $userId = Str::uuid()->toString();
-        } while (AuthModel::where('user_id', $userId)->exists());
+            $user_id = Str::uuid()->toString();
+        } while (AuthModel::where('user_id', $user_id)->exists());
+
+        $arr_data = [
+            'user_id' => $user_id,
+            'verification_number' => $verification_number,
+            'account_role' => $account_role,
+            'status' => $status,
+        ];
 
         // Check if phone number is not empty
         if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
@@ -197,6 +213,9 @@ class AuthController extends Controller
                 'phone_number' => 'required|numeric',
                 'password' => 'required|string|min:6|confirmed:password_confirmation',
             ]);
+
+            $arr_data['phone_number'] = $request->phone_number;
+            $arr_data['password'] = $request->password;
 
             if ($validator->fails()) {
                 return response()->json(['message' => $validator->errors()],  Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -214,87 +233,100 @@ class AuthController extends Controller
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->emailRegister($request, $userId, $verificationNumber, $accountRole, $status, $request->input('email'), $request->input('password'));
-        } else {
-            return response()->json(['message' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
+            $arr_data['email'] = $request->email;
+            $arr_data['password'] = $request->password;
+
+            return $this->emailRegister($request, $arr_data);
         }
+
+        return response()->json(['message' => 'Please Input on Phone Number or Email', Response::HTTP_UNPROCESSABLE_ENTITY], 0);
     }
 
-    // CHILD REGISTER EMAIL
-    public function emailRegister($request, $userId, $verificationNumber, $accountRole, $status, $email, $password)
+    /**
+     * CHILD REGISTER EMAIL
+     * Register a new user for email.
+     *
+     * @param array $arr_data
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function emailRegister($request, $arr_data)
     {
+        // Generate a new token for the user
+        $expiration_time = Carbon::now()->addMinutes(120);
         // Get All Users and Decrypt
         $users = AuthModel::all();
 
         // Decrypt
         foreach ($users as $user) {
             // Start Decrypt
-            $decryptedEmail = Crypt::decrypt($user->email);
+            $decrypted_email = Crypt::decrypt($user->email);
 
             // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-            if ($decryptedEmail === $email && $user->email_verified_at === null) {
-                // Generate a new token for the user
-                $expirationTime = Carbon::now()->addMinutes(120);
-                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
-
-                if (!$newToken) {
+            if ($decrypted_email === $arr_data['email'] && $user->email_verified_at === null) {
+                $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+                if (!$new_token) {
                     return response()->json([
                         'message' => 'Unable to generate a token from user'
                     ], Response::HTTP_OK);
                 }
 
                 // Update verification_number | password | verify email token
-                $user->verification_number = $verificationNumber;
-                $user->password = Hash::make($password);
-                $user->verify_email_token = $newToken;
-                $user->verify_email_token_expire_at = $expirationTime;
+                $user->verification_number = $arr_data['verification_number'];
+                $user->password = Hash::make($arr_data['password']);
+                $user->verify_email_token = $new_token;
+                $user->verify_email_token_expire_at = $expiration_time;
 
                 // Save
-                if ($user->save()) {
-                    // Indicator Logs
-                    $indicator = 'existAccCreate';
-
-                    // Array Logs
-                    $logsData = [
-                        'fields' => [
-                            'user_id' => $user->user_id,
-                            'email' => Crypt::encrypt($email),
-                            'password' => Crypt::encrypt($password),
-                        ]
-                    ];
-
-                    // Logs
-                    $logResult = $this->emailRegisterLogs($request, $userId, $indicator, $logsData);
-
-
-                    // Get the Name of Gmail
-                    $emailParts = explode('@', $email);
-                    $name = [$emailParts[0]];
-
-                    // Send the new token to the user via email
-                    $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
-                    if (!$email) {
-                        return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                    }
-                    return response()->json([
-                        'message' => 'Successfully create token',
-                        // 'data' => $user,
-                        'url_token' => '/signup/verify-email?tj=' . $newToken,
-                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                        'log_message' => $logResult
-                    ], Response::HTTP_OK);
+                if (!$user->save()) {
+                    return response()->json(
+                        [
+                            'message' => 'Error updating password, verification number, new token, and expiration time',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
                 }
 
-                return response()->json(
-                    [
-                        'message' => 'Error updating verification number, token, and expiration time',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+                // Arr Logs details
+                $arr_log_details = [
+                    'fields' => [
+                        'user_id' => $user->user_id,
+                        'email' => Crypt::encrypt($arr_data['email']),
+                        'password' => Crypt::encrypt($arr_data['password']),
+                    ]
+                ];
+
+                // Arr Data Logs
+                $arr_data_logs = [
+                    'user_id' => $user->user_id,
+                    'is_sensitive' => 1,
+                    'is_history' => 1,
+                    'log_details' => $arr_log_details,
+                    'user_action' => 'EXISTING ACCOUNT REDIRECTED TO VERIFICATION PAGE',
+                ];
+
+                // Logs
+                $log_result = $this->helper->log($request, $arr_data_logs);
+
+                // Get the Name of Gmail
+                $email_parts = explode('@', $arr_data['email']);
+                $name = [$email_parts[0]];
+
+                // Send the new token to the user via email
+                $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
+                if (!$email) {
+                    return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+                return response()->json([
+                    'message' => 'Successfully create token',
+                    // 'data' => $user,
+                    'url_token' => '/signup/verify-email?tj=' . $new_token,
+                    'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                    'log_message' => $log_result
+                ], Response::HTTP_OK);
             }
 
             // If same email exist and email_verified_at not null send error message
-            else if ($decryptedEmail === $email && $user->email_verified_at !== null) {
+            else if ($decrypted_email === $arr_data['email'] && $user->email_verified_at !== null) {
 
                 return response()->json(
                     [
@@ -306,72 +338,83 @@ class AuthController extends Controller
         }
 
         // User with the given email does not exist, create a new user
-        $userCreate = AuthModel::create([
-            'user_id' => $userId,
-            'email' => Crypt::encrypt($email),
-            'password' => Hash::make($password),
-            'role' => $accountRole,
-            'status' => $status,
-            'verification_number' => $verificationNumber,
+        $user_create = AuthModel::create([
+            'user_id' => $arr_data['user_id'],
+            'email' => Crypt::encrypt($arr_data['email']),
+            'password' => Hash::make($arr_data['password']),
+            'role' => $arr_data['account_role'],
+            'status' => $arr_data['status'],
+            'verification_number' => $arr_data['verification_number'],
         ]);
 
-        if (!$userCreate) {
+        if (!$user_create) {
             // Error creating user
             return response()->json(['message' => 'Failed to create user'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // Generate a new token for the user
-        $expirationTime = Carbon::now()->addMinutes(120);
-        $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($userCreate);
+        $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user_create);
 
-        if (!$newToken) {
+        if (!$new_token) {
             return response()->json(['message' => 'Failed to generate token'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Update user with the new token for email verification
-        $userCreate->verify_email_token = $newToken;
-        $userCreate->verify_email_token_expire_at = $expirationTime;
+        $user_create->verify_email_token = $new_token;
+        $user_create->verify_email_token_expire_at = $expiration_time;
 
-        if (!$userCreate->save()) {
+        if (!$user_create->save()) {
             return response()->json(['message' => 'Failed to update token and expire at'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // Indicator Logs
-        $indicator = 'freshAccCreate';
-
-        // Array Logs
-        $logsData = [
+        // Arr Logs details
+        $arr_log_details = [
             'fields' => [
-                'user_id' => $userCreate->user_id,
-                'email' => Crypt::encrypt($email),
-                'password' => Crypt::encrypt($password),
+                'user_id' => $arr_data['user_id'],
+                'email' => Crypt::encrypt($arr_data['email']),
+                'password' => Crypt::encrypt($arr_data['password']),
             ]
         ];
 
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_id' => $arr_data['user_id'],
+            'is_sensitive' => 1,
+            'is_history' => 1,
+            'log_details' => $arr_log_details,
+            'user_action' => 'REGISTER AN ACCOUNT USING EMAIL',
+        ];
+
         // Logs
-        $logResult = $this->emailRegisterLogs($request, $userId, $indicator, $logsData);
+        $log_result = $this->helper->log($request, $arr_data_logs);
 
         // Get the Name of Gmail
-        $emailParts = explode('@', $email);
+        $emailParts = explode('@', $arr_data['email']);
         $name = $emailParts[0];
 
         // Send an email to the user with the new token
-        $email = Mail::to($email)->send(new VerificationMail($verificationNumber, $name));
+        $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
         if (!$email) {
             return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json([
             'message' => 'Successfully create token',
-            'url_token' => '/signup/verify-email?tj=' . $newToken,
-            'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-            'log_message' => $logResult
+            'url_token' => '/signup/verify-email?tj=' . $new_token,
+            'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+            'log_message' => $log_result
         ], Response::HTTP_OK);
     }
+
+    /**
+     * CHILD EMAIL REGISTER
+     * Verify email
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function verifyEmail(Request $request)
     {
-        $verificationNumber = mt_rand(100000, 999999);
-        $logDetails = [];
+        $verification_number = mt_rand(100000, 999999);
 
         // Authorize the user
         $user = $this->authorizeUserVerifyEmail($request);
@@ -394,40 +437,59 @@ class AuthController extends Controller
         }
 
         // Expiration to verified Email
-        $expirationTime = Carbon::now()->addSecond();
-        $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+        $expiration_time = Carbon::now()->addSecond();
+        $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
         // Update user status and set email_verified_at to the current timestamp
         $user->status = 'ACTIVE';
-        $user->verify_email_token = $newToken;
+        $user->verify_email_token = $new_token;
         $user->email_verified_at = now();
-        $user->verification_number = $verificationNumber;
+        $user->verification_number = $verification_number;
 
-        if ($user->save()) {
-            $logDetails = [
-                'fields' => [
-                    'user_id' => $user->user_id,
-                    'email_verified_at' => $user->email_verified_at,
-                    'verification_number' => $request->verification_number,
-                ]
-            ];
-            $logResult = $this->verifyEmailLogs($request, $user->user_id, $logDetails);
-
+        if (!$user->save()) {
             return response()->json(
                 [
-                    'message' => 'Email verified successfully',
-                    'log_message' => $logResult
+                    'message' => 'Failed to verify email',
                 ],
-                Response::HTTP_OK
+                Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
+
+        // Log Details
+        $log_details = [
+            'fields' => [
+                'user_id' => $user->user_id,
+                'email_verified_at' => $user->email_verified_at,
+                'verification_number' => $request->verification_number,
+            ]
+        ];
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_id' => $user->user_id,
+            'is_sensitive' => 0,
+            'is_history' => 0,
+            'log_details' => $log_details,
+            'user_action' => 'SUCCESS VERIFY EMAIL',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json(
+            [
+                'message' => 'Email verified successfully',
+                'log_message' => $log_result
+            ],
+            Response::HTTP_OK
+        );
     }
 
     // SIGN UP | VERIFY EMAIL RESEND CODE
     public function resendVerificationAuth(Request $request)
     {
         $logDetails = [];
-        $verificationNumber = mt_rand(100000, 999999);
+        $verification_number = mt_rand(100000, 999999);
 
         // Authorize the user
         $user = $this->authorizeUserResendCode($request);
@@ -446,21 +508,14 @@ class AuthController extends Controller
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
-
-        if ($request->indicator != env('VERIFY_EMAIL_NUM_CODE')) {
-            return response()->json([
-                'message' => 'Invalid indicator',
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
         if ($user->update([
-            'verification_number' => $verificationNumber,
+            'verification_number' => $verification_number,
         ])) {
             $emailParts = explode('@', Crypt::decrypt($user->email));
             $name = [$emailParts[0]];
 
             if ($request->indicator == env('VERIFY_EMAIL_NUM_CODE')) {
-                $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verificationNumber, $name));
+                $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
                 if (!$email) {
                     return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 }
@@ -484,8 +539,6 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request)
     {
-        $logDetails = [];
-
         // Validate
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -505,12 +558,12 @@ class AuthController extends Controller
             // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
             if ($decryptedEmail === $request->email && $user->email_verified_at !== null) {
                 // 2hrs expiration to verified Email
-                $expirationTime = Carbon::now()->addMinutes(120);
-                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+                $expiration_time = Carbon::now()->addMinutes(120);
+                $newToken = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
                 // Update token and expiration
                 $user->reset_password_token = $newToken;
-                $user->reset_password_token_expire_at = $expirationTime;
+                $user->reset_password_token_expire_at = $expiration_time;
 
                 // Save
                 if (!$user->save()) {
@@ -796,53 +849,6 @@ class AuthController extends Controller
     }
 
     // GET ALL USER ACCOUNT | ADMIN SIDE
-    // public function index(Request $request)
-    // {
-    //     // Authorize the user
-    //     $user = $this->helper->authorizeUser($request);
-    //     if (empty($user->user_id)) {
-    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-    //     }
-
-    //     // Decrypt all emails and other attributes
-    //     $decryptedAuthUser = [];
-
-    //     $authUsers = AuthModel::all();
-
-    //     foreach ($authUsers as $authUser) {
-    //         $decryptedEmail = $authUser->email ? Crypt::decrypt($authUser->email) : null;
-    //         $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first(); // Assuming it returns one record
-    //         $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
-
-    //         $decryptedAuthUser[] = [
-    //             'id' => $authUser->id ?? null,
-    //             'user_id' => $authUser->user_id ?? null,
-    //             'password' => Crypt::decrypt($history->value) ?? null,
-    //             'phone_number' => $authUser->phone_number ?? null,
-    //             'email' => $decryptedEmail,
-    //             'role' => $authUser->role ?? null,
-    //             'status' => $authUser->status ?? null,
-    //             'deleted_at' => $authUser->deleted_at ?? null,
-    //             'created_at' => $authUser->created_at ?? null,
-    //             'updated_at' => $authUser->updated_at ?? null,
-
-    //             'userInfo' => [
-    //                 'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
-    //             ],
-
-    //             'column' => [
-
-    //             ],
-
-    //             'function' => $this->functionsApi(),
-    //         ];
-    //     }
-
-    //     // Display or use the decrypted attributes as needed
-    //     return response()->json(['messages' => $decryptedAuthUser], Response::HTTP_OK);
-    // }
-
-    // ADMIN | ACCOUNTS
     public function index(Request $request)
     {
         // Authorize the user
@@ -868,14 +874,22 @@ class AuthController extends Controller
                     $decryptedAuthUser['data']['userInfo'] = [
                         'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
                     ];
-                    $decryptedAuthUser['data'][$column] = $authUser->{$column};
-                    $columnName[] = $this->helper->transformColumnName($column);
+                    $decryptedAuthUser['data']['id'] = Crypt::encrypt($authUser->{$column});
+                    $columnName[] = $this->helper->transformColumnName('Id');
                 } else if ($column == 'email') {
                     $decryptedAuthUser['data'][$column] = $authUser->{$column} ? Crypt::decrypt($authUser->{$column}) : null;
                     $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
                     $decryptedAuthUser['data']['password'] = $history ? Crypt::decrypt($history->value) : null;
                     $columnName[] = $this->helper->transformColumnName($column);
                     $columnName[] = 'password';
+                } else if ($column == 'role') {
+                    $columnName[] = $this->helper->transformColumnName($column);
+                    foreach ($this->ArrEnvRoles as $roleEnv => $roleLabel) {
+                        if ($authUser->{$column} == env($roleEnv)) {
+                            $decryptedAuthUser['data'][$column] = $roleLabel;
+                            break;
+                        }
+                    }
                 } else {
                     // Keep other columns as they are
                     $columnName[] = $this->helper->transformColumnName($column);
@@ -906,42 +920,182 @@ class AuthController extends Controller
         array_push($transformedColumns, $this->helper->transformColumnName($newColumns[1]));
 
         $decryptedAuthUser['column'] = $transformedColumns;
-        $decryptedAuthUser['data']['function'] = [$this->functionsApiAccounts()];
+
+        $crudSettings = $this->getApiAccountCrudSettings();
+        $decryptedAuthUser['data']['action'] = $this->helper->functionsApiAccountsCrud(
+            $crudSettings['prefix'],
+            $crudSettings['apiWithPayloads'],
+            $crudSettings['methods'],
+            $crudSettings['buttonNames'],
+            $crudSettings['icons'],
+            $crudSettings['actions']
+        );
+
+        $relativeSettings = $this->getApiAccountRelativeSettings();
+        $decryptedAuthUser['relative'] = $this->helper->functionRelative(
+            $relativeSettings['prefix'],
+            $relativeSettings['apiWithPayloads'],
+            $relativeSettings['methods'],
+            $relativeSettings['buttonNames'],
+            $relativeSettings['icons'],
+            $relativeSettings['actions']
+        );
 
         // Display or use the decrypted attributes as needed
         return response()->json(['messages' => [$decryptedAuthUser]], Response::HTTP_OK);
     }
 
-
-    // CHILD OF functionsApi
-    private function generateFunction($prefix, $api, $payload)
-    {
-        return [
-            'api' => $prefix . $api,
-            'payload' => $payload,
-        ];
-    }
-
-    // CHILD OF index Accounts
-    private function functionsApiAccounts()
+    private function getApiAccountCrudSettings()
     {
         $prefix = 'accounts/';
-
-        $payloads = [
-            'update-email' => ['user_id', 'new_email'],
-            'update-password' => ['user_id', 'password', 'password_confirmation'],
-            'update-role-status' => ['user_id', 'role', 'status'],
+        $apiWithPayloads = [
+            'update-email' => ['id', 'new_email'],
+            'update-password' => ['id', 'password', 'password_confirmation'],
+            'update-role-status' => ['id', 'role', 'status'],
+        ];
+        $methods = [
+            'update-email' => 'POST',
+            'update-password' => 'POST',
+            'update-role-status' => 'POST',
+        ];
+        $buttonNames = [
+            'update-email' => 'update-email',
+            'update-password' => 'update-password',
+            'update-role-status' => 'update-role-status',
+        ];
+        $icons = [
+            'update-email' => null,
+            'update-password' => null,
+            'update-role-status' => null,
+        ];
+        $actions = [
+            'update-email' => 'modal',
+            'update-password' => 'modal',
+            'update-role-status' => 'modal',
         ];
 
-        $functions = [];
-
-        foreach ($payloads as $key => $payload) {
-            $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
-        }
-
-        return $functions;
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
     }
 
+    private function getApiAccountRelativeSettings()
+    {
+        $prefix = 'accounts/';
+        $apiWithPayloads = [
+            'store' => [
+                'email',
+                'password',
+                'password_confirmation',
+                'role',
+                'status'
+            ],
+            'show/' => [
+                'id',
+            ]
+        ];
+
+        $methods = [
+            'store' => 'POST',
+            'show/' => 'GET',
+        ];
+
+        $buttonNames = [
+            'store' => 'create',
+            'show/' => null,
+        ];
+
+        $icons = [
+            'store' => null,
+            'show/' => null,
+        ];
+
+        $actions = [
+            'store' => 'modal',
+            'show/' => null,
+        ];
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+    }
+
+    // GET SPECIFIC USER ACCOUNT | ADMIN SIDE
+    public function show(Request $request, string $id)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (empty($id) || $id == null || $id == '') {
+            return response()->json(['message' => 'Invalid I.D'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Decrypt all emails and other attributes
+        $decryptedAuthUser = [];
+        $columnName = [];
+
+        // Unset Column not needed
+        $unsetResults = $this->helper->unsetColumn($this->UnsetForRetreives, $this->fillableAttrAuths->getFillableAttributes());
+
+        // Retrieve AuthModel record
+        $authUser = AuthModel::where('user_id', Crypt::decrypt($id))->first();
+
+        if (!$authUser) {
+            return response()->json(['message' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        foreach ($unsetResults as $column) {
+            if ($column == 'user_id') {
+                $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first();
+                $decryptedAuthUser['data']['userInfo'] = [
+                    'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+                ];
+                $decryptedAuthUser['data']['id'] = Crypt::encrypt($authUser->{$column});
+                $columnName[] = $this->helper->transformColumnName('Id');
+            } else if ($column == 'email') {
+                $decryptedAuthUser['data'][$column] = $authUser->{$column} ? Crypt::decrypt($authUser->{$column}) : null;
+                $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+                $decryptedAuthUser['data']['password'] = $history ? Crypt::decrypt($history->value) : null;
+                $columnName[] = $this->helper->transformColumnName($column);
+                $columnName[] = 'password';
+            } else if ($column == 'role') {
+                $columnName[] = $this->helper->transformColumnName($column);
+                foreach ($this->ArrEnvRoles as $roleEnv => $roleLabel) {
+                    if ($authUser->{$column} == env($roleEnv)) {
+                        $decryptedAuthUser['data'][$column] = $roleLabel;
+                        break;
+                    }
+                }
+            } else {
+                // Keep other columns as they are
+                $columnName[] = $this->helper->transformColumnName($column);
+                $value = $authUser->{$column};
+
+                // Check if the column needs formatting and value is not null
+                if (in_array($column, $this->ArrHaveAtConvertToReadDateTime) && $value !== null) {
+                    // Format the value using Carbon
+                    $carbonDate = Carbon::parse($value);
+                    $value = $carbonDate->format('F j, Y g:i a');
+                }
+
+                // Assign the value to the decryptedAuthUser array
+                $decryptedAuthUser['data'][$column] = $value;
+            }
+        }
+
+        // Add new columns
+        $newColumns = [
+            "User Info",
+            "Action"
+        ];
+        $transformedColumns = array_map(function ($columnName) {
+            return $this->helper->transformColumnName($columnName);
+        }, $columnName);
+        array_unshift($transformedColumns, $this->helper->transformColumnName($newColumns[0]));
+        array_push($transformedColumns, $this->helper->transformColumnName($newColumns[1]));
+
+        // Display or use the decrypted attributes as needed
+        return response()->json(['messages' => [$decryptedAuthUser]], Response::HTTP_OK);
+    }
 
     // UPDATE EMAIL | ADMIN SIDE
     public function updateEmailAdmin(Request $request)
@@ -952,10 +1106,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string',
+            'id' => 'required|string',
             'new_email' => 'required|email',
         ]);
 
@@ -965,7 +1118,7 @@ class AuthController extends Controller
         }
 
         // Fetch the user from the database
-        $userAuth = AuthModel::where('user_id', $request->user_id)->first();
+        $userAuth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
         if (!$userAuth) {
             return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -1023,7 +1176,7 @@ class AuthController extends Controller
 
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string',
+            'id' => 'required|string',
             'password' => 'required|string|min:6|confirmed:password_confirmation',
         ]);
 
@@ -1033,7 +1186,7 @@ class AuthController extends Controller
         }
 
         // Fetch the user from the database
-        $userAuth = AuthModel::where('user_id', $request->user_id)->first();
+        $userAuth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
         if (!$userAuth) {
             return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -1043,7 +1196,7 @@ class AuthController extends Controller
         } else {
             $history = HistoryModel::where('column_name', 'password')
                 ->where('tbl_name', 'users_tbl')
-                ->where('tbl_id', $request->user_id)
+                ->where('tbl_id', Crypt::decrypt($request->user_id))
                 ->latest() // Order by created_at column in descending order (latest first)
                 ->first(); // Retrieve the first result
 
@@ -1082,7 +1235,7 @@ class AuthController extends Controller
 
         // Validation rules
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|string',
+            'id' => 'required|string',
             'role' => 'required|string|max:255',
             'status' => 'required|string|max:255',
         ]);
@@ -1093,7 +1246,7 @@ class AuthController extends Controller
         }
 
         // Fetch the user from the database
-        $userAuth = AuthModel::where('user_id', $request->user_id)->first();
+        $userAuth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
         if (!$userAuth) {
             return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -1388,7 +1541,7 @@ class AuthController extends Controller
                 'history_id' => 'history_id-'  . $history->id,
             ]);
         } else {
-            return response()->json(['message' => 'Failed to create history for password storage during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to create history id for password during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         // Create LogsModel entry

@@ -54,6 +54,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     // User Accounts
     Route::prefix('accounts')->group(function () use ($AuthController) {
         Route::get('/index', [$AuthController, 'index']);
+        Route::get('/show/{id}', [$AuthController, 'show']);
         Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
         Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
         Route::post('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
