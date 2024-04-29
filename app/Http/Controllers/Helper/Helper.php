@@ -142,7 +142,7 @@ class Helper
                 'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
                 'tbl_name' => 'users_tbl',
                 'column_name' => 'password',
-                'value' => $arr_data_logs['log_details']['fields']['password'],
+                'value' => $arr_data_logs['log_details']['fields']['password'] ?? $arr_data_logs['log_details']['fields']['new_password'],
             ]);
 
             // Check if history creation failed
