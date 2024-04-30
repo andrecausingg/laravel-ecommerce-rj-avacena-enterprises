@@ -70,7 +70,9 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // This is the default code - andre
+    // 'timezone' => 'UTC',
+    'timezone' => 'Asia/Manila',
 
     /*
     |--------------------------------------------------------------------------
@@ -171,7 +173,6 @@ return [
 
         // Install Composers
         Tymon\JWTAuth\Providers\LaravelServiceProvider::class,
-        Jenssegers\Agent\AgentServiceProvider::class,
     ])->toArray(),
 
     /*
@@ -191,7 +192,6 @@ return [
         // JWT
         'JWTAuth' => Tymon\JWTAuth\Facades\JWTAuth::class,
         'JWTFactory' => Tymon\JWTAuth\Facades\JWTFactory::class,
-        'Agent' => Jenssegers\Agent\Facades\Agent::class,
     ])->toArray(),
 
 ];

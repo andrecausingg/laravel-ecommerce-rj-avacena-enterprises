@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bcdc0930261a9c9e4cfd81781509da0b",
+    "content-hash": "0dce76ce36d71b8590847ffedb92637f",
     "packages": [
         {
             "name": "brick/math",
@@ -129,6 +129,82 @@
                 }
             ],
             "time": "2023-12-11T17:09:12+00:00"
+        },
+        {
+            "name": "composer/ca-bundle",
+            "version": "1.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/composer/ca-bundle.git",
+                "reference": "0c5ccfcfea312b5c5a190a21ac5cef93f74baf99"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/0c5ccfcfea312b5c5a190a21ac5cef93f74baf99",
+                "reference": "0c5ccfcfea312b5c5a190a21ac5cef93f74baf99",
+                "shasum": ""
+            },
+            "require": {
+                "ext-openssl": "*",
+                "ext-pcre": "*",
+                "php": "^7.2 || ^8.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.10",
+                "psr/log": "^1.0",
+                "symfony/phpunit-bridge": "^4.2 || ^5",
+                "symfony/process": "^4.0 || ^5.0 || ^6.0 || ^7.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Composer\\CaBundle\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jordi Boggiano",
+                    "email": "j.boggiano@seld.be",
+                    "homepage": "http://seld.be"
+                }
+            ],
+            "description": "Lets you find a path to the system CA bundle, and includes a fallback to the Mozilla CA bundle.",
+            "keywords": [
+                "cabundle",
+                "cacert",
+                "certificate",
+                "ssl",
+                "tls"
+            ],
+            "support": {
+                "irc": "irc://irc.freenode.org/composer",
+                "issues": "https://github.com/composer/ca-bundle/issues",
+                "source": "https://github.com/composer/ca-bundle/tree/1.5.0"
+            },
+            "funding": [
+                {
+                    "url": "https://packagist.com",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/composer",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/composer/composer",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2024-03-15T14:00:32+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -1046,17 +1122,89 @@
             "time": "2023-12-03T19:50:20+00:00"
         },
         {
-            "name": "jaybizzle/crawler-detect",
-            "version": "v1.2.116",
+            "name": "hisorange/browser-detect",
+            "version": "5.0.3",
             "source": {
                 "type": "git",
-                "url": "https://github.com/JayBizzle/Crawler-Detect.git",
-                "reference": "97e9fe30219e60092e107651abb379a38b342921"
+                "url": "https://github.com/hisorange/browser-detect.git",
+                "reference": "6460325a81460d912131c0b943a00e76f8847cdb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/JayBizzle/Crawler-Detect/zipball/97e9fe30219e60092e107651abb379a38b342921",
-                "reference": "97e9fe30219e60092e107651abb379a38b342921",
+                "url": "https://api.github.com/repos/hisorange/browser-detect/zipball/6460325a81460d912131c0b943a00e76f8847cdb",
+                "reference": "6460325a81460d912131c0b943a00e76f8847cdb",
+                "shasum": ""
+            },
+            "require": {
+                "jaybizzle/crawler-detect": "~1.2",
+                "league/pipeline": "^1.0",
+                "matomo/device-detector": "^6.0",
+                "mobiledetect/mobiledetectlib": "~4.0",
+                "php": "^8.1",
+                "ua-parser/uap-php": "~3.9"
+            },
+            "require-dev": {
+                "orchestra/testbench": "~7.0 || ~8.0",
+                "php-coveralls/php-coveralls": "~2.0",
+                "phpunit/phpunit": "~9.0 || ~10.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "hisorange\\BrowserDetect\\ServiceProvider"
+                    ],
+                    "aliases": {
+                        "Browser": "hisorange\\BrowserDetect\\Facade"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "hisorange\\BrowserDetect\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Varga Zsolt",
+                    "email": "hello@hisorange.me"
+                }
+            ],
+            "description": "Browser & Mobile detection package for Laravel.",
+            "homepage": "https://github.com/hisorange/browser-detect",
+            "keywords": [
+                "analyse",
+                "browser",
+                "detect",
+                "hisorange",
+                "laravel",
+                "mobile",
+                "tablet",
+                "user agent",
+                "user-agent"
+            ],
+            "support": {
+                "issues": "https://github.com/hisorange/browser-detect/issues",
+                "source": "https://github.com/hisorange/browser-detect/tree/5.0.3"
+            },
+            "time": "2024-02-05T08:21:06+00:00"
+        },
+        {
+            "name": "jaybizzle/crawler-detect",
+            "version": "v1.2.118",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/JayBizzle/Crawler-Detect.git",
+                "reference": "9b8912ac5b78b780a0ead552b4c3dc9ddfdea4fd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/JayBizzle/Crawler-Detect/zipball/9b8912ac5b78b780a0ead552b4c3dc9ddfdea4fd",
+                "reference": "9b8912ac5b78b780a0ead552b4c3dc9ddfdea4fd",
                 "shasum": ""
             },
             "require": {
@@ -1093,92 +1241,9 @@
             ],
             "support": {
                 "issues": "https://github.com/JayBizzle/Crawler-Detect/issues",
-                "source": "https://github.com/JayBizzle/Crawler-Detect/tree/v1.2.116"
+                "source": "https://github.com/JayBizzle/Crawler-Detect/tree/v1.2.118"
             },
-            "time": "2023-07-21T15:49:49+00:00"
-        },
-        {
-            "name": "jenssegers/agent",
-            "version": "v2.6.4",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/jenssegers/agent.git",
-                "reference": "daa11c43729510b3700bc34d414664966b03bffe"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/jenssegers/agent/zipball/daa11c43729510b3700bc34d414664966b03bffe",
-                "reference": "daa11c43729510b3700bc34d414664966b03bffe",
-                "shasum": ""
-            },
-            "require": {
-                "jaybizzle/crawler-detect": "^1.2",
-                "mobiledetect/mobiledetectlib": "^2.7.6",
-                "php": ">=5.6"
-            },
-            "require-dev": {
-                "php-coveralls/php-coveralls": "^2.1",
-                "phpunit/phpunit": "^5.0|^6.0|^7.0"
-            },
-            "suggest": {
-                "illuminate/support": "Required for laravel service providers"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "3.0-dev"
-                },
-                "laravel": {
-                    "providers": [
-                        "Jenssegers\\Agent\\AgentServiceProvider"
-                    ],
-                    "aliases": {
-                        "Agent": "Jenssegers\\Agent\\Facades\\Agent"
-                    }
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Jenssegers\\Agent\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Jens Segers",
-                    "homepage": "https://jenssegers.com"
-                }
-            ],
-            "description": "Desktop/mobile user agent parser with support for Laravel, based on Mobiledetect",
-            "homepage": "https://github.com/jenssegers/agent",
-            "keywords": [
-                "Agent",
-                "browser",
-                "desktop",
-                "laravel",
-                "mobile",
-                "platform",
-                "user agent",
-                "useragent"
-            ],
-            "support": {
-                "issues": "https://github.com/jenssegers/agent/issues",
-                "source": "https://github.com/jenssegers/agent/tree/v2.6.4"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/jenssegers",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/jenssegers/agent",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2020-06-13T08:05:20+00:00"
+            "time": "2024-04-23T17:07:05+00:00"
         },
         {
             "name": "laravel/framework",
@@ -2169,33 +2234,161 @@
             "time": "2023-10-17T14:13:20+00:00"
         },
         {
-            "name": "mobiledetect/mobiledetectlib",
-            "version": "2.8.45",
+            "name": "league/pipeline",
+            "version": "1.0.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/serbanghita/Mobile-Detect.git",
-                "reference": "96aaebcf4f50d3d2692ab81d2c5132e425bca266"
+                "url": "https://github.com/thephpleague/pipeline.git",
+                "reference": "aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/serbanghita/Mobile-Detect/zipball/96aaebcf4f50d3d2692ab81d2c5132e425bca266",
-                "reference": "96aaebcf4f50d3d2692ab81d2c5132e425bca266",
+                "url": "https://api.github.com/repos/thephpleague/pipeline/zipball/aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8",
+                "reference": "aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.0.0"
+                "php": ">=7.1"
             },
             "require-dev": {
-                "phpunit/phpunit": "~4.8.36"
+                "leanphp/phpspec-code-coverage": "^4.2",
+                "phpspec/phpspec": "^4.3"
             },
             "type": "library",
             "autoload": {
-                "psr-0": {
-                    "Detection": "namespaced/"
+                "psr-4": {
+                    "League\\Pipeline\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Frank de Jonge",
+                    "email": "info@frenky.net",
+                    "role": "Author"
                 },
-                "classmap": [
-                    "Mobile_Detect.php"
+                {
+                    "name": "Woody Gilk",
+                    "email": "woody.gilk@gmail.com",
+                    "role": "Maintainer"
+                }
+            ],
+            "description": "A plug and play pipeline implementation.",
+            "keywords": [
+                "composition",
+                "design pattern",
+                "pattern",
+                "pipeline",
+                "sequential"
+            ],
+            "support": {
+                "issues": "https://github.com/thephpleague/pipeline/issues",
+                "source": "https://github.com/thephpleague/pipeline/tree/master"
+            },
+            "time": "2018-06-05T21:06:51+00:00"
+        },
+        {
+            "name": "matomo/device-detector",
+            "version": "6.3.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/matomo-org/device-detector.git",
+                "reference": "8096093346917ee2477d802ab3b00c4c091c5cee"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/matomo-org/device-detector/zipball/8096093346917ee2477d802ab3b00c4c091c5cee",
+                "reference": "8096093346917ee2477d802ab3b00c4c091c5cee",
+                "shasum": ""
+            },
+            "require": {
+                "mustangostang/spyc": "*",
+                "php": "^7.2|^8.0"
+            },
+            "replace": {
+                "piwik/device-detector": "self.version"
+            },
+            "require-dev": {
+                "matthiasmullie/scrapbook": "^1.4.7",
+                "mayflower/mo4-coding-standard": "^v9.0.0",
+                "phpstan/phpstan": "^1.10.44",
+                "phpunit/phpunit": "^8.5.8",
+                "psr/cache": "^1.0.1",
+                "psr/simple-cache": "^1.0.1",
+                "symfony/yaml": "^5.1.7"
+            },
+            "suggest": {
+                "doctrine/cache": "Can directly be used for caching purpose",
+                "ext-yaml": "Necessary for using the Pecl YAML parser"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "DeviceDetector\\": ""
+                },
+                "exclude-from-classmap": [
+                    "Tests/"
                 ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "The Matomo Team",
+                    "email": "hello@matomo.org",
+                    "homepage": "https://matomo.org/team/"
+                }
+            ],
+            "description": "The Universal Device Detection library, that parses User Agents and detects devices (desktop, tablet, mobile, tv, cars, console, etc.), clients (browsers, media players, mobile apps, feed readers, libraries, etc), operating systems, devices, brands and models.",
+            "homepage": "https://matomo.org",
+            "keywords": [
+                "devicedetection",
+                "parser",
+                "useragent"
+            ],
+            "support": {
+                "forum": "https://forum.matomo.org/",
+                "issues": "https://github.com/matomo-org/device-detector/issues",
+                "source": "https://github.com/matomo-org/matomo",
+                "wiki": "https://dev.matomo.org/"
+            },
+            "time": "2024-04-12T12:16:21+00:00"
+        },
+        {
+            "name": "mobiledetect/mobiledetectlib",
+            "version": "4.8.06",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/serbanghita/Mobile-Detect.git",
+                "reference": "af088b54cecc13b3264edca7da93a89ba7aa2d9e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/serbanghita/Mobile-Detect/zipball/af088b54cecc13b3264edca7da93a89ba7aa2d9e",
+                "reference": "af088b54cecc13b3264edca7da93a89ba7aa2d9e",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.0",
+                "psr/simple-cache": "^2 || ^3"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^v3.35.1",
+                "phpbench/phpbench": "^1.2",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^9.6",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Detection\\": "src/"
+                }
             },
             "notification-url": "https://packagist.org/downloads/",
             "license": [
@@ -2220,7 +2413,7 @@
             ],
             "support": {
                 "issues": "https://github.com/serbanghita/Mobile-Detect/issues",
-                "source": "https://github.com/serbanghita/Mobile-Detect/tree/2.8.45"
+                "source": "https://github.com/serbanghita/Mobile-Detect/tree/4.8.06"
             },
             "funding": [
                 {
@@ -2228,7 +2421,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-11-07T21:57:25+00:00"
+            "time": "2024-03-01T22:28:42+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -2330,6 +2523,60 @@
                 }
             ],
             "time": "2023-10-27T15:32:31+00:00"
+        },
+        {
+            "name": "mustangostang/spyc",
+            "version": "0.6.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mustangostang/spyc.git",
+                "reference": "4627c838b16550b666d15aeae1e5289dd5b77da0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mustangostang/spyc/zipball/4627c838b16550b666d15aeae1e5289dd5b77da0",
+                "reference": "4627c838b16550b666d15aeae1e5289dd5b77da0",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "4.3.*@dev"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.5.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "Spyc.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "mustangostang",
+                    "email": "vlad.andersen@gmail.com"
+                }
+            ],
+            "description": "A simple YAML loader/dumper class for PHP",
+            "homepage": "https://github.com/mustangostang/spyc/",
+            "keywords": [
+                "spyc",
+                "yaml",
+                "yml"
+            ],
+            "support": {
+                "issues": "https://github.com/mustangostang/spyc/issues",
+                "source": "https://github.com/mustangostang/spyc/tree/0.6.3"
+            },
+            "time": "2019-09-10T13:16:29+00:00"
         },
         {
             "name": "nesbot/carbon",
@@ -5961,6 +6208,69 @@
                 }
             ],
             "time": "2023-02-16T16:29:41+00:00"
+        },
+        {
+            "name": "ua-parser/uap-php",
+            "version": "v3.9.14",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ua-parser/uap-php.git",
+                "reference": "b796c5ea5df588e65aeb4e2c6cce3811dec4fed6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ua-parser/uap-php/zipball/b796c5ea5df588e65aeb4e2c6cce3811dec4fed6",
+                "reference": "b796c5ea5df588e65aeb4e2c6cce3811dec4fed6",
+                "shasum": ""
+            },
+            "require": {
+                "composer/ca-bundle": "^1.1",
+                "php": "^7.2 || ^8.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^0.12.33",
+                "phpunit/phpunit": "^8 || ^9",
+                "symfony/console": "^3.4 || ^4.2 || ^4.3 || ^5.0",
+                "symfony/filesystem": "^3.4 || ^4.2 ||  ^4.3 || ^5.0",
+                "symfony/finder": "^3.4 || ^4.2 || ^4.3 || ^5.0",
+                "symfony/yaml": "^3.4 || ^4.2 || ^4.3 || ^5.0",
+                "vimeo/psalm": "^3.12"
+            },
+            "suggest": {
+                "symfony/console": "Required for CLI usage - ^3.4 || ^4.3 || ^5.0",
+                "symfony/filesystem": "Required for CLI usage - ^3.4 || ^4.3 || ^5.0",
+                "symfony/finder": "Required for CLI usage - ^3.4 || ^4.3 || ^5.0",
+                "symfony/yaml": "Required for CLI usage - ^3.4 || ^4.3 || ^5.0"
+            },
+            "bin": [
+                "bin/uaparser"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "UAParser\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Dave Olsen",
+                    "email": "dmolsen@gmail.com"
+                },
+                {
+                    "name": "Lars Strojny",
+                    "email": "lars@strojny.net"
+                }
+            ],
+            "description": "A multi-language port of Browserscope's user agent parser.",
+            "support": {
+                "issues": "https://github.com/ua-parser/uap-php/issues",
+                "source": "https://github.com/ua-parser/uap-php/tree/v3.9.14"
+            },
+            "time": "2020-10-02T23:36:20+00:00"
         },
         {
             "name": "vlucas/phpdotenv",

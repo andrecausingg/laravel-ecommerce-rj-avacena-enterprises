@@ -9,6 +9,7 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryProductController;
+use App\Http\Controllers\Helper\Helper;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,8 @@ Route::get('/index-history', [AuthController::class, 'indexHistory']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+
+Route::get('/eu-device', [Helper::class, 'userDevice']);
 
 // Authenticated Users
 Route::middleware(['jwt.auth'])->group(function () {

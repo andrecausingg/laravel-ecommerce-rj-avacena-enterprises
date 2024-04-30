@@ -64,91 +64,136 @@ class AuthController extends Controller
         );
     }
 
+    /**
+     * PARENT LOGIN
+     * Login
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function login(Request $request)
     {
-        $verificationNumber = mt_rand(100000, 999999);
-        $clientRole = env('ROLE_CLIENT');
-        $adminRole = env('ROLE_ADMIN');
-        $delivery = env('ROLE_DELIVERY');
-        $cashier = env('ROLE_CASHIER');
+        $arr_data = [];
 
-        // Validation rules
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+        // Check if phone number is not empty
+        if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
+            $validator = Validator::make($request->all(), [
+                'phone_number' => 'required|numeric',
+                'password' => 'required|string',
+            ]);
 
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            $arr_data['phone_number'] = $request->phone_number;
+            $arr_data['password'] = $request->password;
+
+            if ($validator->fails()) {
+                return response()->json(['message' => $validator->errors()],  Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
         }
+        // Check if Email is not empty
+        else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
+            // Validate Password
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+            }
+
+            $arr_data['email'] = $request->email;
+            $arr_data['password'] = $request->password;
+
+            return $this->loginEmail($request, $arr_data);
+        }
+    }
+
+    public function loginEmail($request, $arr_data)
+    {
+        $verification_number = mt_rand(100000, 999999);
 
         // Decrypt al email first
         $users = AuthModel::all();
 
         foreach ($users as $user) {
-            $decryptedEmail = Crypt::decrypt($user->email);
+            $decrypted_email = Crypt::decrypt($user->email);
 
             // Check if Verified Email
-            if ($decryptedEmail == $request->input('email') && Hash::check($request->input('password'), $user->password) && $user->email_verified_at !== null) {
+            if ($decrypted_email == $arr_data['email'] && Hash::check($arr_data['password'], $user->password) && $user->email_verified_at !== null) {
                 // $expirationTime = Carbon::now()->addSeconds(30);
                 // Expiration Time 1month
-                $expirationTime = Carbon::now()->addMinutes(2592000);
-                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
-                if (!$newToken) {
+                $expiration_time = Carbon::now()->addMinutes(2592000);
+                $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+                if (!$new_token) {
                     return response()->json([
                         'message' => 'Unable to generate a token from user'
                     ], Response::HTTP_OK);
                 }
 
-                $user->session_token = $newToken;
-                $user->session_expire_at = $expirationTime;
+                $user->session_token = $new_token;
+                $user->session_expire_at = $expiration_time;
 
-                if ($user->save()) {
-                    // Check If users_info_tbl exist 
-                    $userInfoExists = UserInfoModel::where('user_id', $user->user_id)
-                        ->where(function ($query) {
-                            $query->whereNull('first_name')->orWhere('first_name', '');
-                            $query->orWhereNull('last_name')->orWhere('last_name', '');
-                        })
-                        ->exists();
-
-                    // Logs
-                    $resultLogs = $this->loginLogs($request, $user->user_id);
-
-                    return response()->json([
-                        'role' => $user->role === $clientRole ? $clientRole : ($user->role === $adminRole ? $adminRole : ($user->role === $delivery ? $delivery : ($user->role === $cashier ? $cashier : ''))),
-                        // 'user' => $user,
-                        'user_info' => $userInfoExists ? 'Existing User' : 'New User',
-                        'token_type' => 'Bearer',
-                        'access_token' => $newToken,
-                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                        'message' => 'Login Successfully',
-                        'log_message' => $resultLogs
-                    ], Response::HTTP_OK);
+                if (!$user->save()) {
+                    return response()->json(
+                        ['message' => 'Failed to update session token and expiration'],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
                 }
 
-                return response()->json(
-                    ['message' => 'Failed to update session token and expiration'],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+                // Check If users_info_tbl exist 
+                $user_info_exist = UserInfoModel::where('user_id', $user->user_id)
+                    ->where(function ($query) {
+                        $query->whereNull('first_name')->orWhere('first_name', '');
+                        $query->orWhereNull('last_name')->orWhere('last_name', '');
+                    })
+                    ->exists();
+
+                // Arr Logs details
+                $arr_log_details = [
+                    'fields' => [
+                        'user_id' => $user->user_id,
+                        'ip_address' => $request->ip(),
+                    ]
+                ];
+
+                // Arr Data Logs
+                $arr_data_logs = [
+                    'user_id' => $user->user_id,
+                    'is_sensitive' => 0,
+                    'is_history' => 0,
+                    'log_details' => $arr_log_details,
+                    'user_action' => 'LOGIN',
+                ];
+
+                // Logs
+                $log_result = $this->helper->log($request, $arr_data_logs);
+
+                return response()->json([
+                    // 'user' => $user,
+                    'user_info' => $user_info_exist ? 'Existing User' : 'New User',
+                    'token_type' => 'Bearer',
+                    'access_token' => $new_token,
+                    'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                    'message' => 'Login Successfully',
+                    'log_message' => $log_result
+                ], Response::HTTP_OK);
             }
             // Check if Not Verified then redirect to Verify Email
-            else if ($decryptedEmail == $request->input('email') && Hash::check($request->input('password'), $user->password) && $user->email_verified_at === null) {
+            else if ($decrypted_email == $arr_data['email'] && Hash::check($arr_data['password'], $user->password) && $user->email_verified_at === null) {
                 // Generate a new token for the user
-                $expirationTime = Carbon::now()->addMinutes(120);
-                $newToken = JWTAuth::claims(['exp' => $expirationTime->timestamp])->fromUser($user);
+                $expiration_time = Carbon::now()->addMinutes(120);
+                $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
-                if (!$newToken) {
+                if (!$new_token) {
                     return response()->json([
                         'message' => 'Failed to generate a token from user'
                     ], Response::HTTP_OK);
                 }
 
                 // Update verification_number | password | verify email token
-                $user->verification_number = $verificationNumber;
-                $user->verify_email_token = $newToken;
-                $user->verify_email_token_expire_at = $expirationTime;
+                $user->verification_number = $verification_number;
+                $user->verify_email_token = $new_token;
+                $user->verify_email_token_expire_at = $expiration_time;
 
                 // Save
                 if (!$user->save()) {
@@ -159,17 +204,38 @@ class AuthController extends Controller
                         Response::HTTP_INTERNAL_SERVER_ERROR
                     );
                 }
+
+                // Arr Logs details
+                $arr_log_details = [
+                    'fields' => [
+                        'user_id' => $user->user_id,
+                        'ip_address' => $request->ip(),
+                    ]
+                ];
+
+                // Arr Data Logs
+                $arr_data_logs = [
+                    'user_id' => $user->user_id,
+                    'is_sensitive' => 0,
+                    'is_history' => 0,
+                    'log_details' => $arr_log_details,
+                    'user_action' => 'USER ATTEMPTED TO LOG IN BUT HAS NOT YET BEEN VERIFIED. REDIRECTING TO VERIFY EMAIL',
+                ];
+
+                // Logs
+                $log_result = $this->helper->log($request, $arr_data_logs);
+
                 // Get the Name of Gmail
-                $emailParts = explode('@', $decryptedEmail);
+                $emailParts = explode('@', $decrypted_email);
                 $name = [$emailParts[0]];
 
                 // Send the new token to the user via email
-                Mail::to($decryptedEmail)->send(new VerificationMail($verificationNumber, $name));
+                Mail::to($decrypted_email)->send(new VerificationMail($verification_number, $name));
 
                 return response()->json(
                     [
-                        'expire_at' => $expirationTime->diffInSeconds(Carbon::now()),
-                        'message' => '/signup/verify-email?tj=' . $newToken,
+                        'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                        'message' => '/signup/verify-email?tj=' . $new_token,
                     ],
                     Response::HTTP_OK
                 );
@@ -212,6 +278,7 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'phone_number' => 'required|numeric',
                 'password' => 'required|string|min:6|confirmed:password_confirmation',
+                'eu' => 'required|string',
             ]);
 
             $arr_data['phone_number'] = $request->phone_number;
@@ -410,7 +477,6 @@ class AuthController extends Controller
      * Verify email
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function verifyEmail(Request $request)
     {
@@ -459,7 +525,7 @@ class AuthController extends Controller
         $log_details = [
             'fields' => [
                 'user_id' => $user->user_id,
-                'email_verified_at' => $user->email_verified_at,
+                'email_verified_at' =>  Carbon::parse($user->email_verified_at)->format("F j, Y g:i a"),
                 'verification_number' => $request->verification_number,
             ]
         ];

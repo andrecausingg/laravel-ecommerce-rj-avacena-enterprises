@@ -3,23 +3,17 @@
 namespace App\Http\Controllers\Helper;
 
 use App\Models\LogsModel;
-use Jenssegers\Agent\Agent;
 use App\Models\HistoryModel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Crypt;
+use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
 
 class Helper
 {
-    protected $agent;
-
-    public function __construct(Agent $agent)
-    {
-        $this->agent = $agent;
-    }
-
-
     // Authentication
     public function authorizeUser($request)
     {
@@ -134,9 +128,6 @@ class Helper
 
     public function log($request, $arr_data_logs)
     {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
         if ($arr_data_logs['is_history'] == 1) {
             $history = HistoryModel::create([
                 'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
@@ -165,8 +156,8 @@ class Helper
             'user_id' => $arr_data_logs['user_id'],
             'is_sensitive' => $arr_data_logs['is_sensitive'],
             'ip_address' => $request->ip(),
-            'user_action' => $arr_data_logs['user_action'],
-            'user_device' => $userAgent,
+            'user_action' => strtoupper($arr_data_logs['user_action']),
+            'user_device' => $arr_data_logs['user_device'] != null && $arr_data_logs['user_device'] != '' ? json_encode(Crypt::decrypt($arr_data_logs['user_device']), JSON_PRETTY_PRINT) : null,
             'details' => json_encode($arr_data_logs['log_details'], JSON_PRETTY_PRINT),
         ]);
 
@@ -186,42 +177,65 @@ class Helper
         return response()->json(['message' => $arr_data_logs['is_history'] == 1 ? 'Successfully stored logs and history' : 'Successfully stored logs'], Response::HTTP_OK);
     }
 
-
-    public function userDevice()
+    public function userDevice(Request $request)
     {
-        $arr_device_details = [
-            'device' => $this->agent->device(),
-            'browser' => $this->agent->browser(),
-            'platform' => $this->agent->platform()
+        $device = Browser::isMobile() ? 'Mobile' : (Browser::isTablet() ? 'Tablet' : 'Desktop');
+        $isp_provider = $this->getUserISP($request->ip());
+
+        $device_info = [
+            'browser_name' => Browser::browserName(),
+            'platform_name' => Browser::platformName(),
+            'is_mobile' => Browser::isMobile(),
+            'is_tablet' => Browser::isTablet(),
+            'is_desktop' => Browser::isDesktop(),
+            'is_bot' => Browser::isBot(),
+            'device_type' => Browser::deviceType(),
+            'browser_family' => Browser::browserFamily(),
+            'browser_version' => Browser::browserVersion(),
+            'browser_version_major' => Browser::browserVersionMajor(),
+            'browser_version_minor' => Browser::browserVersionMinor(),
+            'browser_version_patch' => Browser::browserVersionPatch(),
+            'browser_engine' => Browser::browserEngine(),
+            'platform_family' => Browser::platformFamily(),
+            'platform_version' => Browser::platformVersion(),
+            'platform_version_major' => Browser::platformVersionMajor(),
+            'platform_version_minor' => Browser::platformVersionMinor(),
+            'platform_version_patch' => Browser::platformVersionPatch(),
+            'is_windows' => Browser::isWindows(),
+            'is_linux' => Browser::isLinux(),
+            'is_mac' => Browser::isMac(),
+            'is_android' => Browser::isAndroid(),
+            'device_family' => Browser::deviceFamily(),
+            'device_model' => Browser::deviceModel(),
+            'is_chrome' => Browser::isChrome(),
+            'is_firefox' => Browser::isFirefox(),
+            'is_opera' => Browser::isOpera(),
+            'is_safari' => Browser::isSafari(),
+            'is_ie' => Browser::isIE(),
+            'is_edge' => Browser::isEdge(),
+            'is_in_app' => Browser::isInApp(),
         ];
 
-        return $arr_device_details;
+        $arr_data_device = [
+            'device_use' => $device,
+            'ip' => $request->ip(),
+            'isp' => $isp_provider,
+            'device_info' => $device_info,
+
+        ];
+
+        return response()->json(['message' => 'Successfully retrieved eu', 'eu' => Crypt::encrypt($arr_data_device)], Response::HTTP_OK);
     }
 
-    // public function fetchDeviceDetails($data)
-    // {
-    //     if (Browser::isMobile()) {
-    //         $device = 'Mobile';
-    //     } else if (Browser::isTablet()) {
-    //         $device = 'Tablet';
-    //     } else {
-    //         $device = 'Desktop';
-    //     }
-    //     $ispProvider = $this->isp_vendor->getUserISP($data->header('remote-ip'));
-    //     $device_info = $device . '-' . Browser::browserName() . '-' . Browser::platformName() . '-' . $data->header('remote-ip') . '-' . $ispProvider->isp;
+    public function getUserISP($ip)
+    {
+        $response = Http::get("http://ip-api.com/json/{$ip}");
 
-    //     return response()->json(["message" => _("User device information"), "data" => ['device' => $device_info, 'ip' => $data->ip(), 'isp' => $ispProvider->isp]]);
-    // }
-
-    // public function getUserISP($ip)
-    // {
-    //     $response = Http::get("http://ip-api.com/json/{$ip}");
-
-    //     if ($response->successful()) {
-    //         return $response->json();
-    //     } else {
-    //         // Handle unsuccessful response
-    //         return null;
-    //     }
-    // }
+        if ($response->successful()) {
+            return $response->json();
+        } else {
+            // Handle unsuccessful response
+            return null;
+        }
+    }
 }
