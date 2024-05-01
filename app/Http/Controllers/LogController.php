@@ -38,11 +38,15 @@ class LogController extends Controller
         }
 
         $logs = LogsModel::get();
+
         foreach ($logs as $log) {
             $detailsJson = json_decode($log['details'], true);
 
             if (isset($detailsJson['fields'])) {
+                // Decrypt the data
                 $decryptedData = $this->isDecryptedData($log->is_sensitive, $detailsJson['fields'], $this->encryptedFields, $this->notToDecrypt);
+                
+                // Decrypted data save on fields
                 $arrWithParentId = [
                     'fields' => $decryptedData
                 ];
@@ -51,6 +55,8 @@ class LogController extends Controller
             foreach ($this->fillableAttributes as $fillableAttribute) {
                 if ($fillableAttribute == 'details') {
                     $decryptedLogs[$fillableAttribute] = $arrWithParentId;
+                }else if($fillableAttribute == 'user_device'){
+                    $decryptedLogs[$fillableAttribute] = json_decode($log->$fillableAttribute, true);
                 } else {
                     $decryptedLogs[$fillableAttribute] = $log->$fillableAttribute;
                 }

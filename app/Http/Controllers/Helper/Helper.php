@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Helper;
 
 use App\Models\LogsModel;
+use Illuminate\Support\Str;
 use App\Models\HistoryModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -242,7 +244,7 @@ class Helper
     public function validateEuDevice($eu_device)
     {
         $decrypt_eu_device = Crypt::decrypt($eu_device);
-    
+
         // Array of keys to check
         $keys = [
             'device_use',
@@ -250,10 +252,10 @@ class Helper
             'isp',
             'device_info',
         ];
-    
+
         // Initialize a variable to store validation result
         $allExist = true;
-    
+
         // Loop through each key
         foreach ($keys as $key) {
             if (!array_key_exists($key, $decrypt_eu_device)) {
@@ -261,8 +263,24 @@ class Helper
                 break;
             }
         }
-    
+
         // Return the validation result
         return $allExist ? "valid" : "invalid";
+    }
+
+    public function handleUploadImage($arr_data_file)
+    {
+        $file_name = '';
+
+        // Generate File Name
+        $file_name = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $arr_data_file['image_actual_extension'];
+
+        // Generate the file path within the custom folder
+        $file_path = $arr_data_file['custom_folder'] . '/' . $file_name;
+
+        // Save on Storage
+        Storage::disk('public')->put($file_path, file_get_contents($arr_data_file['file_image']));
+
+        return $file_name;
     }
 }

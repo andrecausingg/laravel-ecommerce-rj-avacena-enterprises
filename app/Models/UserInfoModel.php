@@ -40,4 +40,22 @@ class UserInfoModel extends Model
     {
         return $this->fillable;
     }
+
+    public function getUppercase(): array
+    {
+        return  [
+            'first_name', 'middle_name', 'last_name',
+            'address_1', 'address_2', 'region_name',
+            'province_name', 'city_or_municipality_name', 'barangay',
+            'description_location',
+        ];
+    }
+
+    public function unsetDecrypt(): array
+    {
+        return  [
+            'user_info_id', 'user_id',
+            'deleted_at', 'created_at', 'updated_at'
+        ];
+    }
 }

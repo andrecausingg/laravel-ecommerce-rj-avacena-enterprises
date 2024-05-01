@@ -16,23 +16,19 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserInfoController extends Controller
 {
-    protected $fillableAttrUserInfos, $UnsetDecrypts, $Uppercase, $helper;
+    protected $fillableAttrUserInfos, $helper;
     public function __construct(Helper $helper, UserInfoModel $fillableAttrUserInfos)
     {
-        $this->UnsetDecrypts = config('system.user-info.UnsetDecrypt');
-        $this->Uppercase = config('system.user-info.Uppercase');
-
         $this->helper = $helper;
         $this->fillableAttrUserInfos = $fillableAttrUserInfos;
     }
-
 
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $decryptedUserInfos = [];
+        $decrypted_user_infos = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -41,31 +37,34 @@ class UserInfoController extends Controller
         }
 
         // Unset Column not needed to decrypt
-        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
+        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
 
-        $userInfos = UserInfoModel::get();
-        foreach ($userInfos as $userInfo) {
-            if ($userInfo) {
-                $userInfoArray = $userInfo->toArray();
+        $user_infos = UserInfoModel::get();
+        foreach ($user_infos as $user_info) {
+            if ($user_info) {
+                $arr_user_info = $user_info->toArray();
 
-                foreach ($unsetResults as $unsetResult) {
-                    if (isset($userInfoArray[$unsetResult])) {
-                        $userInfoArray[$unsetResult] = $userInfo->{$unsetResult} ? Crypt::decrypt($userInfo->{$unsetResult}) : null;
+                foreach ($unset_results as $unset_result) {
+                    if (isset($arr_user_info[$unset_result])) {
+                        $arr_user_info[$unset_result] = $user_info->{$unset_result} ? Crypt::decrypt($user_info->{$unset_result}) : null;
                     }
                 }
-                $decryptedUserInfos = $userInfoArray;
+                $decrypted_user_infos = $arr_user_info;
             }
         }
 
         return response()->json([
             'message' => 'Successfully Retrieve Data',
-            'result' => $decryptedUserInfos,
+            'result' => $decrypted_user_infos,
         ], Response::HTTP_OK);
     }
 
+    /**
+     * Display a listing of the resource.
+     */
     public function getPersonalInfo(Request $request)
     {
-        $decryptedUserInfos = [];
+        $decrypted_user_infos = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -73,25 +72,25 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
+        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
 
 
         $userInfos = UserInfoModel::where('user_id', $user->user_id)->first();
         if ($userInfos) {
-            $userInfoArray = $userInfos->toArray();
+            $arr_user_info = $userInfos->toArray();
 
-            foreach ($unsetResults as $unsetResult) {
-                if (isset($userInfoArray[$unsetResult])) {
-                    $userInfoArray[$unsetResult] = $userInfos->{$unsetResult} ? Crypt::decrypt($userInfos->{$unsetResult}) : null;
+            foreach ($unset_results as $unset_result) {
+                if (isset($arr_user_info[$unset_result])) {
+                    $arr_user_info[$unset_result] = $userInfos->{$unset_result} ? Crypt::decrypt($userInfos->{$unset_result}) : null;
                 }
             }
-            $decryptedUserInfos = $userInfoArray;
+            $decrypted_user_infos = $arr_user_info;
         }
 
         return response()->json(
             [
                 'message' => 'Successfully Retrieve Data',
-                'result' => $decryptedUserInfos,
+                'result' => $decrypted_user_infos,
             ],
             Response::HTTP_OK
         );
@@ -116,8 +115,8 @@ class UserInfoController extends Controller
         }
 
         // Check if exist user
-        $existHash = UserInfoModel::where('user_id', $user->user_id)->exists();
-        if ($existHash) {
+        $exist_user_id = UserInfoModel::where('user_id', $user->user_id)->exists();
+        if ($exist_user_id) {
             return response()->json(
                 [
                     'message' => 'User i.d hash already exist',
@@ -144,6 +143,7 @@ class UserInfoController extends Controller
             'city_or_municipality_name' => 'required|string|max:255',
             'barangay' => 'required|string|max:255',
             'description_location' => 'nullable|string|max:1500',
+            'eu_device' => 'required|string',
         ]);
 
         // Check if validation fails
@@ -151,53 +151,69 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+
         // UpperCase Specific Field
-        $validatedData = $this->helper->upperCaseSpecific($validator->validated(), $this->Uppercase);
+        $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
 
         // Handle image upload and update
         if ($request->hasFile('image')) {
-            $customFolder = 'user-info';
-            $image = $request->file('image');
-            $imageActualExt = $image->getClientOriginalExtension();
-
-            // Generate File Name
-            $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
-
-            // Generate the file path within the custom folder
-            $filePath = $customFolder . '/' . $filename;
-
-            // Save on Storage
-            Storage::disk('public')->put($filePath, file_get_contents($image));
+            $arr_data_file = [
+                'custom_folder' => 'user-info',
+                'file_image' => $request->file('image'),
+                'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
+            ];
+            $file_name = $this->helper->handleUploadImage($arr_data_file);
         }
 
         // Encrypt the data
-        foreach ($validatedData as $key => $value) {
+        foreach ($validated_data as $key => $value) {
             if ($key === 'image') {
-                $validatedData[$key] = $filename != '' ? Crypt::encrypt($filename) : null;
+                $validated_data[$key] = $file_name != '' ? Crypt::encrypt($file_name) : null;
             } else {
                 // Check if the value is empty
                 if ($value !== null) {
-                    $validatedData[$key] = Crypt::encrypt($value);
+                    $validated_data[$key] = Crypt::encrypt($value);
                 }
             }
         }
 
         // Create UserInfoModel with encrypted data
-        $userInfoCreate = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validatedData));
-        if ($userInfoCreate) {
-            $userInfoCreate->update([
-                'user_info_id' => 'user_info_id-'  . $userInfoCreate->id,
-            ]);
-
-            // Store Logs
-            $logResult = $this->storeLogs($request, $user->user_id, $userInfoCreate);
-            return response()->json([
-                'message' => 'Successfully stored user information',
-                'log_message' => $logResult
-            ], Response::HTTP_OK);
-        } else {
+        $user_info_create = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validated_data));
+        if (!$user_info_create) {
             return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        $user_info_create->update([
+            'user_info_id' => 'user_info_id-'  . $user_info_create->id,
+        ]);
+
+        $log_details = [
+            'fields' => $user_info_create
+        ];
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $request->eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 1,
+            'is_history' => 0,
+            'log_details' => $log_details,
+            'user_action' => 'STORE PERSONAL INFORMATION',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json([
+            'message' => 'Successfully stored user information',
+            'log_message' => $log_result
+        ], Response::HTTP_OK);
     }
 
     /**
@@ -223,17 +239,14 @@ class UserInfoController extends Controller
     public function update(Request $request)
     {
         // Initialize
-        $changesForLogs = [];
-        $filename = '';
+        $changes_for_logs = [];
+        $file_name = '';
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
-        // Unset Column not needed
-        $unsetResults = $this->helper->unsetColumn($this->UnsetDecrypts, $this->fillableAttrUserInfos->getFillableAttributes());
 
         // Validation rules
         $validator = Validator::make($request->all(), [
@@ -253,6 +266,7 @@ class UserInfoController extends Controller
             'city_or_municipality_name' => 'required|string|max:255',
             'barangay' => 'required|string|max:255',
             'description_location' => 'nullable|string|max:1500',
+            'eu_device' => 'required|string',
         ]);
 
         // Check if validation fails
@@ -260,86 +274,109 @@ class UserInfoController extends Controller
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Unset Column not needed
+        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
+
         // UpperCase Specific Field
-        $validatedData = $this->helper->upperCaseSpecific($validator->validated(), $this->Uppercase);
+        $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
 
         // Retrieve the user information
-        $userInfo = UserInfoModel::where('user_id', $user->user_id)->first();
+        $user_info = UserInfoModel::where('user_id', $user->user_id)->first();
 
         // Check if user information exists
-        if (!$userInfo) {
+        if (!$user_info) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
 
         // Handle image upload and update
         if ($request->hasFile('image')) {
-            $customFolder = 'user-info';
-            $image = $request->file('image');
-            $imageActualExt = $image->getClientOriginalExtension();
-
-            // Generate File Name
-            $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
-
-            // Generate the file path within the custom folder
-            $filePath = $customFolder . '/' . $filename;
-
-            // Save on Storage
-            Storage::disk('public')->put($filePath, file_get_contents($image));
+            $arr_data_file = [
+                'custom_folder' => 'user-info',
+                'file_image' => $request->file('image'),
+                'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
+            ];
+            $file_name = $this->helper->handleUploadImage($arr_data_file);
         }
 
         // Loop through the fields for encryption and decryption
-        foreach ($unsetResults as $unsetResult) {
-            $existingValue = $userInfo->$unsetResult !== null ? Crypt::decrypt($userInfo->$unsetResult) : null;
+        foreach ($unset_results as $unset_result) {
+            // Check if the key exists in the $validated_data array
+            if (isset($validated_data[$unset_result])) {
+                $existing_value = $user_info->$unset_result !== null ? Crypt::decrypt($user_info->$unset_result) : null;
 
-            if ($unsetResult != 'image') {
-                $newValue = Crypt::encrypt($validatedData[$unsetResult]);
+                if ($unset_result != 'image') {
+                    $new_value = Crypt::encrypt($validated_data[$unset_result]);
 
-                // Check if the value has changed for logs
-                if ($existingValue != $validatedData[$unsetResult]) {
-                    $changesForLogs[$unsetResult] = [
-                        'oldEnc' => $existingValue,
-                        'newEnc' => $validatedData[$unsetResult],
-                    ];
-                    $userInfo->{$unsetResult} = $newValue; // Set the new value
+                    // Check if the value has changed for logs
+                    if ($existing_value != $validated_data[$unset_result]) {
+                        $changes_for_logs[$unset_result] = [
+                            'oldEnc' => $existing_value,
+                            'newEnc' => $validated_data[$unset_result],
+                        ];
+                        $user_info->{$unset_result} = $new_value; // Set the new value
+                    }
+                } else {
+                    $new_value =  $file_name != '' ? Crypt::encrypt($file_name) : null;
+
+                    if ($existing_value == null && $new_value != null) {
+                        $changes_for_logs['image'] = [
+                            'oldEnc' => $existing_value,
+                            'newEnc' => $file_name,
+                        ];
+                    } else if ($existing_value != null && $new_value != null) {
+                        $changes_for_logs['image'] = [
+                            'oldEnc' => $existing_value,
+                            'newEnc' => $file_name,
+                        ];
+                    }
+
+                    $user_info->{$unset_result} = $new_value; // Set the new value
                 }
-            } else {
-                $newValue =  $filename != '' ? Crypt::encrypt($filename) : null;
-
-                if ($existingValue == null && $newValue != null) {
-                    $changesForLogs['image'] = [
-                        'oldEnc' => $existingValue,
-                        'newEnc' => $filename,
-                    ];
-                } else if ($existingValue != null && $newValue != null) {
-                    $changesForLogs['image'] = [
-                        'oldEnc' => $existingValue,
-                        'newEnc' => $filename,
-                    ];
-                }
-
-                $userInfo->{$unsetResult} = $newValue; // Set the new value
             }
         }
 
         // Save the changes
-        if ($userInfo->save()) {
-            // Check if there are changes before logging
-            if (!empty($changesForLogs)) {
-                // Update successful, log the changes
-                $logResult = $this->updateLogs($request, $user->user_id, $changesForLogs);
+        if (!$user_info->save()) {
+            // If the code reaches here, there was an issue saving the changes
+            return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
-                return response()->json([
-                    'message' => 'Successfully update user information',
-                    'log_message' => $logResult
-                ], Response::HTTP_OK);
-            }
+        // Check if there are changes before logging
+        if (empty($changes_for_logs)) {
             return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // If the code reaches here, there was an issue saving the changes
-        return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-    }
+        $result_format_logs = $this->formatLogsEncData($changes_for_logs);
 
+        $log_details = [
+            'user_id' => $user->user_id,
+            'fields' => $result_format_logs
+        ];
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $request->eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 1,
+            'is_history' => 0,
+            'log_details' => $log_details,
+            'user_action' => 'UPDATE PERSONAL INFORMATION',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json([
+            'message' => 'Successfully update user information',
+            'log_message' => $log_result
+        ], Response::HTTP_OK);
+    }
 
     /**
      * Remove the specified resource from storage.
@@ -349,112 +386,21 @@ class UserInfoController extends Controller
         //
     }
 
-    // GLOBAL FUNCTIONS
-
-
-    public function showDeviceInfo()
-    {
-        // Get the user agent instance
-        $agent = new Agent();
-
-        // Check if the user is using a mobile device
-        if (Agent::isMobile()) {
-            // Get the device name
-            $deviceName = Agent::device();
-
-            // Get the platform (Android, iOS, etc.)
-            $platform = Agent::platform();
-
-            // Now you can use $deviceName and $platform as needed
-            // ...
-        } else {
-            // The user is not on a mobile device
-            // ...
-        }
-
-        // Access device, browser, and operating system information
-        // $device = $agent->device();
-        // $browser = $agent->browser();
-        // $platform = $agent->platform();
-        // // Return the information
-        // return response()->json([
-        //     'device' => $device,
-        //     'browser' => $browser,
-        //     'platform' => $platform,
-        // ]);
-    }
-
-    // Store Logs
-    public function storeLogs($request, $userId, $logDetails)
+    public function formatLogsEncData($changes_for_logs)
     {
         $arr = [];
-        $arr['fields'] = $logDetails;
-
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'STORE PERSONAL INFORMATION',
-            'user_device' => $userAgent,
-            'details' => json_encode($arr, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for personal information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs for personal information'], Response::HTTP_OK);
-    }
-
-    public function updateLogs($request, $userId, $logDetails)
-    {
-
-        $arr = [];
-        $arr['fields'] = [];
-        $arr['fields']['user_id'] = $userId;
-
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        foreach ($logDetails as $field => $change) {
-
+        foreach ($changes_for_logs as $field => $change) {
             // Check if 'oldEnc' and 'newEnc' exist in $change before encrypting
             $encryptedOldValue = isset($change['oldEnc']) ? Crypt::encrypt($change['oldEnc']) : null;
             $encryptedNewValue = isset($change['newEnc']) ? Crypt::encrypt($change['newEnc']) : null;
 
             // Store the original field name and its encrypted values in $arr['fields']
-            $arr['fields'][$field] = [
+            $arr[$field] = [
                 'oldEnc' => $encryptedOldValue,
                 'newEnc' => $encryptedNewValue,
             ];
         }
 
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE PERSONAL INFORMATION',
-            'user_device' => $userAgent,
-            'details' => json_encode($arr, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs for personal information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully update logs for personal information'], Response::HTTP_OK);
+        return $arr;
     }
 }
