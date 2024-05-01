@@ -24,17 +24,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
+    protected $helper;
 
-    protected $helper, $fillableAttrAuths, $UnsetForRetreives, $ArrHaveAtConvertToReadDateTime, $ArrEnvRoles;
-
-    public function __construct(Helper $helper, AuthModel $fillableAttrAuths)
+    public function __construct(Helper $helper)
     {
-        $this->UnsetForRetreives = config('system.accounts.UnsetForRetreiveIndex');
-        $this->ArrHaveAtConvertToReadDateTime = config('system.accounts.ArrHaveAtConvertToReadDateTime');
-        $this->ArrEnvRoles = config('system.accounts.ArrEnvRole');
-
         $this->helper = $helper;
-        $this->fillableAttrAuths = $fillableAttrAuths;
     }
 
     public function indexHistory()
@@ -95,19 +89,34 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
                 'password' => 'required|string',
+                'eu_device' => 'required|string',
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
+            // Validate Eu Device
+            $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+            if ($result_validate_eu_device == 'invalid') {
+                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $arr_data['email'] = $request->email;
             $arr_data['password'] = $request->password;
+            $arr_data['eu_device'] = $request->eu_device;
 
             return $this->loginEmail($request, $arr_data);
         }
     }
 
+    /**
+     * CHILD LOGIN
+     * Login
+     *
+     * @param array $arr_data
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function loginEmail($request, $arr_data)
     {
         $verification_number = mt_rand(100000, 999999);
@@ -158,6 +167,7 @@ class AuthController extends Controller
 
                 // Arr Data Logs
                 $arr_data_logs = [
+                    'user_device' => $arr_data['eu_device'],
                     'user_id' => $user->user_id,
                     'is_sensitive' => 0,
                     'is_history' => 0,
@@ -215,6 +225,7 @@ class AuthController extends Controller
 
                 // Arr Data Logs
                 $arr_data_logs = [
+                    'user_device' => $arr_data['eu_device'],
                     'user_id' => $user->user_id,
                     'is_sensitive' => 0,
                     'is_history' => 0,
@@ -278,7 +289,7 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'phone_number' => 'required|numeric',
                 'password' => 'required|string|min:6|confirmed:password_confirmation',
-                'eu' => 'required|string',
+                'eu_device' => 'required|string',
             ]);
 
             $arr_data['phone_number'] = $request->phone_number;
@@ -287,6 +298,11 @@ class AuthController extends Controller
             if ($validator->fails()) {
                 return response()->json(['message' => $validator->errors()],  Response::HTTP_UNPROCESSABLE_ENTITY);
             }
+
+            $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+            if ($result_validate_eu_device == 'invalid') {
+                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
         }
         // Check if Email is not empty
         else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
@@ -294,14 +310,21 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
                 'password' => 'required|string|min:6|confirmed:password_confirmation',
+                'eu_device' => 'required|string',
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
             }
 
+            $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+            if ($result_validate_eu_device == 'invalid') {
+                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $arr_data['email'] = $request->email;
             $arr_data['password'] = $request->password;
+            $arr_data['eu_device'] = $request->eu_device;
 
             return $this->emailRegister($request, $arr_data);
         }
@@ -364,6 +387,7 @@ class AuthController extends Controller
 
                 // Arr Data Logs
                 $arr_data_logs = [
+                    'user_device' => $arr_data['eu_device'],
                     'user_id' => $user->user_id,
                     'is_sensitive' => 1,
                     'is_history' => 1,
@@ -444,6 +468,7 @@ class AuthController extends Controller
 
         // Arr Data Logs
         $arr_data_logs = [
+            'user_device' => $arr_data['eu_device'],
             'user_id' => $arr_data['user_id'],
             'is_sensitive' => 1,
             'is_history' => 1,
@@ -484,6 +509,7 @@ class AuthController extends Controller
 
         // Authorize the user
         $user = $this->authorizeUserVerifyEmail($request);
+
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
@@ -492,9 +518,16 @@ class AuthController extends Controller
         // Validate
         $validator = Validator::make($request->all(), [
             'verification_number' => 'required|numeric|min:6',
+            'eu_device' => 'required|string',
         ]);
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+        }
+
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Check if the provided verification number matches the stored one
@@ -532,6 +565,7 @@ class AuthController extends Controller
 
         // Arr Data Logs
         $arr_data_logs = [
+            'user_device' => $request->eu_device,
             'user_id' => $user->user_id,
             'is_sensitive' => 0,
             'is_history' => 0,
@@ -569,6 +603,20 @@ class AuthController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Validate
+        $validator = Validator::make($request->all(), [
+            'eu_device' => 'required|string',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+        }
+
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $update_user_verification_number = $user->update([
             'verification_number' => $verification_number,
         ]);
@@ -596,6 +644,7 @@ class AuthController extends Controller
 
         // Arr Data Logs
         $arr_data_logs = [
+            'user_device' => $request->eu_device,
             'user_id' => $user->user_id,
             'is_sensitive' => 0,
             'is_history' => 0,
@@ -624,9 +673,17 @@ class AuthController extends Controller
         // Validate
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
+            'eu_device' => 'required|string',
         ]);
+
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Get All Users and Decrypt
@@ -667,8 +724,9 @@ class AuthController extends Controller
 
                 // Arr Data Logs
                 $arr_data_logs = [
+                    'user_device' => $request->eu_device,
                     'user_id' => $user->user_id,
-                    'is_sensitive' => 0,
+                    'is_sensitive' => 1,
                     'is_history' => 0,
                     'log_details' => $log_details,
                     'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
@@ -711,11 +769,18 @@ class AuthController extends Controller
         // Validate Password
         $validator = Validator::make($request->all(), [
             'password' => 'required|string|min:6|confirmed',
+            'eu_device' => 'required|string',
         ]);
 
         // Check if validation fails
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device == 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Fetch the user from the database
@@ -745,6 +810,7 @@ class AuthController extends Controller
 
         // Arr Data Logs
         $arr_data_logs = [
+            'user_device' => $request->eu_device,
             'user_id' => $user->user_id,
             'is_sensitive' => 1,
             'is_history' => 1,
@@ -876,74 +942,6 @@ class AuthController extends Controller
     }
 
     // Logs
-    public function emailRegisterLogs($request, $userId, $indicator, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create HistoryModel entry for old password
-        $history = HistoryModel::create([
-            'tbl_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'password',
-            'value' => $logDetails['fields']['password'],
-        ]);
-
-        if ($history) {
-            $history->update([
-                'history_id' => 'history_id-'  . $history->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to create history for storing password during email registration'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => $indicator == 'freshAccCreate' ? 'REGISTER AN ACCOUNT USING EMAIL' : 'EXISTING ACCOUNT REDIRECTED TO VERIFICATION PAGE',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs during email registration'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for email registration'], Response::HTTP_OK);
-    }
-
-    public function verifyEmailLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 0,
-            'ip_address' => $request->ip(),
-            'user_action' => 'SUCCESS VERIFY EMAIL',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for successful email verification'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs for successful email verification'], Response::HTTP_OK);
-    }
-
     public function resendVerificationCodeAllLogs($request, $userId, $indicator, $logDetails)
     {
         // Get Device Information
@@ -968,73 +966,6 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
-    }
-
-    public function forgotPasswordLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for successfully sent reset link for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for successfully sent reset link for password update'], Response::HTTP_OK);
-    }
-
-    public function updatePasswordLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        $history = HistoryModel::create([
-            'tbl_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'password',
-            'value' => $logDetails['fields']['new_password'],
-        ]);
-
-        if ($history) {
-            $history->update([
-                'history_id' => 'history_id-'  . $history->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to create history id for password during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE PASSWORD ON FORGOT PASSWORD',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for password update'], Response::HTTP_OK);
     }
 
     public function updateEmailOnSettingUserLogs($request, $userId, $logDetails)

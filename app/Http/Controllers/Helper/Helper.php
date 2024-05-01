@@ -224,10 +224,11 @@ class Helper
 
         ];
 
+        // return response()->json(['message' => 'Successfully retrieved eu', 'eu' => $arr_data_device], Response::HTTP_OK);
         return response()->json(['message' => 'Successfully retrieved eu', 'eu' => Crypt::encrypt($arr_data_device)], Response::HTTP_OK);
     }
 
-    public function getUserISP($ip)
+    private function getUserISP($ip)
     {
         $response = Http::get("http://ip-api.com/json/{$ip}");
 
@@ -237,5 +238,31 @@ class Helper
             // Handle unsuccessful response
             return null;
         }
+    }
+    public function validateEuDevice($eu_device)
+    {
+        $decrypt_eu_device = Crypt::decrypt($eu_device);
+    
+        // Array of keys to check
+        $keys = [
+            'device_use',
+            'ip',
+            'isp',
+            'device_info',
+        ];
+    
+        // Initialize a variable to store validation result
+        $allExist = true;
+    
+        // Loop through each key
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $decrypt_eu_device)) {
+                $allExist = false;
+                break;
+            }
+        }
+    
+        // Return the validation result
+        return $allExist ? "valid" : "invalid";
     }
 }
