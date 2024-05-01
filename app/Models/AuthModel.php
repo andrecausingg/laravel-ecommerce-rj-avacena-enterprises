@@ -69,4 +69,74 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     {
         return $this->fillable;
     }
+
+    public function unsetForRetrieves(): array
+    {
+        return  [
+            'id', 'password', 'verification_key', 'session_token', 'verify_email_token', 'verify_phone_token', 'reset_password_token',
+        ];
+    }
+
+    public function arrHaveAtConvertToReadDateTime(): array
+    {
+        return  [
+            'phone_verified_at', 'email_verified_at', 'update_password_at', 'deleted_at', 'created_at', 'updated_at'
+        ];
+    }
+
+    public function arrEnvRoles(): array
+    {
+        return [
+            'ROLE_SUPER_ADMIN' => 'SUPER ADMIN',
+            'ROLE_ADMIN' => 'ADMIN',
+            'ROLE_CLIENT' => 'CLIENT',
+            'ROLE_DELIVERY' => 'DELIVERY',
+            'ROLE_CASHIER' => 'CASHIER',
+        ];
+    }
+
+    public function arrStoreFields(): array
+    {
+        return [
+            'user_id',
+            'phone_number',
+            'email',
+            'password',
+            'role',
+            'status',
+            'verification_number'
+        ];
+    }
+
+    public function arrUpdateFields(): array
+    {
+        return [
+            'phone_number',
+            'email',
+            'password',
+            'role',
+            'status',
+        ];
+    }
+
+    public function arrEnvAccountStatus(): array
+    {
+        return [
+            'ACCOUNT_PENDING' => env('ACCOUNT_PENDING'),
+            'ACCOUNT_ACTIVE' => env('ACCOUNT_ACTIVE'),
+            'ACCOUNT_BANNED' => env('ACCOUNT_BANNED'),
+            'ACCOUNT_RESTRICTED' => env('ACCOUNT_RESTRICTED'),
+        ];
+    }
+
+    public function arrEnvAccountRole(): array
+    {
+        return [
+            'ROLE_SUPER_ADMIN' => env('ROLE_SUPER_ADMIN'),
+            'ROLE_ADMIN' => env('ROLE_ADMIN'),
+            'ROLE_CLIENT' => env('ROLE_CLIENT'),
+            'ROLE_DELIVERY' => env('ROLE_DELIVERY'),
+            'ROLE_CASHIER' => env('ROLE_CASHIER'),
+        ];
+    }
 }

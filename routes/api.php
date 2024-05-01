@@ -2,14 +2,15 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Helper\Helper;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\UserInfoController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryProductController;
-use App\Http\Controllers\Helper\Helper;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,6 +37,7 @@ Route::get('/eu-device', [Helper::class, 'userDevice']);
 // Authenticated Users
 Route::middleware(['jwt.auth'])->group(function () {
     $AuthController = AuthController::class;
+    $AccountController = AccountController::class;
     $UserInfoController = UserInfoController::class;
     $InventoryController = InventoryController::class;
     $InventoryProductController = InventoryProductController::class;
@@ -54,13 +56,23 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/update-password', [$AuthController, 'updatePassword']);
     });
 
-    // User Accounts
-    Route::prefix('accounts')->group(function () use ($AuthController) {
-        Route::get('/index', [$AuthController, 'index']);
-        Route::get('/show/{id}', [$AuthController, 'show']);
-        Route::post('/update-email', [$AuthController, 'updateEmailAdmin']);
-        Route::post('/update-password', [$AuthController, 'updatePasswordAdmin']);
-        Route::post('/update-role-status', [$AuthController, 'updateRoleAndStatus']);
+    // User Accounts | ADMIN
+    Route::prefix('admin-accounts')->group(function () use ($AccountController) {
+        Route::get('/index', [$AccountController, 'index']);
+        Route::get('/show/{id}', [$AccountController, 'show']);
+        Route::post('/store', [$AccountController, 'store']);
+        Route::post('/update', [$AccountController, 'update']);
+        Route::post('/update-email', [$AccountController, 'updateEmailAdmin']);
+        Route::post('/update-password', [$AccountController, 'updatePasswordAdmin']);
+        Route::post('/update-role-status', [$AccountController, 'updateRoleAndStatus']);
+    });
+
+    // User Accounts | CLIENT
+    Route::prefix('client-accounts')->group(function () use ($AccountController) {
+        Route::post('/update-email', [$AccountController, 'updateEmailOnSettingUser']);
+        Route::post('/update-password', [$AccountController, 'updatePasswordOnSettingUser']);
+        Route::post('/resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
+        Route::post('/resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
     });
 
     // Personal User Information

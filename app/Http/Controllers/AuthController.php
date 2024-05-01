@@ -288,7 +288,7 @@ class AuthController extends Controller
         if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
             $validator = Validator::make($request->all(), [
                 'phone_number' => 'required|numeric',
-                'password' => 'required|string|min:6|confirmed:password_confirmation',
+                'password' => 'required|string|min:8|confirmed:password_confirmation',
                 'eu_device' => 'required|string',
             ]);
 
@@ -309,7 +309,7 @@ class AuthController extends Controller
             // Validate Password
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
-                'password' => 'required|string|min:6|confirmed:password_confirmation',
+                'password' => 'required|string|min:8|confirmed:password_confirmation',
                 'eu_device' => 'required|string',
             ]);
 

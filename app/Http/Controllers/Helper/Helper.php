@@ -69,6 +69,23 @@ class Helper
         return $validatedData;
     }
 
+    public function upperCaseValueSelectTagFilter($datas)
+    {
+        $arr_select_fields = [];
+    
+        foreach ($datas as $key => $value) {
+            // Replace underscores with spaces and capitalize each word
+            $label = ucwords(str_replace('_', ' ', strtolower($value))); 
+            $arr_select_fields[] = [
+                'label' => $label,
+                'value' => $value,
+            ];
+        }
+    
+        return $arr_select_fields;
+    }
+    
+
     // Uppercase the Word with dash -
     public function upperCase($buttonName)
     {
@@ -85,6 +102,28 @@ class Helper
     public function transformColumnName($column)
     {
         return ucwords(str_replace('_', ' ', $column));
+    }
+
+    public function formatApi($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
+    {
+        $functions = [];
+
+        foreach ($apiWithPayloads as $key => $payload) {
+            // Remove forward slash from the key
+            $cleanedKey = rtrim($key, '/');
+
+            $method = $methods[$key] ?? null;
+            $functions[$cleanedKey] = [
+                'api' => $prefix . $key,
+                'payload' => $payload,
+                'method' => $method,
+                'icon' => $icons[$key],
+                'button_name' => $this->upperCase($buttonNames[$key]),
+                'action' => $actions[$key],
+            ];
+        }
+
+        return $functions[] = $functions;
     }
 
     public function functionRelative($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
