@@ -145,7 +145,6 @@ class AccountController extends Controller
         return response()->json(['messages' => [$decryptedAuthUser]], Response::HTTP_OK);
     }
 
-
     // GET SPECIFIC USER ACCOUNT | ADMIN SIDE
     public function show(Request $request, string $id)
     {
