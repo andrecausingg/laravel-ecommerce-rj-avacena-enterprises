@@ -388,6 +388,10 @@ class AccountController extends Controller
                 $arr_validates[$arrStoreField] = Hash::make($request->password);
             } else if ($arrStoreField == 'verification_number') {
                 $arr_validates[$arrStoreField] = $verification_number;
+            } else if ($arrStoreField == 'phone_verified_at' && $request->filled('phone_number')) {
+                $arr_validates[$arrStoreField] = Carbon::now();
+            } else if ($arrStoreField == 'email_verified_at' && $request->filled('email')) {
+                $arr_validates[$arrStoreField] = Carbon::now();
             } else {
                 $arr_validates[$arrStoreField] = $request->$arrStoreField;
             }
@@ -407,7 +411,7 @@ class AccountController extends Controller
                 if ($value !== null) {
                     $arr_log_details['fields'][$field] = Crypt::encrypt($request->$field);
                 }
-            } else {
+            } else if ($field !== 'verification_number' && $field !== 'phone_verified_at' && $field !== 'email_verified_at') {
                 // For other fields, include all values
                 $arr_log_details['fields'][$field] = $value;
             }
@@ -429,15 +433,13 @@ class AccountController extends Controller
         return response()->json([
             'message' => 'Successfully created user',
             'log_message' => $log_result
-        ], Response::HTTP_CREATED);
+        ], Response::HTTP_OK);
     }
 
 
     // UPDATE USER ACCOUNT | ADMIN SIDE
     public function update(Request $request)
     {
-        $verification_number = mt_rand(100000, 999999);
-
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -471,8 +473,14 @@ class AccountController extends Controller
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $history = HistoryModel::where('tbl_id', $account->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+        if (!$history) {
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+        }
+
         // Validate if exist phone number or email
         if ($request->filled('phone_number')) {
+
             $decrypted_phone_number = Crypt::decrypt($account->email);
             // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
             if ($decrypted_phone_number === $request->phone_number && $user->phone_number_verified_at !== null) {
@@ -501,43 +509,50 @@ class AccountController extends Controller
 
         // Put on logs not equal value then put on update
         foreach ($this->fillableAttrAuth->arrUpdateFields() as $arrUpdateFields) {
-            if ($arrUpdateFields == 'phone_number' && $request->filled('phone_number')) {
-                $existing_value = $account->$arrUpdateFields ?? Crypt::decrypt($account->$arrUpdateFields);
-                $new_value = $request->arrUpdateFields ?? null;
-                // Check if the value has changed
-                if ($existing_value !== $new_value) {
-                    $changes_for_logs[$arrUpdateFields] = [
-                        'old' => Crypt::encrypt($existing_value),
-                        'new' => Crypt::encrypt($new_value),
-                    ];
-                    $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->phone_number);
-                }
-            } else if ($arrUpdateFields == 'email' && $request->filled('email')) {
+            if ($arrUpdateFields == 'phone_number') {
+                if ($request->filled('phone_number')) {
+                    $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
+                    $new_value = $request->arrUpdateFields ?? null;
+                    // Check if the value has changed
+                    if ($existing_value !== $new_value) {
 
-                $existing_value = $account->$arrUpdateFields ?? Crypt::decrypt($account->$arrUpdateFields);
-                $new_value = $request->arrUpdateFields ?? null;
-                // Check if the value has changed
-                if ($existing_value !== $new_value) {
-                    $changes_for_logs[$arrUpdateFields] = [
-                        'old' => Crypt::encrypt($existing_value),
-                        'new' => Crypt::encrypt($new_value),
-                    ];
-                    $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->email);
+                        $changes_for_logs[$arrUpdateFields] = [
+                            'old' => Crypt::encrypt($existing_value),
+                            'new' => Crypt::encrypt($new_value),
+                        ];
+
+                        $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->phone_number);
+                    }
+                }
+            } else if ($arrUpdateFields == 'email') {
+                if ($request->filled('email')) {
+                    $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
+                    $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+
+                    // Check if the value has changed
+                    if ($existing_value !== $new_value) {
+                        $changes_for_logs[$arrUpdateFields] = [
+                            'old' => Crypt::encrypt($existing_value),
+                            'new' => Crypt::encrypt($new_value),
+                        ];
+                        $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->email);
+                    }
                 }
             } else if ($arrUpdateFields == 'password') {
-                $existing_value = $account->$arrUpdateFields ?? null;
-                $new_value = $request->$arrUpdateFields;
+                $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
+                $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+
                 // Check if the value has changed
                 if (!Hash::check($new_value, $existing_value)) {
                     $changes_for_logs[$arrUpdateFields] = [
-                        'old' => $existing_value,
+                        'old' => $history->value,
                         'new' => Crypt::encrypt($new_value),
                     ];
                     $arr_validates[$arrUpdateFields] = Hash::make($new_value);
                 }
             } else {
-                $existing_value = $account->$arrUpdateFields ?? null;
-                $new_value = $request->arrUpdateFields ?? null;
+                $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
+                $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
 
                 // Check if the value has changed
                 if ($existing_value !== $new_value) {
@@ -550,39 +565,26 @@ class AccountController extends Controller
             }
         }
 
-        dd($changes_for_logs);
-        dd($arr_validates);
-
-
-        // Create the user
-        $created = AuthModel::update($arr_validates);
-        if (!$created) {
+        // Update the user
+        $update = $account->update($arr_validates);
+        if (!$update) {
             return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Format the logs
-        $arr_log_details = ['fields' => []];
-        foreach ($arr_validates as $field => $value) {
-            // Only include non-null email and password for encryption
-            if ($field === 'phone_number' || $field === 'email' || $field === 'password') {
-                if ($value !== null) {
-                    $arr_log_details['fields'][$field] = Crypt::encrypt($request->$field);
-                }
-            } else {
-                // For other fields, include all values
-                $arr_log_details['fields'][$field] = $value;
-            }
-        }
+        $arr_log_details['fields'] = $changes_for_logs;
+        $arr_log_details['fields']['user_id'] = $account->user_id;
 
         // Arr Data Logs
         $arr_data_logs = [
             'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
+            'user_id' => $account->user_id,
             'is_sensitive' => 1,
             'is_history' => 1,
             'log_details' => $arr_log_details,
-            'user_action' => 'STORE USER ACCOUNT',
+            'user_action' => 'UPDATE USER ACCOUNT',
         ];
+
 
         // Logs
         $log_result = $this->helper->log($request, $arr_data_logs);
@@ -895,6 +897,7 @@ class AccountController extends Controller
                 'user_action' => 'UPDATE EMAIL ON SETTINGS OF USER',
             ];
 
+
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);
 
@@ -982,6 +985,7 @@ class AccountController extends Controller
                 'log_details' => $arr_log_details,
                 'user_action' => 'UPDATE PASSWORD ON USER SETTING',
             ];
+
 
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);

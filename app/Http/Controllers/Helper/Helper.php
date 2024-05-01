@@ -72,19 +72,19 @@ class Helper
     public function upperCaseValueSelectTagFilter($datas)
     {
         $arr_select_fields = [];
-    
+
         foreach ($datas as $key => $value) {
             // Replace underscores with spaces and capitalize each word
-            $label = ucwords(str_replace('_', ' ', strtolower($value))); 
+            $label = ucwords(str_replace('_', ' ', strtolower($value)));
             $arr_select_fields[] = [
                 'label' => $label,
                 'value' => $value,
             ];
         }
-    
+
         return $arr_select_fields;
     }
-    
+
 
     // Uppercase the Word with dash -
     public function upperCase($buttonName)
@@ -169,12 +169,17 @@ class Helper
 
     public function log($request, $arr_data_logs)
     {
+
         if ($arr_data_logs['is_history'] == 1) {
             $history = HistoryModel::create([
                 'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
                 'tbl_name' => 'users_tbl',
                 'column_name' => 'password',
-                'value' => $arr_data_logs['log_details']['fields']['password'] ?? $arr_data_logs['log_details']['fields']['new_password'],
+                'value' => isset($arr_data_logs['log_details']['fields']['password']) ?
+                    $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['new_password']) ?
+                        $arr_data_logs['log_details']['fields']['new_password'] :
+                        $arr_data_logs['log_details']['fields']['password']['new']
+                    ),
             ]);
 
             // Check if history creation failed

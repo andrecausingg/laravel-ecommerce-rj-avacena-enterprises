@@ -104,7 +104,9 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'password',
             'role',
             'status',
-            'verification_number'
+            'verification_number',
+            'phone_verified_at',
+            'email_verified_at',
         ];
     }
 
