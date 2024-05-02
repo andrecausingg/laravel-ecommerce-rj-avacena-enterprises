@@ -211,7 +211,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
     }
 
-    public function arrModel(): array
+    public function arrModelWithId(): array
     {
         return [
             'HistoryModel'  => ['tbl_id'],
@@ -221,6 +221,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'UserInfoModel'  => ['user_id'],
         ];
     }
+
     public function unsetActions(): array
     {
         return [

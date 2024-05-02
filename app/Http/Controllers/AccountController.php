@@ -118,7 +118,7 @@ class AccountController extends Controller
             );
 
             // Unset button on action if exist the id on other tables
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModel());
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModelWithId());
             if ($is_exist_id_other_tbl == 'exist') {
                 foreach ($this->fillableAttrAuth->unsetActions() as $unsetAction) {
                     unset($crud_action[$unsetAction]);
