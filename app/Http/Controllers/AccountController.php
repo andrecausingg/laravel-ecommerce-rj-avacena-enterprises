@@ -176,7 +176,7 @@ class AccountController extends Controller
         }
 
         if (empty($id) || $id == null || $id == '') {
-            return response()->json(['message' => 'Invalid I.D'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => 'Invalid I.D'], Response::HTTP_NOT_FOUND);
         }
 
         // Decrypt all emails and other attributes
@@ -868,22 +868,6 @@ class AccountController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
     {
         //
     }

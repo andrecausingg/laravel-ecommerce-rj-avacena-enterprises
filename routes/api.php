@@ -62,13 +62,11 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::get('/show/{id}', [$AccountController, 'show']);
         Route::post('/store', [$AccountController, 'store']);
         Route::post('/update', [$AccountController, 'update']);
-        Route::post('/update-email', [$AccountController, 'updateEmailAdmin']);
-        Route::post('/update-password', [$AccountController, 'updatePasswordAdmin']);
-        Route::post('/update-role-status', [$AccountController, 'updateRoleAndStatus']);
     });
 
     // User Accounts | CLIENT
     Route::prefix('client-accounts')->group(function () use ($AccountController) {
+        Route::get('/show/{id}', [$AccountController, 'show']);
         Route::post('/update-email', [$AccountController, 'updateEmailOnSettingUser']);
         Route::post('/update-password', [$AccountController, 'updatePasswordOnSettingUser']);
         Route::post('/resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
