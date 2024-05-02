@@ -141,4 +141,90 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'ROLE_CASHIER' => env('ROLE_CASHIER'),
         ];
     }
+
+
+    public function getApiAccountCrudSettings()
+    {
+        $prefix = 'admin-accounts/';
+        $apiWithPayloads = [
+            'update' => ['user_id', 'phone_number', 'email', 'password', 'role', 'status', 'eu_device'],
+            'destroy' => ['user_id']
+        ];
+        $methods = [
+            'update' => 'POST',
+            'destroy' => 'DELETE',
+        ];
+        $buttonNames = [
+            'update' => 'update',
+            'destroy' => 'delete',
+        ];
+        $icons = [
+            'update' => null,
+            'destroy' =>  null,
+        ];
+        $actions = [
+            'update' => 'modal',
+            'destroy' => 'modal',
+        ];
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+    }
+
+    public function getApiAccountRelativeSettings()
+    {
+        $prefix = 'admin-accounts/';
+        $apiWithPayloads = [
+            'store' => [
+                'phone_number',
+                'email',
+                'password',
+                'password_confirmation',
+                'role',
+                'status',
+                'eu_device'
+            ],
+            'show/' => [
+                'id',
+            ]
+        ];
+
+        $methods = [
+            'store' => 'POST',
+            'show/' => 'GET',
+        ];
+
+        $buttonNames = [
+            'store' => 'create',
+            'show/' => null,
+        ];
+
+        $icons = [
+            'store' => null,
+            'show/' => null,
+        ];
+
+        $actions = [
+            'store' => 'modal',
+            'show/' => null,
+        ];
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+    }
+
+    public function arrModel(): array
+    {
+        return [
+            'HistoryModel'  => ['tbl_id'],
+            'LogsModel'  => ['user_id'],
+            'PaymentModel'  => ['user_id'],
+            'PurchaseModel'  => ['user_id_ecom', 'user_id_menu'],
+            'UserInfoModel'  => ['user_id'],
+        ];
+    }
+    public function unsetActions(): array
+    {
+        return [
+            'destroy',
+        ];
+    }
 }

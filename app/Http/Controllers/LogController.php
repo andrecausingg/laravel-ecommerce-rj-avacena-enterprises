@@ -97,9 +97,9 @@ class LogController extends Controller
                     // Check if the field is sensitive and needs decryption
                     if ($isSensitive == 1 && in_array($fieldName, $fieldsToDecrypt)) {
                         if (is_array($fieldValue)) {
-                            $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : null;
-                            $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : null;
-
+                            $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : (isset($fieldValue['old']) ? Crypt::decrypt($fieldValue['old']) : null);
+                            $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : (isset($fieldValue['new']) ? Crypt::decrypt($fieldValue['new']) : null);
+                            
                             $decryptedData[$fieldName]['old'] = $decOld;
                             $decryptedData[$fieldName]['new'] = $decNew;
                         } else {

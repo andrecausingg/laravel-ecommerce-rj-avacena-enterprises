@@ -29,16 +29,18 @@ class AccountController extends Controller
     // GET ALL USER ACCOUNT | ADMIN SIDE
     public function index(Request $request)
     {
+        // Add action
+        $crud_settings = $this->fillableAttrAuth->getApiAccountCrudSettings();
+        $relative_settings = $this->fillableAttrAuth->getApiAccountRelativeSettings();
+        $decrypted_auth_users = [];
+        $column_name = [];
+        $filter = [];
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
-        // Decrypt all emails and other attributes
-        $decrypted_auth_users = [];
-        $column_name = [];
-        $filter = [];
 
         // Unset Column not needed
         $unset_results = $this->helper->unsetColumn($this->fillableAttrAuth->unsetForRetrieves(), $this->fillableAttrAuth->getFillableAttributes());
@@ -46,6 +48,7 @@ class AccountController extends Controller
         // Retrieve all AuthModel records
         $auth_users = AuthModel::get();
 
+        // Data
         foreach ($auth_users as $auth_user) {
             $decrypted_auth_user = [];
 
@@ -105,25 +108,31 @@ class AccountController extends Controller
                 }
             }
 
-            // Add action
-            $crud_settings = $this->getApiAccountCrudSettings();
-            $relative_settings = $this->getApiAccountRelativeSettings();
+            $crud_action = $this->helper->formatApi(
+                $crud_settings['prefix'],
+                $crud_settings['apiWithPayloads'],
+                $crud_settings['methods'],
+                $crud_settings['buttonNames'],
+                $crud_settings['icons'],
+                $crud_settings['actions']
+            );
 
-            $decrypted_auth_user['action'] =
-                $this->helper->formatApi(
-                    $crud_settings['prefix'],
-                    $crud_settings['apiWithPayloads'],
-                    $crud_settings['methods'],
-                    $crud_settings['buttonNames'],
-                    $crud_settings['icons'],
-                    $crud_settings['actions']
-                );
+            // Unset button on action if exist the id on other tables
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModel());
+            if ($is_exist_id_other_tbl == 'exist') {
+                foreach ($this->fillableAttrAuth->unsetActions() as $unsetAction) {
+                    unset($crud_action[$unsetAction]);
+                }
+            }
+            $decrypted_auth_user['action'] = [
+                $crud_action
+            ];
 
             // Add the decrypted user data to the array
             $decrypted_auth_users[] = $decrypted_auth_user;
         }
 
-        // Add Column name
+        // Column Name
         $column_name = array_map(function ($col) {
             return $this->helper->transformColumnName($col);
         }, $column_name);
@@ -155,79 +164,6 @@ class AccountController extends Controller
 
         // Display or use the decrypted attributes as needed
         return response()->json(['messages' => [$response]], Response::HTTP_OK);
-    }
-
-    private function getApiAccountCrudSettings()
-    {
-        $prefix = 'admin-accounts/';
-        $apiWithPayloads = [
-            'update-email' => ['id', 'new_email'],
-            'update-password' => ['id', 'password', 'password_confirmation'],
-            'update-role-status' => ['id', 'role', 'status'],
-        ];
-        $methods = [
-            'update-email' => 'POST',
-            'update-password' => 'POST',
-            'update-role-status' => 'POST',
-        ];
-        $buttonNames = [
-            'update-email' => 'update-email',
-            'update-password' => 'update-password',
-            'update-role-status' => 'update-role-status',
-        ];
-        $icons = [
-            'update-email' => null,
-            'update-password' => null,
-            'update-role-status' => null,
-        ];
-        $actions = [
-            'update-email' => 'modal',
-            'update-password' => 'modal',
-            'update-role-status' => 'modal',
-        ];
-
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
-    }
-
-    private function getApiAccountRelativeSettings()
-    {
-        $prefix = 'admin-accounts/';
-        $apiWithPayloads = [
-            'store' => [
-                'phone_number',
-                'email',
-                'password',
-                'password_confirmation',
-                'role',
-                'status',
-                'eu_device'
-            ],
-            'show/' => [
-                'id',
-            ]
-        ];
-
-        $methods = [
-            'store' => 'POST',
-            'show/' => 'GET',
-        ];
-
-        $buttonNames = [
-            'store' => 'create',
-            'show/' => null,
-        ];
-
-        $icons = [
-            'store' => null,
-            'show/' => null,
-        ];
-
-        $actions = [
-            'store' => 'modal',
-            'show/' => null,
-        ];
-
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
     }
 
     // GET SPECIFIC USER ACCOUNT | ADMIN SIDE
@@ -440,6 +376,8 @@ class AccountController extends Controller
     // UPDATE USER ACCOUNT | ADMIN SIDE
     public function update(Request $request)
     {
+        $arr_log_details = [];
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -572,8 +510,8 @@ class AccountController extends Controller
         }
 
         // Format the logs
-        $arr_log_details['fields'] = $changes_for_logs;
         $arr_log_details['fields']['user_id'] = $account->user_id;
+        $arr_log_details['fields'] = array_merge($arr_log_details['fields'], $changes_for_logs);
 
         // Arr Data Logs
         $arr_data_logs = [
@@ -585,238 +523,13 @@ class AccountController extends Controller
             'user_action' => 'UPDATE USER ACCOUNT',
         ];
 
-
         // Logs
         $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
-            'message' => 'Successfully created user',
+            'message' => 'Successfully update user account',
             'log_message' => $log_result
         ], Response::HTTP_CREATED);
-    }
-
-
-
-
-    /**
-     * UPDATE EMAIL | ADMIN
-     * Update email
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function updateEmailAdmin(Request $request)
-    {
-        // Authorize the user
-        $user = $this->helper->authorizeUser($request);
-        if (empty($user->user_id)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Validation rules
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|string',
-            'new_email' => 'required|email',
-            'eu_device' => 'required|string',
-        ]);
-
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Validate Eu Device
-        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Fetch the user from the database
-        $user_auth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
-        if (!$user_auth) {
-            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $emails = AuthModel::get();
-        $exist = 0;
-        foreach ($emails as $email) {
-            $decrypted_email = Crypt::decrypt($email->email) ?? null;
-            if ($decrypted_email == $request->new_email) {
-                $exist = 1;
-                break;
-            }
-        }
-
-        $decrypted_current_email = Crypt::decrypt($user_auth->email);
-        if ($decrypted_current_email == $request->new_email) {
-            return response()->json(['message' => 'The new email cannot be the same as the old email. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if ($exist == 1) {
-            return response()->json(['message' => 'The email is already taken'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Update the user's email
-        $user_auth->email = Crypt::encrypt($request->new_email);
-
-        // Saving
-        if (!$user_auth->save()) {
-            return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Log details
-        $arr_log_details = [
-            'old_email' => Crypt::encrypt($decrypted_current_email),
-            'new_email' => Crypt::encrypt($request->new_email),
-        ];
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 0,
-            'log_details' => $arr_log_details,
-            'user_action' => 'STORE PERSONAL INFORMATION',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Email updated successfully',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
-    }
-
-    // UPDATE PASSWORD | ADMIN SIDE
-    public function updatePasswordAdmin(Request $request)
-    {
-        // Authorize the user
-        $user = $this->helper->authorizeUser($request);
-        if (empty($user->user_id)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-        }
-
-
-        // Validation rules
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|string',
-            'password' => 'required|string|min:6|confirmed:password_confirmation',
-        ]);
-
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Fetch the user from the database
-        $userAuth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
-        if (!$userAuth) {
-            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if (Hash::check($request->new_password, $userAuth->password)) {
-            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else {
-            $history = HistoryModel::where('column_name', 'password')
-                ->where('tbl_name', 'users_tbl')
-                ->where('tbl_id', Crypt::decrypt($request->user_id))
-                ->latest() // Order by created_at column in descending order (latest first)
-                ->first(); // Retrieve the first result
-
-            // Store old and new passwords
-            $logsData = [
-                'old_password' => $history->value,
-                'new_password' => Crypt::encrypt($request->input('password')),
-            ];
-
-            // Update the user password
-            $userAuth->password = Hash::make($request->input('password'));
-
-            // Saving
-            if ($userAuth->save()) {
-                // Logs
-                $logResult = $this->updatePasswordAdminLogs($request,  $user->user_id, $logsData);
-                return response()->json([
-                    'message' => 'Password updated successfully',
-                    'log_message' => $logResult
-                ], Response::HTTP_OK);
-            } else {
-                return response()->json(['message' => 'Failed to update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-        }
-    }
-
-    // UPDATE ROLE AND STATUS | ADMIN SIDE
-    public function updateRoleAndStatus(Request $request)
-    {
-        // Authorize the user
-        $user = $this->helper->authorizeUser($request);
-        if (empty($user->user_id)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-        }
-
-
-        // Validation rules
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|string',
-            'role' => 'required|string|max:255',
-            'status' => 'required|string|max:255',
-        ]);
-
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Fetch the user from the database
-        $userAuth = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
-        if (!$userAuth) {
-            return response()->json(['message' => 'Data Not Found'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Define the fields to loop through
-        $fields = [
-            'role', 'status',
-        ];
-
-        $changesForLogs = [];
-
-        // Loop through the fields for encryption and decryption
-        foreach ($fields as $field) {
-            try {
-                // Check if the value has changed
-                if ($request->input($field) !== $userAuth->$field) {
-                    $changesForLogs[$field] = [
-                        'old' => $userAuth->$field,
-                        'new' => $request->input($field),
-                    ];
-                }
-
-                // Update the user info
-                $userAuth->$field = $request->input($field);
-            } catch (\Exception $e) {
-                // Log or dump information about the exception
-                Log::info("Decryption error for field $field: " . $e->getMessage());
-            }
-        }
-
-        // Save changes if any
-        if (!empty($changesForLogs)) {
-            if ($userAuth->save()) {
-                // Logs
-                $logResult = $this->updateRoleAndStatusLogs($request,  $user->user_id, $changesForLogs);
-                return response()->json([
-                    'message' => 'Role and Status updated successfully',
-                    'log_message' => $logResult
-                ], Response::HTTP_OK);
-            } else {
-                return response()->json(['message' => 'Failed to update Role and Status'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-        } else {
-            return response()->json(['message' => 'No changes to update'], Response::HTTP_OK);
-        }
     }
 
 
@@ -971,8 +684,8 @@ class AccountController extends Controller
             $arr_log_details = [
                 'fields' => [
                     'user_id' => $user->user_id,
-                    'old_password' => Crypt::encrypt($request->input('current_password')),
-                    'new_password' => Crypt::encrypt($request->input('password')),
+                    'old' => Crypt::encrypt($request->input('current_password')),
+                    'new' => Crypt::encrypt($request->input('password')),
                 ]
             ];
 
@@ -997,6 +710,13 @@ class AccountController extends Controller
         }
     }
 
+    /**
+     * CHILD updatePasswordOnSettingUser | CLIENT SIDE
+     * Resend code password
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function resendVerificationCodeEmail(Request $request)
     {
         $verification_number = mt_rand(100000, 999999);
@@ -1067,6 +787,13 @@ class AccountController extends Controller
         ], Response::HTTP_OK);
     }
 
+    /**
+     * CHILD updateEmailOnSettingUser | CLIENT SIDE
+     * Resend code email
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function resendVerificationCodePassword(Request $request)
     {
         $verification_number = mt_rand(100000, 999999);

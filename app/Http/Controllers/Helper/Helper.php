@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Helper;
 
 use App\Models\LogsModel;
-use Illuminate\Support\Str;
 use App\Models\HistoryModel;
+use App\Models\PaymentModel;
+use App\Models\PurchaseModel;
+use App\Models\UserInfoModel;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -13,6 +16,8 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
+
+
 
 class Helper
 {
@@ -85,7 +90,6 @@ class Helper
         return $arr_select_fields;
     }
 
-
     // Uppercase the Word with dash -
     public function upperCase($buttonName)
     {
@@ -126,47 +130,6 @@ class Helper
         return $functions[] = $functions;
     }
 
-    public function functionRelative($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
-    {
-        $functions = [];
-
-        foreach ($apiWithPayloads as $key => $payload) {
-            // Remove forward slash from the key
-            $cleanedKey = rtrim($key, '/');
-
-            $method = $methods[$key] ?? null;
-            $functions[$cleanedKey] = [
-                'api' => $prefix . $key,
-                'payload' => $payload,
-                'method' => $method,
-                'icon' => $icons[$key],
-                'button_name' => $this->upperCase($buttonNames[$key]),
-                'action' => $actions[$key],
-            ];
-        }
-
-        return [$functions];
-    }
-
-    public function functionsApiAccountsCrud($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
-    {
-        $functions = [];
-
-        foreach ($apiWithPayloads as $key => $payload) {
-            $method = $methods[$key] ?? null;
-            $functions[$key] = [
-                'api' => $prefix . $key,
-                'payload' => $payload,
-                'method' => $method,
-                'icon' => $icons[$key],
-                'button_name' => $this->upperCase($buttonNames[$key]),
-                'action' => $actions[$key],
-            ];
-        }
-
-        return $functions;
-    }
-
     public function log($request, $arr_data_logs)
     {
 
@@ -175,10 +138,10 @@ class Helper
                 'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
                 'tbl_name' => 'users_tbl',
                 'column_name' => 'password',
-                'value' => isset($arr_data_logs['log_details']['fields']['password']) ?
-                    $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['new_password']) ?
-                        $arr_data_logs['log_details']['fields']['new_password'] :
-                        $arr_data_logs['log_details']['fields']['password']['new']
+                'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
+                    $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
+                        $arr_data_logs['log_details']['fields']['password']['new'] :
+                        null
                     ),
             ]);
 
@@ -273,7 +236,6 @@ class Helper
         // return response()->json(['message' => 'Successfully retrieved eu', 'eu' => $arr_data_device], Response::HTTP_OK);
         return response()->json(['message' => 'Successfully retrieved eu', 'eu' => Crypt::encrypt($arr_data_device)], Response::HTTP_OK);
     }
-
     private function getUserISP($ip)
     {
         $response = Http::get("http://ip-api.com/json/{$ip}");
@@ -311,7 +273,6 @@ class Helper
         // Return the validation result
         return $allExist ? "valid" : "invalid";
     }
-
     public function handleUploadImage($arr_data_file)
     {
         $file_name = '';
@@ -326,5 +287,41 @@ class Helper
         Storage::disk('public')->put($file_path, file_get_contents($arr_data_file['file_image']));
 
         return $file_name;
+    }
+
+    public function isExistIdOtherTbl($id, $modelAndId)
+    {
+        foreach ($modelAndId as $model => $columns) {
+            foreach ($columns as $column) {
+                if ($model == 'HistoryModel') {
+                    $exists = HistoryModel::where($column, $id)->exists();
+                    if ($exists) {
+                        return 'exist';
+                    }
+                } else if ($model == 'LogsModel') {
+                    $exists = LogsModel::where($column, $id)->exists();
+                    if ($exists) {
+                        return 'exist';
+                    }
+                } else if ($model == 'PaymentModel') {
+                    $exists = PaymentModel::where($column, $id)->exists();
+                    if ($exists) {
+                        return 'exist';
+                    }
+                } else if ($model == 'PurchaseModel') {
+                    $exists = PurchaseModel::where($column, $id)->exists();
+                    if ($exists) {
+                        return 'exist';
+                    }
+                } else if ($model == 'UserInfoModel') {
+                    $exists = UserInfoModel::where($column, $id)->exists();
+                    if ($exists) {
+                        return 'exist';
+                    }
+                }
+            }
+        }
+        // Return 'notExist' if no match is found
+        return 'notExist';
     }
 }
