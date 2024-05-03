@@ -3,17 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
-use Illuminate\Support\Str;
 use App\Models\HistoryModel;
-use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
+use App\Http\Controllers\Helper\Helper;
 use Symfony\Component\HttpFoundation\Response;
 
 class AccountController extends Controller
@@ -26,7 +26,13 @@ class AccountController extends Controller
         $this->fillableAttrAuth = $fillableAttrAuth;
     }
 
-    // GET ALL USER ACCOUNT | ADMIN SIDE
+    /**
+     * GET ALL USER ACCOUNT | ADMIN SIDE
+     * Fetch all data
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         // Add action
@@ -117,13 +123,17 @@ class AccountController extends Controller
                 $crud_settings['actions']
             );
 
-            // Unset button on action if exist the id on other tables
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModelWithId());
-            if ($is_exist_id_other_tbl == 'exist') {
+            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillableAttrAuth->unsetActions() as $unsetAction) {
                     unset($crud_action[$unsetAction]);
                 }
+                // Unset the first element from the result array
+                array_shift($is_exist_id_other_tbl);
             }
+
+
             $decrypted_auth_user['action'] = [
                 $crud_action
             ];
@@ -166,7 +176,14 @@ class AccountController extends Controller
         return response()->json(['messages' => [$response]], Response::HTTP_OK);
     }
 
-    // GET SPECIFIC USER ACCOUNT | ADMIN SIDE
+    /**
+     * GET SPECIFIC USER ACCOUNT | ADMIN SIDE
+     * Fetch specific data
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show(Request $request, string $id)
     {
         // Authorize the user
@@ -247,7 +264,13 @@ class AccountController extends Controller
         return response()->json(['messages' => [$decrypted_user_auth]], Response::HTTP_OK);
     }
 
-    // STORE USER ACCOUNT | ADMIN SIDE
+    /**
+     * STORE USER ACCOUNT | ADMIN SIDE
+     * store
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request)
     {
         $verification_number = mt_rand(100000, 999999);
@@ -282,13 +305,13 @@ class AccountController extends Controller
         }
 
         $accounts = AuthModel::all();
+
         // Decrypt and validate email if exist
         foreach ($accounts as $account) {
             // Start Decrypt
-            $decrypted_email = Crypt::decrypt($account->email);
-            $decrypted_phone_number = Crypt::decrypt($account->email);
 
             if ($request->filled('phone_number')) {
+                $decrypted_phone_number = $account->phone_number ?? Crypt::decrypt($account->phone_number);
                 // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
                 if ($decrypted_phone_number === $request->phone_number && $user->phone_verified_at !== null) {
                     return response()->json(
@@ -300,6 +323,7 @@ class AccountController extends Controller
                 }
             }
             if ($request->filled('email')) {
+                $decrypted_email = $account->email ?? Crypt::decrypt($account->email);
                 // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
                 if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
                     return response()->json(
@@ -364,16 +388,21 @@ class AccountController extends Controller
         ];
 
         // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+        // $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
             'message' => 'Successfully created user',
-            'log_message' => $log_result
+            // 'log_message' => $log_result
         ], Response::HTTP_OK);
     }
 
-
-    // UPDATE USER ACCOUNT | ADMIN SIDE
+    /**
+     * UPDATE USER ACCOUNT | ADMIN SIDE
+     * update
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request)
     {
         $arr_log_details = [];
@@ -530,6 +559,89 @@ class AccountController extends Controller
             'message' => 'Successfully update user account',
             'log_message' => $log_result
         ], Response::HTTP_CREATED);
+    }
+
+    /**
+     * DESTROY USER ACCOUNT | ADMIN SIDE
+     * destroy
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(Request $request)
+    {
+        $arr_log_details = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|string',
+            'eu_device' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // dd(Crypt::decrypt($request->user_id));
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device === 'invalid') {
+            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
+        if (!$account) {
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+        }
+        foreach ($this->fillableAttrAuth->getFillableAttributes() as $getFillableAttributes) {
+            if ($getFillableAttributes == 'password') {
+                $is_exist_id_other_tbls = $this->helper->isExistIdOtherTbl($account->user_id, $this->fillableAttrAuth->arrModelWithId());
+                // Check if exist on other tbl
+                foreach ($is_exist_id_other_tbls as $is_exist_id_other_tbl) {
+                    // Ensure $is_exist_id_other_tbl is an array before accessing its elements
+                    if (is_array($is_exist_id_other_tbl) && isset($is_exist_id_other_tbl['is_exist']) && $is_exist_id_other_tbl['is_exist'] == 'yes') {
+                        return response()->json([
+                            'message' => "Failed to delete because this ID exists in another table.",
+                            'result_is_exist_other_tbl' => $is_exist_id_other_tbls,
+                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                    }
+                }
+
+                $arr_log_details['fields'][$getFillableAttributes] = $account->value;
+            } else {
+                $arr_log_details['fields'][$getFillableAttributes] = $account->$getFillableAttributes;
+            }
+        }
+
+        // Delete the user
+        if (!$account->delete()) {
+            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $request->eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 1,
+            'is_history' => 0,
+            'log_details' => $arr_log_details,
+            'user_action' => 'DELETE USER ACCOUNT',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json([
+            'message' => 'Successfully created user',
+            'log_message' => $log_result
+        ], Response::HTTP_OK);
     }
 
 
@@ -862,13 +974,5 @@ class AccountController extends Controller
             'message' => 'A new verification code has been sent to your email',
             'log_message' => $log_result
         ], Response::HTTP_OK);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
     }
 }

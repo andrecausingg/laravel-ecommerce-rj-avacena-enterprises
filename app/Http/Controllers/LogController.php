@@ -7,22 +7,18 @@ use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
-    protected $encryptedFields, $fillableAttributes, $notToDecrypt, $helper;
+    protected $helper, $fillableAttrLogs;
 
-    public function __construct(Helper $helper)
+    public function __construct(Helper $helper, LogsModel $fillableAttrLogs)
     {
-
-        $logsModel = new LogsModel();
-
-        $this->encryptedFields = config('system.logs.EncryptedFields');
-        $this->notToDecrypt = config('system.logs.NotToDecrypt');
-        $this->fillableAttributes = $logsModel->getFillableAttributes();
+        $this->fillableAttrLogs = $fillableAttrLogs;
         $this->helper = $helper;
     }
 
@@ -44,21 +40,21 @@ class LogController extends Controller
 
             if (isset($detailsJson['fields'])) {
                 // Decrypt the data
-                $decryptedData = $this->isDecryptedData($log->is_sensitive, $detailsJson['fields'], $this->encryptedFields, $this->notToDecrypt);
-                
+                $decryptedData = $this->isDecryptedData($log->is_sensitive, $detailsJson['fields'], $this->fillableAttrLogs->encryptedFields(), $this->fillableAttrLogs->notToDecrypt());
+
                 // Decrypted data save on fields
                 $arrWithParentId = [
                     'fields' => $decryptedData
                 ];
             }
 
-            foreach ($this->fillableAttributes as $fillableAttribute) {
-                if ($fillableAttribute == 'details') {
-                    $decryptedLogs[$fillableAttribute] = $arrWithParentId;
-                }else if($fillableAttribute == 'user_device'){
-                    $decryptedLogs[$fillableAttribute] = json_decode($log->$fillableAttribute, true);
+            foreach ($this->fillableAttrLogs->getFillableAttributes() as $fillableAttrLog) {
+                if ($fillableAttrLog == 'details') {
+                    $decryptedLogs[$fillableAttrLog] = $arrWithParentId;
+                } else if ($fillableAttrLog == 'user_device') {
+                    $decryptedLogs[$fillableAttrLog] = json_decode($log->$fillableAttrLog, true);
                 } else {
-                    $decryptedLogs[$fillableAttribute] = $log->$fillableAttribute;
+                    $decryptedLogs[$fillableAttrLog] = $log->$fillableAttrLog;
                 }
             }
 
@@ -67,9 +63,9 @@ class LogController extends Controller
             if ($userInfo) {
                 $userInfoArray = $userInfo->toArray();
 
-                foreach ($this->encryptedFields as $field) {
-                    if (isset($userInfoArray[$field])) {
-                        $userInfoArray[$field] = $userInfo->{$field} ? Crypt::decrypt($userInfo->{$field}) : null;
+                foreach ($this->fillableAttrLogs->encryptedFields() as $encryptedField) {
+                    if (isset($userInfoArray[$encryptedField])) {
+                        $userInfoArray[$encryptedField] = $userInfo->{$encryptedField} ? Crypt::decrypt($userInfo->{$encryptedField}) : null;
                     }
                 }
                 $decryptedLogs['userInfo'] = $userInfoArray;
@@ -99,11 +95,11 @@ class LogController extends Controller
                         if (is_array($fieldValue)) {
                             $decOld = isset($fieldValue['oldEnc']) ? Crypt::decrypt($fieldValue['oldEnc']) : (isset($fieldValue['old']) ? Crypt::decrypt($fieldValue['old']) : null);
                             $decNew = isset($fieldValue['newEnc']) ? Crypt::decrypt($fieldValue['newEnc']) : (isset($fieldValue['new']) ? Crypt::decrypt($fieldValue['new']) : null);
-                            
+
                             $decryptedData[$fieldName]['old'] = $decOld;
                             $decryptedData[$fieldName]['new'] = $decNew;
                         } else {
-                            $decryptedData[$fieldName] = Crypt::decrypt($fieldValue);
+                            $decryptedData[$fieldName] = $fieldValue !== null ? Crypt::decrypt($fieldValue) : null;
                         }
                     } else {
                         $decryptedData[$fieldName] = $fieldValue;
@@ -114,6 +110,8 @@ class LogController extends Controller
                 }
             }
         }
+
+        Log::info($decryptedData);
 
 
         return $decryptedData;

@@ -291,37 +291,73 @@ class Helper
 
     public function isExistIdOtherTbl($id, $modelAndId)
     {
+        $arr_result = [];
+
         foreach ($modelAndId as $model => $columns) {
             foreach ($columns as $column) {
                 if ($model == 'HistoryModel') {
                     $exists = HistoryModel::where($column, $id)->exists();
+                    $data = HistoryModel::where($column, $id)->first();
                     if ($exists) {
-                        return 'exist';
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
                     }
-                } else if ($model == 'LogsModel') {
+                } 
+                
+                if ($model == 'LogsModel') {
                     $exists = LogsModel::where($column, $id)->exists();
+                    $data = LogsModel::where($column, $id)->first();
                     if ($exists) {
-                        return 'exist';
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
                     }
-                } else if ($model == 'PaymentModel') {
+                } 
+                
+                if ($model == 'PaymentModel') {
                     $exists = PaymentModel::where($column, $id)->exists();
+                    $data = PaymentModel::where($column, $id)->first();
                     if ($exists) {
-                        return 'exist';
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
                     }
-                } else if ($model == 'PurchaseModel') {
+                } 
+                
+                if ($model == 'PurchaseModel') {
                     $exists = PurchaseModel::where($column, $id)->exists();
+                    $data = PurchaseModel::where($column, $id)->first();
                     if ($exists) {
-                        return 'exist';
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
                     }
-                } else if ($model == 'UserInfoModel') {
+                } 
+                
+                if ($model == 'UserInfoModel') {
                     $exists = UserInfoModel::where($column, $id)->exists();
+                    $data = UserInfoModel::where($column, $id)->first();
                     if ($exists) {
-                        return 'exist';
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
                     }
                 }
             }
         }
+
         // Return 'notExist' if no match is found
-        return 'notExist';
+        return $arr_result;
     }
 }

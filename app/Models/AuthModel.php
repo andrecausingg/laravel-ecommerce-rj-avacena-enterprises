@@ -142,13 +142,12 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         ];
     }
 
-
     public function getApiAccountCrudSettings()
     {
         $prefix = 'admin-accounts/';
         $apiWithPayloads = [
             'update' => ['user_id', 'phone_number', 'email', 'password', 'role', 'status', 'eu_device'],
-            'destroy' => ['user_id']
+            'destroy' => ['user_id', 'eu_device']
         ];
         $methods = [
             'update' => 'POST',

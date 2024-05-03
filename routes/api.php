@@ -62,6 +62,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::get('/show/{id}', [$AccountController, 'show']);
         Route::post('/store', [$AccountController, 'store']);
         Route::post('/update', [$AccountController, 'update']);
+        Route::delete('/destroy', [$AccountController, 'destroy']);
     });
 
     // User Accounts | CLIENT
