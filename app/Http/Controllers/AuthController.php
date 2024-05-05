@@ -98,8 +98,8 @@ class AuthController extends Controller
 
             // Validate Eu Device
             $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-            if ($result_validate_eu_device == 'invalid') {
-                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            if ($result_validate_eu_device) {
+                return $result_validate_eu_device;
             }
 
             $arr_data['email'] = $request->email;
@@ -300,8 +300,8 @@ class AuthController extends Controller
             }
 
             $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-            if ($result_validate_eu_device == 'invalid') {
-                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            if ($result_validate_eu_device) {
+                return $result_validate_eu_device;
             }
         }
         // Check if Email is not empty
@@ -318,8 +318,8 @@ class AuthController extends Controller
             }
 
             $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-            if ($result_validate_eu_device == 'invalid') {
-                return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            if ($result_validate_eu_device) {
+                return $result_validate_eu_device;
             }
 
             $arr_data['email'] = $request->email;
@@ -526,8 +526,8 @@ class AuthController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Check if the provided verification number matches the stored one
@@ -613,8 +613,8 @@ class AuthController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $update_user_verification_number = $user->update([
@@ -682,8 +682,8 @@ class AuthController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Get All Users and Decrypt
@@ -779,8 +779,8 @@ class AuthController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Fetch the user from the database

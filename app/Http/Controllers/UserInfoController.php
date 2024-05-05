@@ -146,10 +146,9 @@ class UserInfoController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
-
 
         // UpperCase Specific Field
         $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
@@ -260,8 +259,8 @@ class UserInfoController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Unset Column not needed

@@ -123,6 +123,7 @@ class AccountController extends Controller
                 $crud_settings['actions']
             );
 
+            // Checking Id on other tbl if exist unset the the api
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModelWithId());
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
@@ -132,7 +133,6 @@ class AccountController extends Controller
                 // Unset the first element from the result array
                 array_shift($is_exist_id_other_tbl);
             }
-
 
             $decrypted_auth_user['action'] = [
                 $crud_action
@@ -161,14 +161,14 @@ class AccountController extends Controller
         $response = [
             'data' => $decrypted_auth_users,
             'column' => $column_name,
-            'relative' => $this->helper->formatApi(
+            'relative' => [$this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['apiWithPayloads'],
                 $relative_settings['methods'],
                 $relative_settings['buttonNames'],
                 $relative_settings['icons'],
                 $relative_settings['actions']
-            ),
+            )],
             'filter' => $filter
         ];
 
@@ -300,8 +300,8 @@ class AccountController extends Controller
 
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device === 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $accounts = AuthModel::all();
@@ -388,11 +388,11 @@ class AccountController extends Controller
         ];
 
         // Logs
-        // $log_result = $this->helper->log($request, $arr_data_logs);
+        $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
             'message' => 'Successfully created user',
-            // 'log_message' => $log_result
+            'log_message' => $log_result
         ], Response::HTTP_OK);
     }
 
@@ -430,8 +430,8 @@ class AccountController extends Controller
 
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device === 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
@@ -592,8 +592,8 @@ class AccountController extends Controller
 
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device === 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
@@ -644,7 +644,6 @@ class AccountController extends Controller
         ], Response::HTTP_OK);
     }
 
-
     /**
      * UPDATE EMAIL | CLIENT SIDE
      * Update email
@@ -677,8 +676,8 @@ class AccountController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Fetch the user from the database
@@ -725,6 +724,9 @@ class AccountController extends Controller
 
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result) {
+                return $log_result;
+            }
 
             return response()->json([
                 'message' => 'Email updated successfully',
@@ -765,8 +767,8 @@ class AccountController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         // Fetch the user from the database
@@ -835,8 +837,6 @@ class AccountController extends Controller
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
-
-        // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -851,8 +851,8 @@ class AccountController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $update_user_verification_number = $user->update([
@@ -912,8 +912,6 @@ class AccountController extends Controller
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
-
-        // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
@@ -928,8 +926,8 @@ class AccountController extends Controller
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-        if ($result_validate_eu_device == 'invalid') {
-            return response()->json(['message' => 'Incorrect eu_device'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
         }
 
         $update_user_verification_number = $user->update([

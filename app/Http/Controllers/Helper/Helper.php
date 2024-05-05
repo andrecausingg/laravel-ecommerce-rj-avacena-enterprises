@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Helper;
 
+use App\Models\AuthModel;
 use App\Models\LogsModel;
 use App\Models\HistoryModel;
 use App\Models\PaymentModel;
@@ -27,25 +28,35 @@ class Helper
         try {
             // Authenticate the user with the provided token
             $user = JWTAuth::parseToken()->authenticate();
-            if (!$user) {
-                return response()->json(['error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
-            }
-
             // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-            if (!$bearerToken || $user->session_token !== $bearerToken || $user->session_expire_at < Carbon::now()) {
-                return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            $bearer_token = $request->bearerToken();
+
+            // Check if user is not found
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
             }
 
+            // Check if bearer token is missing
+            if ($user->session_token !== $bearer_token) {
+                return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // Check if the user's session token does not match the bearer token or if the session has expired
+            if ($user->session_expire_at < Carbon::now()) {
+                return response()->json(['message' => 'Session Expired'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // If everything is valid, return the authenticated user
             return $user;
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to authenticate'], Response::HTTP_UNAUTHORIZED);
         }
     }
+
 
     // Unset column dont want to include to save on database
     public function unsetColumn($unsets, $fillableAttr)
@@ -103,10 +114,21 @@ class Helper
     }
 
     // Uppercase All the Word with dash - 
-    public function transformColumnName($column)
+    public function transformColumnName($columns)
     {
-        return ucwords(str_replace('_', ' ', $column));
+        $arr_column = [];
+
+        if (is_array($columns)) {
+            foreach ($columns as $column) {
+                $arr_column[] = ucwords(str_replace('_', ' ', $column));
+            }
+
+            return $arr_column;
+        } else {
+            return ucwords(str_replace('_', ' ', $columns));
+        }
     }
+
 
     public function formatApi($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
     {
@@ -132,7 +154,6 @@ class Helper
 
     public function log($request, $arr_data_logs)
     {
-
         if ($arr_data_logs['is_history'] == 1) {
             $history = HistoryModel::create([
                 'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
@@ -147,7 +168,10 @@ class Helper
 
             // Check if history creation failed
             if (!$history) {
-                return response()->json(['message' => 'Failed to store history'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return response()->json([
+                    'message' => 'Failed to store history',
+                    'parameter' => $history,
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             // Update history ID
@@ -171,7 +195,10 @@ class Helper
         ]);
 
         if (!$log) {
-            return response()->json(['message' => 'Failed to store logs'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json([
+                'message' => 'Failed to store logs',
+                'parameter' => $log,
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         $log_update = $log->update([
@@ -180,7 +207,10 @@ class Helper
 
         // Check if history update failed
         if (!$log_update) {
-            return response()->json(['message' => 'Failed to update log ID'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json([
+                'message' => 'Failed to update log ID',
+                'parameter' => $log_update,
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json(['message' => $arr_data_logs['is_history'] == 1 ? 'Successfully stored logs and history' : 'Successfully stored logs'], Response::HTTP_OK);
@@ -259,19 +289,12 @@ class Helper
             'device_info',
         ];
 
-        // Initialize a variable to store validation result
-        $allExist = true;
-
         // Loop through each key
         foreach ($keys as $key) {
             if (!array_key_exists($key, $decrypt_eu_device)) {
-                $allExist = false;
-                break;
+                return response()->json(['message' => 'Incorrect eu device'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         }
-
-        // Return the validation result
-        return $allExist ? "valid" : "invalid";
     }
     public function handleUploadImage($arr_data_file)
     {
@@ -305,8 +328,8 @@ class Helper
                             // 'data' => $data
                         ];
                     }
-                } 
-                
+                }
+
                 if ($model == 'LogsModel') {
                     $exists = LogsModel::where($column, $id)->exists();
                     $data = LogsModel::where($column, $id)->first();
@@ -317,8 +340,8 @@ class Helper
                             // 'data' => $data
                         ];
                     }
-                } 
-                
+                }
+
                 if ($model == 'PaymentModel') {
                     $exists = PaymentModel::where($column, $id)->exists();
                     $data = PaymentModel::where($column, $id)->first();
@@ -329,8 +352,8 @@ class Helper
                             // 'data' => $data
                         ];
                     }
-                } 
-                
+                }
+
                 if ($model == 'PurchaseModel') {
                     $exists = PurchaseModel::where($column, $id)->exists();
                     $data = PurchaseModel::where($column, $id)->first();
@@ -341,8 +364,8 @@ class Helper
                             // 'data' => $data
                         ];
                     }
-                } 
-                
+                }
+
                 if ($model == 'UserInfoModel') {
                     $exists = UserInfoModel::where($column, $id)->exists();
                     $data = UserInfoModel::where($column, $id)->first();
@@ -360,4 +383,74 @@ class Helper
         // Return 'notExist' if no match is found
         return $arr_result;
     }
+
+    public function storeMultipleData($arr_store_fields, $user_input_data)
+    {
+        $arr_attributes_store = [];
+
+        foreach ($arr_store_fields as $arr_store_field) {
+            if (array_key_exists($arr_store_field, $user_input_data)) {
+                $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+            }
+        }
+
+        return $arr_attributes_store;
+    }
+
+    public function updateUniqueId($model, $id_to_updates, $id)
+    {
+        // Update the unique id
+        foreach ($id_to_updates as $id_to_updates_key => $id_to_updates_value) {
+            $model->update([$id_to_updates_key => $id_to_updates_value . $id]);
+        }
+        if (!$model->save()) {
+            return response()->json(['message' => 'Failed to update unique id'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updateMultipleData($model, $arr_update_fields, $user_input_data)
+    {
+        // Update the inventory info
+        foreach ($arr_update_fields as $arr_update_field) {
+            $model->$arr_update_field = $user_input_data[$arr_update_field];
+        }
+        if (!$model->save()) {
+            return response()->json(['message' => 'Failed to update inventory'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function updateLogsOldNew($model, $arr_update_fields, $user_input_data)
+    {
+        $changes_item_for_logs = [];
+
+        // dd($model);
+        // dd($arr_update_fields);
+        // dd($user_input_data);
+
+        foreach ($arr_update_fields as $arr_update_field) {
+            $existing_value = $model->$arr_update_field ?? null;
+            $new_value = $user_input_data[$arr_update_field] ?? null;
+            // Check if the value has changed
+            if ($existing_value !== $new_value) {
+                $changes_item_for_logs[$arr_update_field] = [
+                    'old' => $existing_value,
+                    'new' => $new_value,
+                ];
+            }
+        }
+
+
+        return $changes_item_for_logs;
+    }
+
+    public function checkIfTheresChangesLogs($changes_for_logs)
+    {
+        foreach ($changes_for_logs as $item) {
+            if (array_key_exists('fields', $item) && is_array($item['fields']) && empty($item['fields'])) {
+                return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+    }
+
+    // public function formatTheDateAndTime{}
 }

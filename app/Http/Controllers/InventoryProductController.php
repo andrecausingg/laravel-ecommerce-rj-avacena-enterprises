@@ -69,12 +69,7 @@ class InventoryProductController extends Controller
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
-            return response()->json(
-                [
-                    'message' => 'Not authenticated user',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Check if 'items' key exists in the request

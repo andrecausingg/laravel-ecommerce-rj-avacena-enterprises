@@ -42,7 +42,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_product_id' => 'required|string',
@@ -336,7 +335,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'purchase_id' => 'required|string',
@@ -429,7 +427,6 @@ class PurchaseController extends Controller
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
@@ -551,7 +548,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'purchase_id' => 'required|array',
@@ -643,7 +639,6 @@ class PurchaseController extends Controller
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
-
 
         // Get the user ID
         $user_id = $user->user_id;
