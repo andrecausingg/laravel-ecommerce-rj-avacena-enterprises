@@ -34,7 +34,7 @@ class PurchaseModel extends Model
 
         'retail_price',
         'discounted_price',
-        
+
         'status',
 
         'deleted_at',
@@ -47,5 +47,63 @@ class PurchaseModel extends Model
     public function getFillableAttributes(): array
     {
         return $this->fillable;
+    }
+
+    public function arrToStores(): array
+    {
+        return  [
+            'purchase_id',
+            'purchase_group_id',
+
+            'user_id_customer',
+            'user_id_menu',
+
+            'inventory_product_id',
+            'inventory_group_id',
+            'item_code',
+
+            'image',
+            'name',
+            'category',
+            'description',
+            'supplier_name',
+            'design',
+            'size',
+            'color',
+
+            'retail_price',
+            'discounted_price',
+
+            'status',
+        ];
+    }
+
+    public function arrAddQtyPurchases(): array
+    {
+        return  [
+            'purchase_group_id',
+
+            'user_id_customer',
+            'user_id_ecom',
+            'user_id_menu',
+
+            'inventory_product_id',
+            'inventory_group_id',
+            'item_code',
+
+            'image',
+            'name',
+            'category',
+            'description',
+            'supplier_name',
+            'design',
+            'size',
+            'color',
+
+            'retail_price',
+            'discounted_price',
+
+            'status',
+        ];
     }
 }
