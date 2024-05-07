@@ -15,7 +15,6 @@ return new class extends Migration
             // Ids
             $table->id();
             $table->text('inventory_id')->unique()->nullable();
-            $table->text('group_id')->unique()->nullable();
 
             // Default
             $table->string('name');

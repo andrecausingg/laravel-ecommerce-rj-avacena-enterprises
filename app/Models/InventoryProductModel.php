@@ -15,9 +15,10 @@ class InventoryProductModel extends Model
     protected $primaryKey = 'id';
     protected $fillable = [
         'inventory_product_id',
-        'inventory_group_id',
-        'item_code',
 
+        'inventory_id',
+
+        'item_code',
         'image',
         'name',
         'category',
@@ -41,5 +42,49 @@ class InventoryProductModel extends Model
     public function getFillableAttributes(): array
     {
         return $this->fillable;
+    }
+
+    public function arrToStores(): array
+    {
+        return [
+            'inventory_id',
+            'item_code',
+            'image',
+            'name',
+            'category',
+            'description',
+            'supplier_name',
+            'design',
+            'size',
+            'color',
+            'retail_price',
+            'discounted_price',
+            'unit_supplier_price',
+        ];
+    }
+    public function arrToUpdates(): array
+    {
+        return [
+            'inventory_id',
+            'item_code',
+            'image',
+            'name',
+            'category',
+            'description',
+            'supplier_name',
+            'design',
+            'size',
+            'color',
+            'retail_price',
+            'discounted_price',
+            'unit_supplier_price',
+        ];
+    }
+
+    public function idToUpdate(): array
+    {
+        return [
+            'inventory_product_id' => 'inv_product_id-',
+        ];
     }
 }

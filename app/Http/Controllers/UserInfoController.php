@@ -288,21 +288,21 @@ class UserInfoController extends Controller
         }
 
         // Loop through the fields for encryption and decryption
-        foreach ($unset_results as $unset_result) {
+        foreach ($this->fillableAttrUserInfos->arrToUpdates() as $arrToUpdates) {
             // Check if the key exists in the $validated_data array
-            if (isset($validated_data[$unset_result])) {
-                $existing_value = $user_info->$unset_result !== null ? Crypt::decrypt($user_info->$unset_result) : null;
+            if (isset($validated_data[$arrToUpdates])) {
+                $existing_value = $user_info->$arrToUpdates !== null ? Crypt::decrypt($user_info->$arrToUpdates) : null;
 
-                if ($unset_result != 'image') {
-                    $new_value = Crypt::encrypt($validated_data[$unset_result]);
+                if ($arrToUpdates != 'image') {
+                    $new_value = Crypt::encrypt($validated_data[$arrToUpdates]);
 
                     // Check if the value has changed for logs
-                    if ($existing_value != $validated_data[$unset_result]) {
-                        $changes_for_logs[$unset_result] = [
+                    if ($existing_value != $validated_data[$arrToUpdates]) {
+                        $changes_for_logs[$arrToUpdates] = [
                             'oldEnc' => $existing_value,
-                            'newEnc' => $validated_data[$unset_result],
+                            'newEnc' => $validated_data[$arrToUpdates],
                         ];
-                        $user_info->{$unset_result} = $new_value; // Set the new value
+                        $user_info->{$arrToUpdates} = $new_value; // Set the new value
                     }
                 } else {
                     $new_value =  $file_name != '' ? Crypt::encrypt($file_name) : null;
@@ -319,7 +319,7 @@ class UserInfoController extends Controller
                         ];
                     }
 
-                    $user_info->{$unset_result} = $new_value; // Set the new value
+                    $user_info->{$arrToUpdates} = $new_value; // Set the new value
                 }
             }
         }

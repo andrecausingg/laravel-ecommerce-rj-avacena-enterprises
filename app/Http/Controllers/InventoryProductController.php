@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
 use App\Models\InventoryProductModel;
+use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -15,15 +16,11 @@ use Symfony\Component\HttpFoundation\Response;
 class InventoryProductController extends Controller
 {
 
-    protected $fillAttrInventoryProducts, $unsetsTimeStamps, $unsetsStore, $helper;
+    protected $fillableAttrInventoryChildren, $helper;
 
-    public function __construct(Helper $helper)
+    public function __construct(Helper $helper, InventoryProductModel $fillableAttrInventoryChildren)
     {
-        $InventoryProductModel = new InventoryProductModel();
-
-        $this->fillAttrInventoryProducts = $InventoryProductModel->getFillableAttributes();
-        $this->unsetsTimeStamps = config('system.a-global.Unset-Timestamp');
-        $this->unsetsStore = config('system.inventory-product.UnsetStore');
+        $this->fillableAttrInventoryChildren = $fillableAttrInventoryChildren;
         $this->helper = $helper;
     }
 
@@ -61,10 +58,9 @@ class InventoryProductController extends Controller
      */
     public function store(Request $request)
     {
-        $filename = '';
+        $file_name = '';
         // Initialize an array to store all created items
-        $createdItems = [];
-        $arrStore = [];
+        $created_items = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -84,7 +80,7 @@ class InventoryProductController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'items.*.inventory_group_id' => 'required|string|max:500',
+            'items.*.inventory_id' => 'required|string|max:500',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
@@ -112,62 +108,71 @@ class InventoryProductController extends Controller
             );
         }
 
-        foreach ($request['items'] as $productUserInput) {
-            // Retrieve the inventory record
-            $inventory = InventoryModel::where('group_id', $productUserInput['inventory_group_id'])->first();
+        foreach ($request['items'] as $user_input) {
+            // Validate eu_device
+            $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
+            if ($result_validate_eu_device) {
+                return $result_validate_eu_device;
+            }
 
+            // Retrieve the inventory record
+            $inventory = InventoryModel::where('inventory_id', $user_input['inventory_id'])->first();
             // Check if inventory record exists
             if (!$inventory) {
-                return response()->json(['message' => 'Parent inventory I.D not found'], Response::HTTP_NOT_FOUND);
+                return response()->json([
+                    'message' => 'Parent inventory I.D not found',
+                ], Response::HTTP_NOT_FOUND);
             }
 
-            // Handle image
-            if ($productUserInput['image'] && $productUserInput['image']->hasFile('image')) {
-                $customFolder = 'inventory';
-                $image = $productUserInput['image'];
-                $imageActualExt = $image->getClientOriginalExtension();
-
-                $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
-
-                $filePath = $customFolder . '/' . $filename;
-
-                Storage::disk('public')->put($filePath, file_get_contents($image));
+            // Handle image upload if it exists for the current item
+            if (isset($user_input['image']) && $user_input['image']->isValid()) {
+                // Handle image upload 
+                $arr_data_file = [
+                    'custom_folder' => 'inventory-children',
+                    'file_image' => $user_input['image'],
+                    'image_actual_extension' => $user_input['image']->getClientOriginalExtension(),
+                ];
+                $file_name = $this->helper->handleUploadImage($arr_data_file);
             }
 
-            // Unset Columns
-            $unsetResults = $this->helper->unsetColumn($this->unsetsStore, $this->fillAttrInventoryProducts);
-            foreach ($unsetResults as $unsetResult) {
-                $arrStore[$unsetResult] = $unsetResult == 'image' ? ($filename ? $filename : null) : $productUserInput[$unsetResult];
-            }
-
-            // Store
-            $created = InventoryProductModel::create($arrStore);
+            // Create the InventoryModel instance with the selected attributes
+            $result_to_create = $this->helper->storeMultipleData($this->fillableAttrInventoryChildren->arrToStores(), $user_input, $file_name);
+            $created = InventoryProductModel::create($result_to_create);
             if (!$created) {
                 return response()->json(
                     [
-                        'message' => 'Failed to store Inventory Products',
+                        'message' => 'Failed to store Inventory Child',
                     ],
                     Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
 
-            // Update Id
-            $lastInsertedId = $created->id;
-            $created->update([
-                'inventory_product_id' => 'inv_prod_id-' . $lastInsertedId,
-            ]);
+            // Update the unique I.D
+            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillableAttrInventoryChildren->idToUpdate(), $created->id);
+            if ($update_unique_id) {
+                return $update_unique_id;
+            }
 
-            // Store Created
-            $createdItems[] = $created;
+            $created_items[] = $created;
+            $eu_device = $user_input['eu_device'];
         }
 
-        // Fetch Message Logs
-        $logResult = $this->storeLogs($request, $user->user_id, $createdItems);
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 0,
+            'is_history' => 0,
+            'log_details' => $created_items,
+            'user_action' => 'STORE INVENTORY CHILD',
+        ];
+
+        $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json(
             [
-                'message' => 'Inventory records parent store successfully',
-                'log_message' => $logResult
+                'message' => 'Inventory records child store successfully',
+                'log_message' => $log_result
             ],
             Response::HTTP_OK
         );
@@ -193,9 +198,8 @@ class InventoryProductController extends Controller
      */
     public function update(Request $request)
     {
-
-        $changesForLogs = [];
-        $changesForLogsItem = [];
+        $changes_for_log = [];
+        $file_name = '';
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -210,7 +214,7 @@ class InventoryProductController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'items.*.inventory_group_id' => 'required|string|max:500',
+            'items.*.inventory_id' => 'required|string|max:500',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
@@ -225,6 +229,7 @@ class InventoryProductController extends Controller
             'items.*.size' => 'nullable|string|max:500',
             'items.*.color' => 'nullable|string|max:500',
             'items.*.unit_supplier_price' => 'nullable|numeric',
+            'items.*.eu_device' => 'required|string',
         ]);
 
 
@@ -238,87 +243,129 @@ class InventoryProductController extends Controller
             );
         }
 
-        foreach ($this->unsetsTimeStamps as $unsetsTimeStamp) {
-            // Find the key associated with the field and unset it
-            $key = array_search($unsetsTimeStamp, $this->fillAttrInventoryProducts);
-            if ($key !== false) {
-                unset($this->fillAttrInventoryProducts[$key]);
+        foreach ($request['items'] as $user_input) {
+            // Validate eu_device
+            $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
+            if ($result_validate_eu_device) {
+                return $result_validate_eu_device;
             }
-        }
 
-        foreach ($request['items'] as $productUserInput) {
-            // Retrieve the inventory record
-            $inventory = InventoryProductModel::where('inventory_product_id', $productUserInput['inventory_product_id'])->first();
-
-            // Check if inventory record exists
+            $inventory = InventoryProductModel::where('inventory_product_id', $user_input['inventory_product_id'])->first();
             if (!$inventory) {
                 return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
 
-            if ($productUserInput['image'] && $productUserInput['image']->hasFile('image')) {
-                $customFolder = 'inventory';
-                $image = $productUserInput['image'];
-                $imageActualExt = $image->getClientOriginalExtension();
-
-                $filename = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $imageActualExt;
-
-                $filePath = $customFolder . '/' . $filename;
-
-                Storage::disk('public')->put($filePath, file_get_contents($image));
+            // Handle image upload if it exists for the current item
+            if (isset($user_input['image']) && $user_input['image']->isValid()) {
+                // Handle image upload 
+                $arr_data_file = [
+                    'custom_folder' => 'inventory-children',
+                    'file_image' => $user_input['image'],
+                    'image_actual_extension' => $user_input['image']->getClientOriginalExtension(),
+                ];
+                $file_name = $this->helper->handleUploadImage($arr_data_file);
             }
 
-            foreach ($this->fillAttrInventoryProducts as $fillAttrInventoryProduct) {
-                $existingValue = $inventory->$fillAttrInventoryProduct ?? null;
-                $newValue = $productUserInput[$fillAttrInventoryProduct] ?? null;
-
-                // Check if the value has changed
-                if ($existingValue !== $newValue) {
-                    $changesForLogsItem[$fillAttrInventoryProduct] = [
-                        'old' => $existingValue,
-                        'new' => $newValue,
-                    ];
-                }
-            }
-
-            // Log the changes for the current item
-            $changesForLogs[] = [
-                'inventory_product_id' => $productUserInput['inventory_product_id'],
-                'inventory_group_id' => $productUserInput['inventory_group_id'],
-                'fields' => $changesForLogsItem,
+            // Get the changes of the fields
+            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillableAttrInventoryChildren->arrToUpdates(), $user_input, $file_name);
+            $changes_for_log[] = [
+                'inventory_product_id' => $user_input['inventory_product_id'],
+                'fields' => $result_changes_item_for_logs,
             ];
 
-            // Update the inventory info
-            foreach ($this->fillAttrInventoryProducts as $fillAttrInventoryProduct) {
-                $inventory->$fillAttrInventoryProduct = $productUserInput[$fillAttrInventoryProduct];
+            // Update Multiple Data
+            $result_update_multi_data = $this->helper->updateMultipleData($inventory, $this->fillableAttrInventoryChildren->arrToUpdates(), $user_input, $file_name);
+            if ($result_update_multi_data) {
+                return $result_update_multi_data;
             }
 
-            // Save the updated inventory
-            if (!$inventory->save()) {
-                return response()->json(['message' => 'Failed to update inventory'], Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
+            $eu_device = $user_input['eu_device'];
         }
 
-        foreach ($changesForLogs as $item) {
-            if (array_key_exists('fields', $item) && is_array($item['fields']) && empty($item['fields'])) {
-                return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
+        // Check if theres Changes Logs
+        $result_changes_logs = $this->helper->checkIfTheresChangesLogs($changes_for_log);
+        if ($result_changes_logs) {
+            return $result_changes_logs;
         }
 
-        // Log all changes
-        $resultLogs = $this->updateLogs($request, $user->user_id, $changesForLogs);
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 1,
+            'is_history' => 0,
+            'log_details' => $changes_for_log,
+            'user_action' => 'UPDATE INVENTORY CHILDREN',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
-            'message' => 'All inventory child records updated successfully',
-            'log_message' => $resultLogs
+            'message' => 'Successfully update inventory child',
+            'log_message' => $log_result
         ], Response::HTTP_OK);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request)
     {
-        //
+        $arr_log_details = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'inventory_id' => 'required|string',
+            'eu_device' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
+
+        $inventory = InventoryProductModel::where('inventory_product_id', Crypt::decrypt($request->inventory_id))->first();
+        if (!$inventory) {
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+        }
+        foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttributes) {
+            $arr_log_details['fields'][$getFillableAttributes] = $inventory->$getFillableAttributes;
+        }
+
+        // Delete the user
+        if (!$inventory->delete()) {
+            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $request->eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 0,
+            'is_history' => 0,
+            'log_details' => $arr_log_details,
+            'user_action' => 'DELETE INVENTORY CHILD',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json([
+            'message' => 'Successfully created user',
+            'log_message' => $log_result
+        ], Response::HTTP_OK);
     }
 
     public function storeLogs($request, $userId, $logDetails)

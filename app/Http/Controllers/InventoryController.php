@@ -56,10 +56,14 @@ class InventoryController extends Controller
             }
 
             $arr_inventory_item['inventory_parent'] = $arr_parent_inventory_data;
-            $inventoryChilds = InventoryProductModel::where('inventory_group_id', $inventory_parent->group_id)->get();
-            $arr_inventory_item['inventory_parent']['variant'] =  $inventoryChilds->count();
-            $arr_inventory_item['inventory_parent']['stock'] = $inventoryChilds->sum('stock');
-            $arr_inventory_item['inventory_parent']['inventory_children'] = $inventoryChilds->toArray();
+            $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
+            $arr_inventory_item['inventory_parent']['variant'] =  $inventory_children->count();
+            $arr_inventory_item['inventory_parent']['stock'] = $inventory_children->sum('stock');
+
+            foreach ($inventory_children->toArray() as $inventory_children) {
+                dd($inventory_children);
+            }
+            $arr_inventory_item['inventory_parent']['inventory_children'] = $inventory_children->toArray();
 
             // Format Api
             $crud_action = $this->helper->formatApi(
@@ -185,7 +189,7 @@ class InventoryController extends Controller
             if (!$created) {
                 return response()->json(
                     [
-                        'message' => 'Failed to store Inventory Parent',
+                        'message' => 'Failed to store Inventory Parent'
                     ],
                     Response::HTTP_INTERNAL_SERVER_ERROR
                 );
@@ -273,7 +277,6 @@ class InventoryController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
-            'items.*.group_id' => 'required|string',
             'items.*.name' => 'required|string|max:255',
             'items.*.category' => 'required|string|max:255',
             'items.*.eu_device' => 'required|string',
@@ -284,40 +287,50 @@ class InventoryController extends Controller
             return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request) {
+            foreach ($request->input('items') as $item) {
+                $exists = InventoryModel::where('name', $item['name'])
+                    ->where('category', $item['category'])
+                    ->exists();
+
+                if ($exists) {
+                    $validator->errors()->add('items', 'The combination of name and category already exists.');
+                }
+            }
+        });
+
         // Input User
-        foreach ($request['items'] as $product_user_input) {
+        foreach ($request['items'] as $user_input) {
             // Validate eu_device
-            $result_validate_eu_device = $this->helper->validateEuDevice($product_user_input['eu_device']);
+            $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
             if ($result_validate_eu_device) {
                 return $result_validate_eu_device;
             }
 
             // Check if inventory record exists
-            $inventory = InventoryModel::where('inventory_id', $product_user_input['inventory_id'])
-                ->where('group_id', $product_user_input['group_id'])
+            $inventory = InventoryModel::where('inventory_id', $user_input['inventory_id'])
                 ->first();
             if (!$inventory) {
                 return response()->json([
-                    'message' => 'Data not found',
-                    'parameter' => $product_user_input
+                    'message' => 'Data not found'
                 ], Response::HTTP_NOT_FOUND);
             }
 
             // Get the changes of the fields
-            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillableAttrInventorys->arrToUpdates(), $product_user_input);
+            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillableAttrInventorys->arrToUpdates(), $user_input, '');
             $changes_for_logs[] = [
-                'inventory_id' => $product_user_input['inventory_id'],
-                'group_id' => $product_user_input['group_id'],
+                'inventory_id' => $user_input['inventory_id'],
                 'fields' => $result_changes_item_for_logs,
             ];
 
             // Update Multiple Data
-            $result_update_multi_data = $this->helper->updateMultipleData($inventory, $this->fillableAttrInventorys->arrToUpdates(), $product_user_input);
+            $result_update_multi_data = $this->helper->updateMultipleData($inventory, $this->fillableAttrInventorys->arrToUpdates(), $user_input, '');
             if ($result_update_multi_data) {
                 return $result_update_multi_data;
             }
 
-            $eu_device = $product_user_input['eu_device'];
+            $eu_device = $user_input['eu_device'];
         }
 
         // Check if theres Changes Logs
@@ -340,7 +353,7 @@ class InventoryController extends Controller
         $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
-            'message' => 'Inventory records parent store successfully',
+            'message' => 'Inventory records parent update successfully',
             'log_message' => $log_result,
             'exist_data' => $arr_existing_data
         ], Response::HTTP_OK);
@@ -349,9 +362,62 @@ class InventoryController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request)
     {
-        //
+        $arr_log_details = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'inventory_id' => 'required|string',
+            'eu_device' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
+
+        $inventory = InventoryModel::where('inventory_id', Crypt::decrypt($request->inventory_id))->first();
+        if (!$inventory) {
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+        }
+        foreach ($this->fillableAttrInventorys->getFillableAttributes() as $fillableAttrInventorys) {
+            $arr_log_details['fields'][$fillableAttrInventorys] = $inventory->$fillableAttrInventorys;
+        }
+
+        // Delete the user
+        if (!$inventory->delete()) {
+            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Arr Data Logs
+        $arr_data_logs = [
+            'user_device' => $request->eu_device,
+            'user_id' => $user->user_id,
+            'is_sensitive' => 0,
+            'is_history' => 0,
+            'log_details' => $arr_log_details,
+            'user_action' => 'DELETE INVENTORY PARENT',
+        ];
+
+        // Logs
+        $log_result = $this->helper->log($request, $arr_data_logs);
+
+        return response()->json([
+            'message' => 'Successfully created user',
+            'log_message' => $log_result
+        ], Response::HTTP_OK);
     }
 
 

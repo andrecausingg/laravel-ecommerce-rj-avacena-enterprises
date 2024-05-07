@@ -277,6 +277,8 @@ class Helper
             return null;
         }
     }
+
+    // Validate Eu device
     public function validateEuDevice($eu_device)
     {
         $decrypt_eu_device = Crypt::decrypt($eu_device);
@@ -312,6 +314,7 @@ class Helper
         return $file_name;
     }
 
+    // This is for checking in index to display a button delete
     public function isExistIdOtherTbl($id, $modelAndId)
     {
         $arr_result = [];
@@ -384,19 +387,25 @@ class Helper
         return $arr_result;
     }
 
-    public function storeMultipleData($arr_store_fields, $user_input_data)
+    // Store Multiple Data
+    public function storeMultipleData($arr_store_fields, $user_input_data, $file_name = '')
     {
         $arr_attributes_store = [];
 
         foreach ($arr_store_fields as $arr_store_field) {
             if (array_key_exists($arr_store_field, $user_input_data)) {
-                $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+                if ($arr_store_field === 'image') {
+                    $arr_attributes_store[$arr_store_field] = $file_name;
+                } else {
+                    $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+                }
             }
         }
 
         return $arr_attributes_store;
     }
 
+    // Update a unique I.D on store and update
     public function updateUniqueId($model, $id_to_updates, $id)
     {
         // Update the unique id
@@ -408,34 +417,53 @@ class Helper
         }
     }
 
-    public function updateMultipleData($model, $arr_update_fields, $user_input_data)
+    public function updateMultipleData($model, $arr_update_fields, $user_input_data, $file_name = '')
     {
         // Update the inventory info
         foreach ($arr_update_fields as $arr_update_field) {
-            $model->$arr_update_field = $user_input_data[$arr_update_field];
+            if($arr_update_field == 'image'){
+                $model->$arr_update_field = $file_name;
+            }else{
+                $model->$arr_update_field = $user_input_data[$arr_update_field];
+            }
         }
         if (!$model->save()) {
             return response()->json(['message' => 'Failed to update inventory'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
-    public function updateLogsOldNew($model, $arr_update_fields, $user_input_data)
+    public function updateLogsOldNew($model, $arr_update_fields, $user_input_data, $file_name)
     {
         $changes_item_for_logs = [];
-
-        // dd($model);
-        // dd($arr_update_fields);
-        // dd($user_input_data);
 
         foreach ($arr_update_fields as $arr_update_field) {
             $existing_value = $model->$arr_update_field ?? null;
             $new_value = $user_input_data[$arr_update_field] ?? null;
-            // Check if the value has changed
-            if ($existing_value !== $new_value) {
-                $changes_item_for_logs[$arr_update_field] = [
-                    'old' => $existing_value,
-                    'new' => $new_value,
-                ];
+
+            if ($arr_update_field != 'image') {
+                // Check if the value has changed
+                if ($existing_value !== $new_value) {
+                    $changes_item_for_logs[$arr_update_field] = [
+                        'old' => $existing_value,
+                        'new' => $new_value,
+                    ];
+                }
+            } else {
+                $new_value =  $file_name != '' ? $file_name : null;
+
+                if ($existing_value == null && $new_value != null) {
+                    $changes_item_for_logs['image'] = [
+                        'old' => $existing_value,
+                        'new' => $file_name,
+                    ];
+                } else if ($existing_value != null && $new_value != null) {
+                    $changes_item_for_logs['image'] = [
+                        'old' => $existing_value,
+                        'new' => $file_name,
+                    ];
+                }
+
+                $model->{$arr_update_field} = $new_value; // Set the new value
             }
         }
 

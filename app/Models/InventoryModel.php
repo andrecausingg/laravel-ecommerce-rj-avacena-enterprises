@@ -15,7 +15,6 @@ class InventoryModel extends Model
     protected $primaryKey = 'id';
     protected $fillable = [
         'inventory_id',
-        'group_id',
         'name',
         'category',
         'created_at',
@@ -32,7 +31,6 @@ class InventoryModel extends Model
     {
         return [
             'inventory_id' => 'inv_id-',
-            'group_id' => 'inv_gro_id-',
         ];
     }
 
@@ -67,7 +65,7 @@ class InventoryModel extends Model
     public function arrModelWithId(): array
     {
         return [
-            'InventoryProductModel'  => ['inventory_id', 'inventory_group_id']
+            'InventoryProductModel'  => ['inventory_id']
         ];
     }
 

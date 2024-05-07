@@ -15,10 +15,11 @@ return new class extends Migration
             // Ids
             $table->id();
             $table->text('inventory_product_id')->unique()->nullable();
-            $table->text('inventory_group_id');
-            $table->string('item_code');
+
+            $table->text('inventory_id');
 
             // Name 
+            $table->string('item_code');
             $table->longText('image')->nullable();
             $table->text('name');
             $table->string('category')->nullable();

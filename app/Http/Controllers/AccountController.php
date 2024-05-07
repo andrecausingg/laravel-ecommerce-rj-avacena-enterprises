@@ -622,7 +622,7 @@ class AccountController extends Controller
 
         // Delete the user
         if (!$account->delete()) {
-            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => 'Failed to delete'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Arr Data Logs
