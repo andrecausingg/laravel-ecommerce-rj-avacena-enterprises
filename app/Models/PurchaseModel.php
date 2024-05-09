@@ -20,7 +20,7 @@ class PurchaseModel extends Model
         'user_id_menu',
 
         'inventory_product_id',
-        'inventory_group_id',
+        // 'inventory_group_id',
         'item_code',
 
         'image',

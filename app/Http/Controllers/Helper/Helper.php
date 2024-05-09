@@ -400,8 +400,9 @@ class Helper
     }
 
     // Store Multiple Data
-    public function storeMultipleData($arr_store_fields, $user_input_data, $file_name = '')
+    public function arrStoreData($arr_store_fields, $user_input_data, $file_name = '')
     {
+        
         $arr_attributes_store = [];
 
         foreach ($arr_store_fields as $arr_store_field) {
@@ -429,7 +430,7 @@ class Helper
         }
     }
 
-    public function updateMultipleData($model, $arr_update_fields, $user_input_data, $file_name = '')
+    public function arrUpdateData($model, $arr_update_fields, $user_input_data, $file_name = '')
     {
         // Update the inventory info
         foreach ($arr_update_fields as $arr_update_field) {
@@ -454,7 +455,7 @@ class Helper
 
             if ($arr_update_field != 'image') {
                 // Check if the value has changed
-                if ($existing_value !== $new_value) {
+                if ($existing_value != $new_value) {
                     $changes_item_for_logs[$arr_update_field] = [
                         'old' => $existing_value,
                         'new' => $new_value,

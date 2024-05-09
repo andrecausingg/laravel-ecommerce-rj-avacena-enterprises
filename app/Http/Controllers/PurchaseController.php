@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
 use App\Models\InventoryProductModel;
 use App\Http\Controllers\Helper\Helper;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -67,7 +68,7 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_product_id', $request->inventory_product_id)
+        $inventory_product = InventoryProductModel::where('inventory_product_id', Crypt::decrypt($request->inventory_product_id))
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
@@ -78,13 +79,13 @@ class PurchaseController extends Controller
         }
 
         // Add New Item on purchase_group_id
-        if ($request->purchase_group_id != '' && $request->purchase_group_id != null && $request->user_id_customer != '' && $request->user_id_customer != null) {
+        if (Crypt::decrypt($request->purchase_group_id) != '' && Crypt::decrypt($request->purchase_group_id) != null && $request->user_id_customer != '' && $request->user_id_customer != null) {
             do {
                 foreach ($this->fillable_attr_purchase->arrToStores() as $arrToStores) {
                     if ($arrToStores == 'user_id_customer') {
                         $arr_store_fresh_create[$arrToStores] = $request->user_id_customer;
                     } else if ($arrToStores == 'purchase_group_id') {
-                        $arr_store_fresh_create[$arrToStores] = $request->purchase_group_id;
+                        $arr_store_fresh_create[$arrToStores] = Crypt::decrypt($request->purchase_group_id);
                     } else if ($arrToStores == 'user_id_menu') {
                         $arr_store_fresh_create[$arrToStores] = $user->user_id;
                     } else if ($arrToStores == 'status') {
@@ -116,7 +117,7 @@ class PurchaseController extends Controller
                 }
 
                 // Minus Stock
-                $minus_stock = $this->minusStock($request->inventory_product_id, $request->inventory_group_id);
+                $minus_stock = $this->minusStock($request->inventory_product_id);
                 $total_amount_payment = $this->totalAmountPayment($created_purchase->purchase_group_id, $created_purchase->user_id_customer);
 
                 // Create a new payment record
@@ -205,7 +206,7 @@ class PurchaseController extends Controller
                     }
 
                     // Minus Stock
-                    $minus_stock = $this->minusStock($request->inventory_product_id, $request->inventory_group_id);
+                    $minus_stock = $this->minusStock($request->inventory_product_id);
                     $total_amount_payment = $this->totalAmountPayment($created_purchase->purchase_group_id, $created_purchase->user_id_customer);
 
                     // Create a new payment record
@@ -252,32 +253,27 @@ class PurchaseController extends Controller
                     }
 
                     // Create a new purchase record
-                    $created_purchase = PurchaseModel::create($arr_store_fresh_create);
-
-                    if (!$created_purchase) {
+                    $created = PurchaseModel::create($arr_store_fresh_create);
+                    if (!$created) {
                         return response()->json(
                             ['message' => 'Failed to store purchase'],
                             Response::HTTP_INTERNAL_SERVER_ERROR
                         );
                     }
 
-                    // Update the purchase_id with the correct format
-                    $update_purchase_id = $created_purchase->update([
-                        'purchase_id' => 'purchase_id-' . $created_purchase->id,
-                    ]);
-                    if (!$update_purchase_id) {
-                        return response()->json(
-                            ['message' => 'Failed to update purchase ID'],
-                            Response::HTTP_INTERNAL_SERVER_ERROR
-                        );
+                    // Update the unique I.D
+                    $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_purchase->idToUpdate(), $created->id);
+                    if ($update_unique_id) {
+                        // Retun only if theres an error
+                        return $update_unique_id;
                     }
 
                     // Minus Stock
-                    $minus_stock = $this->minusStock($request->inventory_product_id, $request->inventory_group_id);
-                    $total_amount_payment = $this->totalAmountPayment($created_purchase->purchase_group_id, $created_purchase->user_id_customer);
+                    $minus_stock = $this->minusStock($request->inventory_product_id);
+                    $total_amount_payment = $this->totalAmountPayment($created->purchase_group_id, $created->user_id_customer);
 
                     // Create a new payment record
-                    $update_payment = PaymentModel::where('purchase_group_id', $created_purchase->purchase_group_id)->first()->update([
+                    $update_payment = PaymentModel::where('purchase_group_id', $created->purchase_group_id)->first()->update([
                         'total_amount' => $total_amount_payment['total_amount'],
                         'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
                     ]);
@@ -342,7 +338,7 @@ class PurchaseController extends Controller
 
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id', $request->inventory_group_id)
+            ->where('inventory_group_id')
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
@@ -362,9 +358,9 @@ class PurchaseController extends Controller
         }
 
         $purchase = PurchaseModel::where('purchase_id', $request->purchase_id)
-            ->where('purchase_group_id', $request->purchase_group_id)
+            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
             ->where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id', $request->inventory_group_id)
+            ->where('inventory_group_id')
             ->where('user_id_customer', $request->user_id_customer)
             ->where('user_id_menu', $user->user_id)
             ->first();
@@ -380,9 +376,9 @@ class PurchaseController extends Controller
 
         $purchase->delete();
 
-        $total_amount_payment = $this->totalAmountPayment($request->purchase_group_id, $request->user_id_customer);
+        $total_amount_payment = $this->totalAmountPayment(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
         $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', $request->purchase_group_id)
+            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
             ->first()
             ->update([
                 'total_amount' => $total_amount_payment['total_amount'],
@@ -442,7 +438,7 @@ class PurchaseController extends Controller
         }
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id', $request->inventory_group_id)
+            ->where('inventory_group_id')
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
@@ -462,9 +458,9 @@ class PurchaseController extends Controller
         }
 
         $purchase = PurchaseModel::where('purchase_id', $request->purchase_id)
-            ->where('purchase_group_id', $request->purchase_group_id)
+            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
             ->where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id', $request->inventory_group_id)
+            ->where('inventory_group_id')
             ->where('user_id_customer', $request->user_id_customer)
             ->where('user_id_menu', $user->user_id)
             ->first();
@@ -507,9 +503,9 @@ class PurchaseController extends Controller
             );
         }
 
-        $total_amount_payment = $this->totalAmountPayment($request->purchase_group_id, $request->user_id_customer);
+        $total_amount_payment = $this->totalAmountPayment(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
         $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', $request->purchase_group_id)
+            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
             ->first()
             ->update([
                 'total_amount' => $total_amount_payment['total_amount'],
@@ -592,9 +588,9 @@ class PurchaseController extends Controller
             'stock' => max(0, $inventory_product->stock + count($deleted_purchase_id)),
         ]);
 
-        $total_amount_payment = $this->totalAmountPaymentDeleteAll($request->purchase_group_id, $request->user_id_customer);
+        $total_amount_payment = $this->totalAmountPaymentDeleteAll(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
         $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', $request->purchase_group_id)
+            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
             ->first();
 
         if (!$update_payment) {
@@ -760,10 +756,9 @@ class PurchaseController extends Controller
     }
 
     // CHILD store
-    private function minusStock($inventory_product_id, $inventory_group_id)
+    private function minusStock($inventory_product_id)
     {
         $inventory_product = InventoryProductModel::where('inventory_product_id', $inventory_product_id)
-            ->where('inventory_group_id', $inventory_group_id)
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);

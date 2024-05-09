@@ -16,36 +16,120 @@ use Symfony\Component\HttpFoundation\Response;
 
 class InventoryProductController extends Controller
 {
+    
+    protected $fillable_attr_inventory_children, $helper;
 
-    protected $fillableAttrInventoryChildren, $helper;
-
-    public function __construct(Helper $helper, InventoryProductModel $fillableAttrInventoryChildren)
+    public function __construct(Helper $helper, InventoryProductModel $fillable_attr_inventory_children)
     {
-        $this->fillableAttrInventoryChildren = $fillableAttrInventoryChildren;
+        $this->fillable_attr_inventory_children = $fillable_attr_inventory_children;
         $this->helper = $helper;
     }
 
     /**
      * Display a listing of the resource.
      */
+    // public function index(Request $request)
+    // {
+    //     // Authorize the user
+    //     $user = $this->helper->authorizeUser($request);
+    //     if (empty($user->user_id)) {
+    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+    //     }
+
+    //     $inventoryProduct = InventoryProductModel::get();
+
+    //     return response()->json(
+    //         [
+    //             'message' => 'Successfully Retrieve Data',
+    //             'result' => $inventoryProduct
+    //         ],
+    //         Response::HTTP_OK
+    //     );
+    // }
     public function index(Request $request)
     {
+        $arr_inventory = [];
+        $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
+        $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
+        $arr_inventory_item = [];
+        $arr_parent_inventory_data = [];
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventoryProduct = InventoryProductModel::get();
+        $    = InventoryModel::get();
+        foreach ($inventory_parents as $inventory_parent) {
+            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
+                if ($getFillableAttribute == 'inventory_id') {
+                    $arr_parent_inventory_data[$getFillableAttribute] = Crypt::encrypt($inventory_parent->$getFillableAttribute);
+                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                    $arr_parent_inventory_data[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_parent->$getFillableAttribute);
+                } else {
+                    $arr_parent_inventory_data[$getFillableAttribute] = $inventory_parent->$getFillableAttribute;
+                }
+            }
+
+            $arr_inventory_item = $arr_parent_inventory_data;
+            $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
+            $arr_inventory_item['variant'] =  $inventory_children->count();
+            $arr_inventory_item['stock'] = $inventory_children->sum('stock');
+
+            // Format Api
+            $crud_action = $this->helper->formatApi(
+                $crud_settings['prefix'],
+                $crud_settings['apiWithPayloads'],
+                $crud_settings['methods'],
+                $crud_settings['buttonNames'],
+                $crud_settings['icons'],
+                $crud_settings['actions']
+            );
+
+            // Checking Id on other tbl if exist unset the the api
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
+
+            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+                foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {
+                    unset($crud_action[$unsetAction]);
+                }
+            }
+
+            // Add the format Api Crud
+            $arr_inventory_item['action'] = [
+                $crud_action
+            ];
+
+            // Data
+            $arr_inventory[] = $arr_inventory_item;
+        }
+
+        // Final response structure
+        $response = [
+            'data' => $arr_inventory,
+            'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
+            'relative' => [$this->helper->formatApi(
+                $relative_settings['prefix'],
+                $relative_settings['apiWithPayloads'],
+                $relative_settings['methods'],
+                $relative_settings['buttonNames'],
+                $relative_settings['icons'],
+                $relative_settings['actions']
+            )],
+            // 'filter' => $filter
+        ];
 
         return response()->json(
             [
                 'message' => 'Successfully Retrieve Data',
-                'result' => $inventoryProduct
+                'result' => $response
             ],
             Response::HTTP_OK
         );
     }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -137,7 +221,7 @@ class InventoryProductController extends Controller
             }
 
             // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->storeMultipleData($this->fillableAttrInventoryChildren->arrToStores(), $user_input, $file_name);
+            $result_to_create = $this->helper->arrStoreData($this->fillable_attr_inventory_children->arrToStores(), $user_input, $file_name);
             $created = InventoryProductModel::create($result_to_create);
             if (!$created) {
                 return response()->json(
@@ -149,7 +233,7 @@ class InventoryProductController extends Controller
             }
 
             // Update the unique I.D
-            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillableAttrInventoryChildren->idToUpdate(), $created->id);
+            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_inventory_children->idToUpdate(), $created->id);
             if ($update_unique_id) {
                 return $update_unique_id;
             }
@@ -203,12 +287,12 @@ class InventoryProductController extends Controller
 
         foreach ($inventory_product->toArray() as $toArray) {
             $arr_product = [];
-            foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttribute) {
+            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_product_id') {
                     $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
                 } else if ($getFillableAttribute == 'inventory_id') {
                     $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
                     $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
                 } else {
                     $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
@@ -260,7 +344,7 @@ class InventoryProductController extends Controller
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'nullable',
-            'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
+            'items.*.name' => 'required|string|max:500',
             'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
@@ -308,14 +392,14 @@ class InventoryProductController extends Controller
             }
 
             // Get the changes of the fields
-            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillableAttrInventoryChildren->arrToUpdates(), $user_input, $file_name);
+            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventory_children->arrToUpdates(), $user_input, $file_name);
             $changes_for_log[] = [
                 'inventory_product_id' => $user_input['inventory_product_id'],
                 'fields' => $result_changes_item_for_logs,
             ];
 
             // Update Multiple Data
-            $result_update_multi_data = $this->helper->updateMultipleData($inventory, $this->fillableAttrInventoryChildren->arrToUpdates(), $user_input, $file_name);
+            $result_update_multi_data = $this->helper->arrUpdateData($inventory, $this->fillable_attr_inventory_children->arrToUpdates(), $user_input, $file_name);
             if ($result_update_multi_data) {
                 return $result_update_multi_data;
             }
@@ -381,7 +465,7 @@ class InventoryProductController extends Controller
         if (!$inventory) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
-        foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttributes) {
+        foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttributes) {
             $arr_log_details['fields'][$getFillableAttributes] = $inventory->$getFillableAttributes;
         }
 

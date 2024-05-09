@@ -18,12 +18,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AccountController extends Controller
 {
-    protected $helper, $fillableAttrAuth;
+    
+    protected $helper, $fillable_attr_auth;
 
-    public function __construct(Helper $helper, AuthModel $fillableAttrAuth)
+    public function __construct(Helper $helper, AuthModel $fillable_attr_auth)
     {
         $this->helper = $helper;
-        $this->fillableAttrAuth = $fillableAttrAuth;
+        $this->fillable_attr_auth = $fillable_attr_auth;
     }
 
     /**
@@ -36,8 +37,8 @@ class AccountController extends Controller
     public function index(Request $request)
     {
         // Add action
-        $crud_settings = $this->fillableAttrAuth->getApiAccountCrudSettings();
-        $relative_settings = $this->fillableAttrAuth->getApiAccountRelativeSettings();
+        $crud_settings = $this->fillable_attr_auth->getApiAccountCrudSettings();
+        $relative_settings = $this->fillable_attr_auth->getApiAccountRelativeSettings();
         $decrypted_auth_users = [];
         $column_name = [];
         $filter = [];
@@ -49,7 +50,7 @@ class AccountController extends Controller
         }
 
         // Unset Column not needed
-        $unset_results = $this->helper->unsetColumn($this->fillableAttrAuth->unsetForRetrieves(), $this->fillableAttrAuth->getFillableAttributes());
+        $unset_results = $this->helper->unsetColumn($this->fillable_attr_auth->unsetForRetrieves(), $this->fillable_attr_auth->getFillableAttributes());
 
         // Retrieve all AuthModel records
         $auth_users = AuthModel::get();
@@ -88,7 +89,7 @@ class AccountController extends Controller
                     if (!in_array($this->helper->transformColumnName($column), $column_name)) {
                         $column_name[] = $this->helper->transformColumnName($column);
                     }
-                    foreach ($this->fillableAttrAuth->arrEnvRoles() as $roleEnv => $roleLabel) {
+                    foreach ($this->fillable_attr_auth->arrEnvRoles() as $roleEnv => $roleLabel) {
                         if ($auth_user->{$column} == env($roleEnv)) {
                             $decrypted_auth_user[$column] = $roleLabel;
                             break;
@@ -101,7 +102,7 @@ class AccountController extends Controller
                     }
 
                     // Check if the column needs formatting and value is not null
-                    if (in_array($column, $this->fillableAttrAuth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
+                    if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
                         $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
                     }
                 }
@@ -117,10 +118,10 @@ class AccountController extends Controller
             );
 
             // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillableAttrAuth->arrModelWithId());
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillable_attr_auth->arrModelWithId());
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
-                foreach ($this->fillableAttrAuth->unsetActions() as $unsetAction) {
+                foreach ($this->fillable_attr_auth->unsetActions() as $unsetAction) {
                     unset($crud_action[$unsetAction]);
                 }
                 // Unset the first element from the result array
@@ -143,8 +144,8 @@ class AccountController extends Controller
         $column_name[] = "Action";
 
         // Filter Column
-        $filter_status = $this->helper->upperCaseValueSelectTagFilter($this->fillableAttrAuth->arrEnvAccountStatus());
-        $filter_role = $this->helper->upperCaseValueSelectTagFilter($this->fillableAttrAuth->arrEnvAccountRole());
+        $filter_status = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountStatus());
+        $filter_role = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountRole());
         $filter[] = [
             'status' => $filter_status,
             'role' => $filter_role
@@ -194,7 +195,7 @@ class AccountController extends Controller
         $column_name = [];
 
         // Unset Column not needed
-        $unset_results = $this->helper->unsetColumn($this->fillableAttrAuth->unsetForRetrieves(), $this->fillableAttrAuth->getFillableAttributes());
+        $unset_results = $this->helper->unsetColumn($this->fillable_attr_auth->unsetForRetrieves(), $this->fillable_attr_auth->getFillableAttributes());
 
         // Retrieve AuthModel record
         $auth_user = AuthModel::where('user_id', Crypt::decrypt($id))->first();
@@ -219,7 +220,7 @@ class AccountController extends Controller
                 $column_name[] = 'password';
             } else if ($column == 'role') {
                 $column_name[] = $this->helper->transformColumnName($column);
-                foreach ($this->fillableAttrAuth->arrEnvRoles() as $roleEnv => $roleLabel) {
+                foreach ($this->fillable_attr_auth->arrEnvRoles() as $roleEnv => $roleLabel) {
                     if ($auth_user->{$column} == env($roleEnv)) {
                         $decrypted_user_auth['data'][$column] = $roleLabel;
                         break;
@@ -229,7 +230,7 @@ class AccountController extends Controller
                 // Keep other columns as they are
                 $column_name[] = $this->helper->transformColumnName($column);
 
-                if (in_array($column, $this->fillableAttrAuth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
+                if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
                     $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
                 }
             }
@@ -323,7 +324,7 @@ class AccountController extends Controller
         }
 
         // Store only have value   
-        foreach ($this->fillableAttrAuth->arrStoreFields() as $arrStoreField) {
+        foreach ($this->fillable_attr_auth->arrStoreFields() as $arrStoreField) {
             if ($arrStoreField == 'user_id') {
                 $arr_validates[$arrStoreField] = $user_id;
             } else if ($arrStoreField == 'phone_number' && $request->filled('phone_number')) {
@@ -461,7 +462,7 @@ class AccountController extends Controller
 
 
         // Put on logs not equal value then put on update
-        foreach ($this->fillableAttrAuth->arrUpdateFields() as $arrUpdateFields) {
+        foreach ($this->fillable_attr_auth->arrUpdateFields() as $arrUpdateFields) {
             if ($arrUpdateFields == 'phone_number') {
                 if ($request->filled('phone_number')) {
                     $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
@@ -586,9 +587,9 @@ class AccountController extends Controller
         if (!$account) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
-        foreach ($this->fillableAttrAuth->getFillableAttributes() as $getFillableAttributes) {
+        foreach ($this->fillable_attr_auth->getFillableAttributes() as $getFillableAttributes) {
             if ($getFillableAttributes == 'password') {
-                $is_exist_id_other_tbls = $this->helper->isExistIdOtherTbl($account->user_id, $this->fillableAttrAuth->arrModelWithId());
+                $is_exist_id_other_tbls = $this->helper->isExistIdOtherTbl($account->user_id, $this->fillable_attr_auth->arrModelWithId());
                 // Check if exist on other tbl
                 foreach ($is_exist_id_other_tbls as $is_exist_id_other_tbl) {
                     // Ensure $is_exist_id_other_tbl is an array before accessing its elements

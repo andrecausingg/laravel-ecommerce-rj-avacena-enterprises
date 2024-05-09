@@ -60,6 +60,7 @@ class InventoryProductModel extends Model
             'retail_price',
             'discounted_price',
             'unit_supplier_price',
+            'stock',
         ];
     }
     public function arrToUpdates(): array
@@ -78,6 +79,7 @@ class InventoryProductModel extends Model
             'retail_price',
             'discounted_price',
             'unit_supplier_price',
+            'stock',
         ];
     }
 
@@ -86,6 +88,80 @@ class InventoryProductModel extends Model
         return [
             'inventory_product_id' => 'inv_product_id-',
         ];
+    }
+
+    public function arrModelWithId(): array
+    {
+        return [
+            'PurchaseModel'  => ['inventory_id']
+        ];
+    }
+
+    public function getApiAccountCrudSettings()
+    {
+        $prefix = 'inventory/product/';
+        $apiWithPayloads = [
+            'update' => $this->arrToUpdates(),
+            'destroy' => ['inventory_id', 'eu_device']
+        ];
+        $methods = [
+            'update' => 'POST',
+            'destroy' => 'DELETE',
+        ];
+        $buttonNames = [
+            'update' => 'update',
+            'destroy' => 'delete',
+        ];
+        $icons = [
+            'update' => null,
+            'destroy' =>  null,
+        ];
+        $actions = [
+            'update' => 'modal',
+            'destroy' => 'modal',
+        ];
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+    }
+
+    public function getApiAccountRelativeSettings()
+    {
+        $prefix = 'inventory/product/';
+        $apiWithPayloads = [
+            'store' => $this->arrToStores(),
+            'show/' => [
+                'id',
+            ],
+            'product/show/' => [
+                'id',
+            ]
+        ];
+
+        $methods = [
+            'store' => 'POST',
+            'show/' => 'GET',
+            'product/show/' => 'GET',
+        ];
+
+        $buttonNames = [
+            'store' => 'create',
+            'show/' => null,
+            'product/show/' => null,
+        ];
+
+        $icons = [
+            'store' => null,
+            'show/' => null,
+            'product/show/' => null,
+        ];
+
+        $actions = [
+            'store' => 'modal',
+            'show/' => null,
+            'product/show/' => 'GET',
+        ];
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
     }
 
     public function arrToConvertToReadableDateTime(): array

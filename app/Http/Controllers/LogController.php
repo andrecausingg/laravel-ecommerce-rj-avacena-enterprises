@@ -14,11 +14,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
-    protected $helper, $fillableAttrLogs;
+    protected $helper, $fillable_attr_logs;
 
-    public function __construct(Helper $helper, LogsModel $fillableAttrLogs)
+    public function __construct(Helper $helper, LogsModel $fillable_attr_logs)
     {
-        $this->fillableAttrLogs = $fillableAttrLogs;
+        $this->fillable_attr_logs = $fillable_attr_logs;
         $this->helper = $helper;
     }
 
@@ -40,19 +40,19 @@ class LogController extends Controller
             $details_json = json_decode($log['details'], true);
 
             // Decrypt the data
-            $decrypted_data = $this->isDecryptedData($log->is_sensitive, ($details_json['fields'] ?? $details_json), $this->fillableAttrLogs->encryptedFields(), $this->fillableAttrLogs->notToDecrypt());
+            $decrypted_data = $this->isDecryptedData($log->is_sensitive, ($details_json['fields'] ?? $details_json), $this->fillable_attr_logs->encryptedFields(), $this->fillable_attr_logs->notToDecrypt());
 
             // Decrypted data save on fields
             $arr_with_parent_id = [
                 'fields' => $decrypted_data
             ];
 
-            foreach ($this->fillableAttrLogs->getFillableAttributes() as $fillableAttrLog) {
+            foreach ($this->fillable_attr_logs->getFillableAttributes() as $fillableAttrLog) {
                 if ($fillableAttrLog == 'details') {
                     $decrypted_logs[$fillableAttrLog] = $arr_with_parent_id;
                 } else if ($fillableAttrLog == 'user_device') {
                     $decrypted_logs[$fillableAttrLog] = json_decode($log->$fillableAttrLog, true);
-                } else if (in_array($fillableAttrLog, $this->fillableAttrLogs->arrToConvertToReadableDateTime())) {
+                } else if (in_array($fillableAttrLog, $this->fillable_attr_logs->arrToConvertToReadableDateTime())) {
                     $decrypted_logs[$fillableAttrLog] = $this->helper->convertReadableTimeDate($log->$fillableAttrLog);
                 } else {
                     $decrypted_logs[$fillableAttrLog] = $log->$fillableAttrLog;
@@ -64,7 +64,7 @@ class LogController extends Controller
             if ($user_info) {
                 $arr_user_info = $user_info->toArray();
 
-                foreach ($this->fillableAttrLogs->encryptedFields() as $encryptedField) {
+                foreach ($this->fillable_attr_logs->encryptedFields() as $encryptedField) {
                     if (isset($arr_user_info[$encryptedField])) {
                         $arr_user_info[$encryptedField] = $user_info->{$encryptedField} ? Crypt::decrypt($user_info->{$encryptedField}) : null;
                     }

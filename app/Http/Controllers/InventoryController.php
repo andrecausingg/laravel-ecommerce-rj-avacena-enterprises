@@ -14,14 +14,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class InventoryController extends Controller
 {
+       
+    protected $helper, $fillable_attr_inventorys, $fillable_attr_inventory_children;
 
-    protected $helper, $fillableAttrInventorys, $fillableAttrInventoryChildren;
-
-    public function __construct(Helper $helper, InventoryModel $fillableAttrInventorys, InventoryProductModel $fillableAttrInventoryChildren)
+    public function __construct(Helper $helper, InventoryModel $fillable_attr_inventorys, InventoryProductModel $fillable_attr_inventory_children)
     {
         $this->helper = $helper;
-        $this->fillableAttrInventorys = $fillableAttrInventorys;
-        $this->fillableAttrInventoryChildren = $fillableAttrInventoryChildren;
+        $this->fillable_attr_inventorys = $fillable_attr_inventorys;
+        $this->fillable_attr_inventory_children = $fillable_attr_inventory_children;
     }
 
     /**
@@ -30,8 +30,8 @@ class InventoryController extends Controller
     public function index(Request $request)
     {
         $arr_inventory = [];
-        $crud_settings = $this->fillableAttrInventorys->getApiAccountCrudSettings();
-        $relative_settings = $this->fillableAttrInventorys->getApiAccountRelativeSettings();
+        $crud_settings = $this->fillable_attr_inventorys->getApiAccountCrudSettings();
+        $relative_settings = $this->fillable_attr_inventorys->getApiAccountRelativeSettings();
         $arr_inventory_item = [];
         $arr_parent_inventory_data = [];
 
@@ -43,10 +43,10 @@ class InventoryController extends Controller
 
         $inventory_parents = InventoryModel::get();
         foreach ($inventory_parents as $inventory_parent) {
-            foreach ($this->fillableAttrInventorys->getFillableAttributes() as $getFillableAttribute) {
+            foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_id') {
                     $arr_parent_inventory_data[$getFillableAttribute] = Crypt::encrypt($inventory_parent->$getFillableAttribute);
-                } else if (in_array($getFillableAttribute, $this->fillableAttrInventorys->arrToConvertToReadableDateTime())) {
+                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventorys->arrToConvertToReadableDateTime())) {
                     $arr_parent_inventory_data[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_parent->$getFillableAttribute);
                 } else {
                     $arr_parent_inventory_data[$getFillableAttribute] = $inventory_parent->$getFillableAttribute;
@@ -69,11 +69,11 @@ class InventoryController extends Controller
             );
 
             // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillableAttrInventorys->arrModelWithId());
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
 
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
-                foreach ($this->fillableAttrInventorys->unsetActions() as $unsetAction) {
+                foreach ($this->fillable_attr_inventorys->unsetActions() as $unsetAction) {
                     unset($crud_action[$unsetAction]);
                 }
             }
@@ -90,7 +90,7 @@ class InventoryController extends Controller
         // Final response structure
         $response = [
             'data' => $arr_inventory,
-            'column' => $this->helper->transformColumnName($this->fillableAttrInventorys->getFillableAttributes()),
+            'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
             'relative' => [$this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['apiWithPayloads'],
@@ -178,7 +178,7 @@ class InventoryController extends Controller
             }
 
             // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->storeMultipleData($this->fillableAttrInventorys->arrToStores(), $user_input);
+            $result_to_create = $this->helper->arrStoreData($this->fillable_attr_inventorys->arrToStores(), $user_input);
             $created = InventoryModel::create($result_to_create);
             if (!$created) {
                 return response()->json(
@@ -190,7 +190,7 @@ class InventoryController extends Controller
             }
 
             // Update the unique I.D
-            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillableAttrInventorys->idToUpdate(), $created->id);
+            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_inventorys->idToUpdate(), $created->id);
             if ($update_unique_id) {
                 return $update_unique_id;
             }
@@ -241,10 +241,10 @@ class InventoryController extends Controller
             );
         }
 
-        foreach ($this->fillableAttrInventorys->getFillableAttributes() as $getFillableAttribute) {
+        foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $getFillableAttribute) {
             if ($getFillableAttribute == 'inventory_id') {
                 $arr_inventory[$getFillableAttribute] = Crypt::encrypt($inventory->$getFillableAttribute);
-            } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+            } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
                 $carbon_date = Carbon::parse($inventory->$getFillableAttribute);
                 $value = $carbon_date->format('F j, Y g:i a');
                 $arr_inventory[$getFillableAttribute] = $value;
@@ -285,12 +285,12 @@ class InventoryController extends Controller
 
         foreach ($inventory_product->toArray() as $toArray) {
             $arr_product = [];
-            foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttribute) {
+            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_product_id') {
                     $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
                 } else if ($getFillableAttribute == 'inventory_id') {
                     $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
                     $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
                 } else {
                     $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
@@ -371,14 +371,14 @@ class InventoryController extends Controller
             }
 
             // Get the changes of the fields
-            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillableAttrInventorys->arrToUpdates(), $user_input, '');
+            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
             $changes_for_logs[] = [
                 'inventory_id' => $user_input['inventory_id'],
                 'fields' => $result_changes_item_for_logs,
             ];
 
             // Update Multiple Data
-            $result_update_multi_data = $this->helper->updateMultipleData($inventory, $this->fillableAttrInventorys->arrToUpdates(), $user_input, '');
+            $result_update_multi_data = $this->helper->arrUpdateData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
             if ($result_update_multi_data) {
                 return $result_update_multi_data;
             }
@@ -447,15 +447,15 @@ class InventoryController extends Controller
         }
 
         // Checking Id on other tbl if exist unset the the api
-        $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillableAttrInventorys->arrModelWithId());
+        $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
 
         // Check if 'is_exist' is 'yes' in the first element and then unset it
         if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
             return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
         }
 
-        foreach ($this->fillableAttrInventorys->getFillableAttributes() as $fillableAttrInventorys) {
-            $arr_log_details['fields'][$fillableAttrInventorys] = $inventory->$fillableAttrInventorys;
+        foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $fillable_attr_inventorys) {
+            $arr_log_details['fields'][$fillable_attr_inventorys] = $inventory->$fillable_attr_inventorys;
         }
 
         // Delete the user
