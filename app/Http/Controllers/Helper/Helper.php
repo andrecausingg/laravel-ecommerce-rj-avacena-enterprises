@@ -130,7 +130,6 @@ class Helper
         }
     }
 
-
     public function formatApi($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
     {
         $functions = [];

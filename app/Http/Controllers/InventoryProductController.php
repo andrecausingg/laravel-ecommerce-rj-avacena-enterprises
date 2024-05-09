@@ -333,7 +333,7 @@ class InventoryProductController extends Controller
         $arr_data_logs = [
             'user_device' => $eu_device,
             'user_id' => $user->user_id,
-            'is_sensitive' => 1,
+            'is_sensitive' => 0,
             'is_history' => 0,
             'log_details' => $changes_for_log,
             'user_action' => 'UPDATE INVENTORY CHILDREN',

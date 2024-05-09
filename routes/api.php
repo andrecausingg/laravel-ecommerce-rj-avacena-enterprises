@@ -95,6 +95,7 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::post('store', [$InventoryController, 'store']);
             Route::get('edit/{id}', [$InventoryController, 'edit']);
             Route::post('update', [$InventoryController, 'update']);
+            Route::delete('delete', [$InventoryController, 'destroy']);
         });
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {

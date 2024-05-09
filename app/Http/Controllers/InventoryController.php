@@ -445,6 +445,15 @@ class InventoryController extends Controller
         if (!$inventory) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
+
+        // Checking Id on other tbl if exist unset the the api
+        $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillableAttrInventorys->arrModelWithId());
+
+        // Check if 'is_exist' is 'yes' in the first element and then unset it
+        if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+            return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
+        }
+
         foreach ($this->fillableAttrInventorys->getFillableAttributes() as $fillableAttrInventorys) {
             $arr_log_details['fields'][$fillableAttrInventorys] = $inventory->$fillableAttrInventorys;
         }

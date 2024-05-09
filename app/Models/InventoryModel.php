@@ -74,7 +74,7 @@ class InventoryModel extends Model
         $prefix = 'inventory/parent/';
         $apiWithPayloads = [
             'update' => $this->arrToUpdates(),
-            'destroy' => ['user_id', 'eu_device']
+            'destroy' => ['inventory_id', 'eu_device']
         ];
         $methods = [
             'update' => 'POST',
