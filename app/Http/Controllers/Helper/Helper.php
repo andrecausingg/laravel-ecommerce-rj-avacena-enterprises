@@ -4,15 +4,16 @@ namespace App\Http\Controllers\Helper;
 
 use App\Models\AuthModel;
 use App\Models\LogsModel;
+use Illuminate\Support\Str;
 use App\Models\HistoryModel;
 use App\Models\PaymentModel;
+use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
 use App\Models\UserInfoModel;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Http;
+use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
@@ -380,6 +381,18 @@ class Helper
                         ];
                     }
                 }
+
+                if ($model == 'InventoryProductModel') {
+                    $exists = InventoryProductModel::where($column, $id)->exists();
+                    $data = InventoryProductModel::where($column, $id)->first();
+                    if ($exists) {
+                        $arr_result[] = [
+                            'is_exist' => 'yes',
+                            'model' => $model,
+                            // 'data' => $data
+                        ];
+                    }
+                }
             }
         }
 
@@ -421,9 +434,9 @@ class Helper
     {
         // Update the inventory info
         foreach ($arr_update_fields as $arr_update_field) {
-            if($arr_update_field == 'image'){
+            if ($arr_update_field == 'image') {
                 $model->$arr_update_field = $file_name;
-            }else{
+            } else {
                 $model->$arr_update_field = $user_input_data[$arr_update_field];
             }
         }

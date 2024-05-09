@@ -60,10 +60,10 @@ class InventoryController extends Controller
             $arr_inventory_item['inventory_parent']['variant'] =  $inventory_children->count();
             $arr_inventory_item['inventory_parent']['stock'] = $inventory_children->sum('stock');
 
-            foreach ($inventory_children->toArray() as $inventory_children) {
-                dd($inventory_children);
-            }
-            $arr_inventory_item['inventory_parent']['inventory_children'] = $inventory_children->toArray();
+            // foreach ($inventory_children->toArray() as $inventory_children) {
+            //     dd($inventory_children);
+            // }
+            // $arr_inventory_item['inventory_parent']['inventory_children'] = $inventory_children->toArray();
 
             // Format Api
             $crud_action = $this->helper->formatApi(
@@ -76,7 +76,8 @@ class InventoryController extends Controller
             );
 
             // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_group_id, $this->fillableAttrInventorys->arrModelWithId());
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillableAttrInventorys->arrModelWithId());
+
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillableAttrInventorys->unsetActions() as $unsetAction) {

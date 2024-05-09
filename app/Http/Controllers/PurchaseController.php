@@ -45,7 +45,6 @@ class PurchaseController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_product_id' => 'required|string',
-            'inventory_group_id' => 'required|string',
             'purchase_group_id' => 'nullable',
             'user_id_customer' => 'nullable',
             'quantity' => 'required|numeric|min:1',
@@ -69,7 +68,6 @@ class PurchaseController extends Controller
         }
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id', $request->inventory_group_id)
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
