@@ -6,6 +6,7 @@ use App\Models\LogsModel;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
+use Illuminate\Support\Carbon;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
@@ -180,9 +181,49 @@ class InventoryProductController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        //
+        $arr_inventory_product = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
+        if ($inventory_product->isEmpty()) {
+            return response()->json(
+                [
+                    'message' => 'Data not found',
+                ],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        foreach ($inventory_product->toArray() as $toArray) {
+            $arr_product = [];
+            foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttribute) {
+                if ($getFillableAttribute == 'inventory_product_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if ($getFillableAttribute == 'inventory_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
+                } else {
+                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
+                }
+            }
+            $arr_inventory_product[] = $arr_product;
+        }
+
+        return response()->json(
+            [
+                "message" => "Successfully Retrieve Data",
+                'result' => $arr_inventory_product,
+            ],
+            Response::HTTP_OK
+        );
     }
 
     /**

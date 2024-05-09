@@ -493,5 +493,13 @@ class Helper
         }
     }
 
+    public function convertReadableTimeDate($data)
+    {
+        $carbon_date = Carbon::parse($data);
+        $value = $carbon_date->format('F j, Y g:i a');
+
+        return $value;
+    }
+
     // public function formatTheDateAndTime{}
 }

@@ -55,7 +55,7 @@ class InventoryModel extends Model
         ];
     }
 
-    public function arrHaveAtConvertToReadDateTime(): array
+    public function arrToConvertToReadableDateTime(): array
     {
         return  [
             'created_at', 'updated_at', 'deleted_at'
@@ -103,27 +103,34 @@ class InventoryModel extends Model
             'store' => $this->arrToStores(),
             'show/' => [
                 'id',
+            ],
+            'product/show/' => [
+                'id',
             ]
         ];
 
         $methods = [
             'store' => 'POST',
             'show/' => 'GET',
+            'product/show/' => 'GET',
         ];
 
         $buttonNames = [
             'store' => 'create',
             'show/' => null,
+            'product/show/' => null,
         ];
 
         $icons = [
             'store' => null,
             'show/' => null,
+            'product/show/' => null,
         ];
 
         $actions = [
             'store' => 'modal',
             'show/' => null,
+            'product/show/' => 'GET',
         ];
 
         return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');

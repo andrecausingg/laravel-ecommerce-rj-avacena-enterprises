@@ -52,6 +52,8 @@ class LogController extends Controller
                     $decrypted_logs[$fillableAttrLog] = $arr_with_parent_id;
                 } else if ($fillableAttrLog == 'user_device') {
                     $decrypted_logs[$fillableAttrLog] = json_decode($log->$fillableAttrLog, true);
+                } else if (in_array($fillableAttrLog, $this->fillableAttrLogs->arrToConvertToReadableDateTime())) {
+                    $decrypted_logs[$fillableAttrLog] = $this->helper->convertReadableTimeDate($log->$fillableAttrLog);
                 } else {
                     $decrypted_logs[$fillableAttrLog] = $log->$fillableAttrLog;
                 }
@@ -109,9 +111,6 @@ class LogController extends Controller
                 }
             }
         }
-
-        Log::info($decrypted_data);
-
 
         return $decrypted_data;
     }

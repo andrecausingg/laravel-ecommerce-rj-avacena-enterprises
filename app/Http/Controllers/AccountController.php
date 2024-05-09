@@ -99,18 +99,11 @@ class AccountController extends Controller
                     if (!in_array($this->helper->transformColumnName($column), $column_name)) {
                         $column_name[] = $this->helper->transformColumnName($column);
                     }
-                    // Keep other columns as they are
-                    $value = $auth_user->{$column};
 
                     // Check if the column needs formatting and value is not null
-                    if (in_array($column, $this->fillableAttrAuth->arrHaveAtConvertToReadDateTime()) && $value !== null) {
-                        // Format the value using Carbon
-                        $carbon_date = Carbon::parse($value);
-                        $value = $carbon_date->format('F j, Y g:i a');
+                    if (in_array($column, $this->fillableAttrAuth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
+                        $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
                     }
-
-                    // Assign the value to the decrypted_auth_user array
-                    $decrypted_auth_user[$column] = $value;
                 }
             }
 
@@ -204,30 +197,30 @@ class AccountController extends Controller
         $unset_results = $this->helper->unsetColumn($this->fillableAttrAuth->unsetForRetrieves(), $this->fillableAttrAuth->getFillableAttributes());
 
         // Retrieve AuthModel record
-        $authUser = AuthModel::where('user_id', Crypt::decrypt($id))->first();
+        $auth_user = AuthModel::where('user_id', Crypt::decrypt($id))->first();
 
-        if (!$authUser) {
+        if (!$auth_user) {
             return response()->json(['message' => 'User not found'], Response::HTTP_NOT_FOUND);
         }
 
         foreach ($unset_results as $column) {
             if ($column == 'user_id') {
-                $userInfo = UserInfoModel::where('user_id', $authUser->user_id)->first();
+                $userInfo = UserInfoModel::where('user_id', $auth_user->user_id)->first();
                 $decrypted_user_auth['data']['userInfo'] = [
                     'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
                 ];
-                $decrypted_user_auth['data']['id'] = Crypt::encrypt($authUser->{$column});
+                $decrypted_user_auth['data']['id'] = Crypt::encrypt($auth_user->{$column});
                 $column_name[] = $this->helper->transformColumnName('Id');
             } else if ($column == 'email') {
-                $decrypted_user_auth['data'][$column] = $authUser->{$column} ? Crypt::decrypt($authUser->{$column}) : null;
-                $history = HistoryModel::where('tbl_id', $authUser->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+                $decrypted_user_auth['data'][$column] = $auth_user->{$column} ? Crypt::decrypt($auth_user->{$column}) : null;
+                $history = HistoryModel::where('tbl_id', $auth_user->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
                 $decrypted_user_auth['data']['password'] = $history ? Crypt::decrypt($history->value) : null;
                 $column_name[] = $this->helper->transformColumnName($column);
                 $column_name[] = 'password';
             } else if ($column == 'role') {
                 $column_name[] = $this->helper->transformColumnName($column);
                 foreach ($this->fillableAttrAuth->arrEnvRoles() as $roleEnv => $roleLabel) {
-                    if ($authUser->{$column} == env($roleEnv)) {
+                    if ($auth_user->{$column} == env($roleEnv)) {
                         $decrypted_user_auth['data'][$column] = $roleLabel;
                         break;
                     }
@@ -235,17 +228,10 @@ class AccountController extends Controller
             } else {
                 // Keep other columns as they are
                 $column_name[] = $this->helper->transformColumnName($column);
-                $value = $authUser->{$column};
 
-                // Check if the column needs formatting and value is not null
-                if (in_array($column, $this->fillableAttrAuth->arrHaveAtConvertToReadDateTime()) && $value !== null) {
-                    // Format the value using Carbon
-                    $carbonDate = Carbon::parse($value);
-                    $value = $carbonDate->format('F j, Y g:i a');
+                if (in_array($column, $this->fillableAttrAuth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
+                    $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
                 }
-
-                // Assign the value to the decrypted_user_auth array
-                $decrypted_user_auth['data'][$column] = $value;
             }
         }
 

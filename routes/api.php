@@ -90,6 +90,8 @@ Route::middleware(['jwt.auth'])->group(function () {
     Route::prefix('inventory')->group(function () use ($InventoryController, $InventoryProductController) {
         Route::prefix('parent')->group(function () use ($InventoryController) {
             Route::get('index', [$InventoryController, 'index']);
+            Route::get('show/{id}', [$InventoryController, 'show']);
+            Route::get('product/show/{id}', [$InventoryController, 'showProduct']);
             Route::post('store', [$InventoryController, 'store']);
             Route::get('edit/{id}', [$InventoryController, 'edit']);
             Route::post('update', [$InventoryController, 'update']);
@@ -97,6 +99,7 @@ Route::middleware(['jwt.auth'])->group(function () {
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {
             Route::get('/index', [$InventoryProductController, 'index']);
+            Route::get('/show/{id}', [$InventoryProductController, 'show']);
             Route::post('/store', [$InventoryProductController, 'store']);
             Route::post('/update', [$InventoryProductController, 'update']);
         });

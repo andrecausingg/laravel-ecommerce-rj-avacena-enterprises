@@ -54,4 +54,11 @@ class LogsModel extends Model
             'user_id', 'id', 'deleted_at', 'created_at', 'updated_at'
         ];
     }
+
+    public function arrToConvertToReadableDateTime(): array
+    {
+        return  [
+            'created_at', 'updated_at', 'deleted_at'
+        ];
+    }
 }

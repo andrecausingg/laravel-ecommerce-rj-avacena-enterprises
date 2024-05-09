@@ -87,4 +87,11 @@ class InventoryProductModel extends Model
             'inventory_product_id' => 'inv_product_id-',
         ];
     }
+
+    public function arrToConvertToReadableDateTime(): array
+    {
+        return  [
+            'created_at', 'updated_at', 'deleted_at'
+        ];
+    }
 }

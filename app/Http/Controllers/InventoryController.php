@@ -15,14 +15,14 @@ use Symfony\Component\HttpFoundation\Response;
 class InventoryController extends Controller
 {
 
-    protected $fillableAttrInventorys, $helper;
+    protected $helper, $fillableAttrInventorys, $fillableAttrInventoryChildren;
 
-    public function __construct(Helper $helper, InventoryModel $fillableAttrInventorys)
+    public function __construct(Helper $helper, InventoryModel $fillableAttrInventorys, InventoryProductModel $fillableAttrInventoryChildren)
     {
         $this->helper = $helper;
         $this->fillableAttrInventorys = $fillableAttrInventorys;
+        $this->fillableAttrInventoryChildren = $fillableAttrInventoryChildren;
     }
-
 
     /**
      * Display a listing of the resource.
@@ -46,24 +46,17 @@ class InventoryController extends Controller
             foreach ($this->fillableAttrInventorys->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_id') {
                     $arr_parent_inventory_data[$getFillableAttribute] = Crypt::encrypt($inventory_parent->$getFillableAttribute);
-                } else if (in_array($getFillableAttribute, $this->fillableAttrInventorys->arrHaveAtConvertToReadDateTime())) {
-                    $carbon_date = Carbon::parse($inventory_parent->$getFillableAttribute);
-                    $value = $carbon_date->format('F j, Y g:i a');
-                    $arr_parent_inventory_data[$getFillableAttribute] = $value;
+                } else if (in_array($getFillableAttribute, $this->fillableAttrInventorys->arrToConvertToReadableDateTime())) {
+                    $arr_parent_inventory_data[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_parent->$getFillableAttribute);
                 } else {
                     $arr_parent_inventory_data[$getFillableAttribute] = $inventory_parent->$getFillableAttribute;
                 }
             }
 
-            $arr_inventory_item['inventory_parent'] = $arr_parent_inventory_data;
+            $arr_inventory_item = $arr_parent_inventory_data;
             $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
-            $arr_inventory_item['inventory_parent']['variant'] =  $inventory_children->count();
-            $arr_inventory_item['inventory_parent']['stock'] = $inventory_children->sum('stock');
-
-            // foreach ($inventory_children->toArray() as $inventory_children) {
-            //     dd($inventory_children);
-            // }
-            // $arr_inventory_item['inventory_parent']['inventory_children'] = $inventory_children->toArray();
+            $arr_inventory_item['variant'] =  $inventory_children->count();
+            $arr_inventory_item['stock'] = $inventory_children->sum('stock');
 
             // Format Api
             $crud_action = $this->helper->formatApi(
@@ -86,7 +79,7 @@ class InventoryController extends Controller
             }
 
             // Add the format Api Crud
-            $arr_inventory_item['inventory_parent']['action'] = [
+            $arr_inventory_item['action'] = [
                 $crud_action
             ];
 
@@ -230,13 +223,15 @@ class InventoryController extends Controller
      */
     public function show(Request $request, string $id)
     {
+        $arr_inventory = [];
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory = InventoryModel::where('inventory_id', $id)->first();
+        $inventory = InventoryModel::where('inventory_id', Crypt::decrypt($id))->first();
         if (!$inventory) {
             return response()->json(
                 [
@@ -246,15 +241,72 @@ class InventoryController extends Controller
             );
         }
 
+        foreach ($this->fillableAttrInventorys->getFillableAttributes() as $getFillableAttribute) {
+            if ($getFillableAttribute == 'inventory_id') {
+                $arr_inventory[$getFillableAttribute] = Crypt::encrypt($inventory->$getFillableAttribute);
+            } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+                $carbon_date = Carbon::parse($inventory->$getFillableAttribute);
+                $value = $carbon_date->format('F j, Y g:i a');
+                $arr_inventory[$getFillableAttribute] = $value;
+            } else {
+                $arr_inventory[$getFillableAttribute] = $inventory->$getFillableAttribute;
+            }
+        }
+
+
         return response()->json(
             [
                 "message" => "Successfully Retrieve Data",
-                'result' => $inventory,
+                'result' => $arr_inventory,
             ],
             Response::HTTP_OK
         );
     }
 
+    public function showProduct(Request $request, string $id)
+    {
+        $arr_inventory_product = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
+        if ($inventory_product->isEmpty()) {
+            return response()->json(
+                [
+                    'message' => 'Data not found',
+                ],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        foreach ($inventory_product->toArray() as $toArray) {
+            $arr_product = [];
+            foreach ($this->fillableAttrInventoryChildren->getFillableAttributes() as $getFillableAttribute) {
+                if ($getFillableAttribute == 'inventory_product_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if ($getFillableAttribute == 'inventory_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if (in_array($getFillableAttribute, $this->fillableAttrInventoryChildren->arrToConvertToReadableDateTime())) {
+                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
+                } else {
+                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
+                }
+            }
+            $arr_inventory_product[] = $arr_product;
+        }
+
+        return response()->json(
+            [
+                "message" => "Successfully Retrieve Data",
+                'result' => $arr_inventory_product,
+            ],
+            Response::HTTP_OK
+        );
+    }
 
     /**
      * Update the specified resource in storage.
@@ -419,64 +471,5 @@ class InventoryController extends Controller
             'message' => 'Successfully created user',
             'log_message' => $log_result
         ], Response::HTTP_OK);
-    }
-
-
-    public function storeLogs($request, $userId, $logDetails)
-    {
-
-        $arr = [];
-        $arr['fields'] = $logDetails;
-
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'ip_address' => $request->ip(),
-            'user_action' => 'STORE INVENTORY PARENT',
-            'user_device' => $userAgent,
-            'details' => json_encode($arr, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for store inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored inventory parent'], Response::HTTP_OK);
-    }
-
-    public function updateLogs($request, $userId, $logDetails)
-    {
-
-        $arr = [];
-        $arr['fields'] = $logDetails;
-
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE INVENTORY PARENT',
-            'user_device' => $userAgent,
-            'details' => json_encode($arr, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs for update inventory parent'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully update inventory parent'], Response::HTTP_OK);
     }
 }
