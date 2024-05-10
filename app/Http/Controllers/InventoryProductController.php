@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class InventoryProductController extends Controller
 {
-    
+
     protected $fillable_attr_inventory_children, $helper;
 
     public function __construct(Helper $helper, InventoryProductModel $fillable_attr_inventory_children)
@@ -52,7 +52,6 @@ class InventoryProductController extends Controller
         $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
         $arr_inventory_item = [];
-        $arr_parent_inventory_data = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -60,22 +59,19 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $    = InventoryModel::get();
-        foreach ($inventory_parents as $inventory_parent) {
+        $inventory_products = InventoryProductModel::get();
+        foreach ($inventory_products as $inventory_product) {
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
-                if ($getFillableAttribute == 'inventory_id') {
-                    $arr_parent_inventory_data[$getFillableAttribute] = Crypt::encrypt($inventory_parent->$getFillableAttribute);
+                if ($getFillableAttribute == 'inventory_product_id') {
+                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
+                } else if ($getFillableAttribute == 'inventory_id') {
+                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
                 } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                    $arr_parent_inventory_data[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_parent->$getFillableAttribute);
+                    $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
                 } else {
-                    $arr_parent_inventory_data[$getFillableAttribute] = $inventory_parent->$getFillableAttribute;
+                    $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
                 }
             }
-
-            $arr_inventory_item = $arr_parent_inventory_data;
-            $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
-            $arr_inventory_item['variant'] =  $inventory_children->count();
-            $arr_inventory_item['stock'] = $inventory_children->sum('stock');
 
             // Format Api
             $crud_action = $this->helper->formatApi(
@@ -88,8 +84,7 @@ class InventoryProductController extends Controller
             );
 
             // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
-
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {
@@ -129,6 +124,7 @@ class InventoryProductController extends Controller
             Response::HTTP_OK
         );
     }
+
 
     /**
      * Show the form for creating a new resource.

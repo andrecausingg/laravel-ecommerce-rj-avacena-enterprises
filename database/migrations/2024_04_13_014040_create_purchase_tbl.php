@@ -24,8 +24,8 @@ return new class extends Migration
             $table->text('user_id_menu')->nullable();
 
             // Inventory I.Ds
+            $table->text('inventory_id');
             $table->text('inventory_product_id');
-            $table->text('inventory_group_id');
             $table->string('item_code');
 
             // Name 

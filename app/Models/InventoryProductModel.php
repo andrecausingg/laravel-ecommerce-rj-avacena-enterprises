@@ -93,7 +93,7 @@ class InventoryProductModel extends Model
     public function arrModelWithId(): array
     {
         return [
-            'PurchaseModel'  => ['inventory_id']
+            'PurchaseModel'  => ['inventory_product_id', ]
         ];
     }
 
@@ -132,33 +132,26 @@ class InventoryProductModel extends Model
             'show/' => [
                 'id',
             ],
-            'product/show/' => [
-                'id',
-            ]
         ];
 
         $methods = [
             'store' => 'POST',
             'show/' => 'GET',
-            'product/show/' => 'GET',
         ];
 
         $buttonNames = [
             'store' => 'create',
             'show/' => null,
-            'product/show/' => null,
         ];
 
         $icons = [
             'store' => null,
             'show/' => null,
-            'product/show/' => null,
         ];
 
         $actions = [
             'store' => 'modal',
             'show/' => null,
-            'product/show/' => 'GET',
         ];
 
         return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');

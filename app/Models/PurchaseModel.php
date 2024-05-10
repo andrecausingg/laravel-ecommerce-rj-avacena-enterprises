@@ -20,7 +20,7 @@ class PurchaseModel extends Model
         'user_id_menu',
 
         'inventory_product_id',
-        // 'inventory_group_id',
+        'inventory_id',
         'item_code',
 
         'image',
@@ -59,7 +59,7 @@ class PurchaseModel extends Model
             'user_id_menu',
 
             'inventory_product_id',
-            'inventory_group_id',
+            'inventory_id',
             'item_code',
 
             'image',
@@ -88,7 +88,7 @@ class PurchaseModel extends Model
             'user_id_menu',
 
             'inventory_product_id',
-            'inventory_group_id',
+            'inventory_id',
             'item_code',
 
             'image',
@@ -104,6 +104,20 @@ class PurchaseModel extends Model
             'discounted_price',
 
             'status',
+        ];
+    }
+
+    public function idToUpdatePurchase(): array
+    {
+        return [
+            'purchase_id' => 'purchase_id-',
+        ];
+    }
+
+    public function idToUpdatePayment(): array
+    {
+        return [
+            'payment_id' => 'payment_id-',
         ];
     }
 }
