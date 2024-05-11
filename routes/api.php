@@ -121,6 +121,7 @@ Route::middleware(['jwt.auth'])->group(function () {
 
     // Payment
     Route::prefix('payment')->group(function () use ($PaymentController) {
+        Route::get('/dashboard', [$PaymentController, 'dashboard']);
         Route::post('/payment', [$PaymentController, 'payment']);
     });
 

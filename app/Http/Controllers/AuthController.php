@@ -90,16 +90,19 @@ class AuthController extends Controller
                 'title' => 'Dashboard',
                 'path' => '/dashboard',
                 'icon' => 'heroicons-outline:chart-pie',
+                'api' => 'payment/dashboard'
             ],
             [
                 'title' => 'Inventory',
                 'path' => '/inventory',
                 'icon' => 'heroicons-outline:cube',
+                'api' => 'inventory/parent/index'
             ],
             [
                 'title' => 'Users',
                 'path' => '/users',
                 'icon' => 'heroicons-outline:user-group',
+                'api' => 'admin-accounts/index'
             ],
             [
                 'title' => 'Orders',

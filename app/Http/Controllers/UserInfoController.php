@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 
 use App\Models\UserInfoModel;
-use Jenssegers\Agent\Facades\Agent;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Storage;

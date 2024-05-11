@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
 use Illuminate\Support\Carbon;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
@@ -15,11 +16,32 @@ use Symfony\Component\HttpFoundation\Response;
 class PaymentController extends Controller
 {
 
-    protected $helper;
 
-    public function __construct(Helper $helper)
+    protected $helper, $fillable_attr_purchase, $fillable_attr_inventory_product, $fillable_attr_payment;
+
+    public function __construct(Helper $helper, PurchaseModel $fillable_attr_purchase, InventoryProductModel $fillable_attr_inventory_product, PaymentModel $fillable_attr_payment)
     {
         $this->helper = $helper;
+        $this->fillable_attr_purchase = $fillable_attr_purchase;
+        $this->fillable_attr_inventory_product = $fillable_attr_inventory_product;
+        $this->fillable_attr_payment = $fillable_attr_payment;
+    }
+    public function dashboard(Request $request)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+
+
+        return response()->json([
+            'message' => 'Successfully get dashboard data.',
+            'stock' => $this->getTotalStock(),
+            'sale' => $this->getSaleTodayMonthYear(),
+            'today_transaction' => $today_transaction
+        ], Response::HTTP_OK);
     }
 
 
@@ -96,6 +118,63 @@ class PaymentController extends Controller
         }
 
         return response()->json(['message' => 'Purchase successfully paid.'], Response::HTTP_OK);
+    }
+
+    private function getTotalStock()
+    {
+        // Get the sum of inventory products
+        $inventory_product_sum = InventoryProductModel::sum('stock');
+
+        return $inventory_product_sum;
+    }
+
+    private function getSaleTodayMonthYear()
+    {
+        $arr_sale = [];
+
+        // Get the current month's sales total
+        $arr_sale['month']['current'] = PaymentModel::whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->sum('total_amount');
+
+        // Get the previous month's sales total
+        $arr_sale['month']['previous'] = PaymentModel::whereYear('created_at', now()->subMonth()->year)
+            ->whereMonth('created_at', now()->subMonth()->month)
+            ->sum('total_amount');
+
+        // Calculate the percentage increase or decrease for monthly sales
+        if ($arr_sale['month']['previous'] != 0) {
+            $arr_sale['month']['percent_change'] = (($arr_sale['month']['current'] - $arr_sale['month']['previous']) / abs($arr_sale['month']['previous'])) * 100;
+        } else {
+            $arr_sale['month']['percent_change'] = ($arr_sale['month']['current'] != 0) ? 100 : 0;
+        }
+
+        // Get the current year's sales total
+        $arr_sale['year']['current'] = PaymentModel::whereYear('created_at', now()->year)
+            ->sum('total_amount');
+
+        // Get the previous year's sales total
+        $arr_sale['year']['previous'] = PaymentModel::whereYear('created_at', now()->subYear()->year)
+            ->sum('total_amount');
+
+        // Calculate the percentage increase or decrease for yearly sales
+        if ($arr_sale['year']['previous'] != 0) {
+            $arr_sale['year']['percent_change'] = (($arr_sale['year']['current'] - $arr_sale['year']['previous']) / abs($arr_sale['year']['previous'])) * 100;
+        } else {
+            $arr_sale['year']['percent_change'] = ($arr_sale['year']['current'] != 0) ? 100 : 0;
+        }
+
+        // Get today's sales total
+        $arr_sale['today']['current'] = PaymentModel::whereDate('created_at', now()->toDateString())
+            ->sum('total_amount');
+
+        return [$arr_sale];
+    }
+
+    private function getTodayTransaction()
+    {
+        // Get today's Transaction
+        $today_transaction = PaymentModel::whereDate('created_at', now()->toDateString())->get();
     }
 
     /**
