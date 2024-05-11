@@ -83,6 +83,13 @@ class InventoryProductModel extends Model
         ];
     }
 
+    public function unsetActions(): array
+    {
+        return [
+            'destroy',
+        ];
+    }
+
     public function idToUpdate(): array
     {
         return [
@@ -93,7 +100,7 @@ class InventoryProductModel extends Model
     public function arrModelWithId(): array
     {
         return [
-            'PurchaseModel'  => ['inventory_product_id', ]
+            'PurchaseModel'  => ['inventory_product_id',]
         ];
     }
 

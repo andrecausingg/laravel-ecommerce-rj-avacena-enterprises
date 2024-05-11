@@ -72,6 +72,7 @@ class PurchaseController extends Controller
         // Decrypted Variables
         $decrypted_inventory_product_id = $request->inventory_product_id != "" && $request->inventory_product_id != null ? Crypt::decrypt($request->inventory_product_id) : null;
         $decrypted_purchase_group_id = isset($request->purchase_group_id) &&  $request->purchase_group_id != "" && $request->purchase_group_id != null ? Crypt::decrypt($request->purchase_group_id) : null;
+        $decrypted_purchase_user_id_customer = isset($request->user_id_customer) &&  $request->user_id_customer != "" && $request->user_id_customer != null ? Crypt::decrypt($request->user_id_customer) : null;
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
             ->first();
@@ -85,13 +86,16 @@ class PurchaseController extends Controller
 
         // Add New Item on purchase_group_id
         if (
-            $decrypted_inventory_product_id != '' &&  $decrypted_purchase_group_id != null &&  $decrypted_purchase_group_id != false
-            && $request->user_id_customer != '' && $request->user_id_customer != null
+            $decrypted_inventory_product_id != '' &&
+            $decrypted_purchase_group_id != '' && $decrypted_purchase_group_id != null &&  $decrypted_purchase_group_id != false &&
+            $decrypted_purchase_user_id_customer != '' && $decrypted_purchase_user_id_customer != null &&  $decrypted_purchase_user_id_customer != false
         ) {
             do {
                 foreach ($this->fillable_attr_purchase->arrToStores() as $arrToStores) {
-                    if ($arrToStores == 'user_id_customer') {
-                        $arr_store_fresh_create[$arrToStores] = $request->user_id_customer;
+                    if ($arrToStores == 'purchase_group_id') {
+                        $arr_store_fresh_create[$arrToStores] = $decrypted_purchase_group_id;
+                    } else if ($arrToStores == 'user_id_customer') {
+                        $arr_store_fresh_create[$arrToStores] = $decrypted_purchase_user_id_customer;
                     } else if ($arrToStores == 'inventory_product_id') {
                         $arr_store_fresh_create[$arrToStores] =  $decrypted_inventory_product_id;
                     } else if ($arrToStores == 'user_id_menu') {
@@ -149,6 +153,7 @@ class PurchaseController extends Controller
         }
         // Fresh Create
         else {
+            $ctr = 0;
             $group_purchase_id = $this->generateGroupPurchaseId();
             $new_customer_id = $this->generateCustomerId();
 
@@ -228,9 +233,9 @@ class PurchaseController extends Controller
                 else {
                     foreach ($this->fillable_attr_purchase->arrToStores() as $arrToStores) {
                         if ($arrToStores == 'user_id_customer') {
-                            $arr_store_fresh_create[$arrToStores] = $arr_data_fresh_create['newCustomerId'];
+                            $arr_store_fresh_create[$arrToStores] = $new_customer_id;
                         } else if ($arrToStores == 'purchase_group_id') {
-                            $arr_store_fresh_create[$arrToStores] = $arr_data_fresh_create['groupPurchaseId'];
+                            $arr_store_fresh_create[$arrToStores] = $group_purchase_id;
                         } else if ($arrToStores == 'user_id_menu') {
                             $arr_store_fresh_create[$arrToStores] = $user->user_id;
                         } else if ($arrToStores == 'status') {
@@ -257,7 +262,7 @@ class PurchaseController extends Controller
                     }
 
                     // Minus Stock
-                    $minus_stock = $this->minusStock($request->inventory_product_id);
+                    $minus_stock = $this->minusStock($decrypted_inventory_product_id);
                     $total_amount_payment = $this->totalAmountPayment($created_purchase->purchase_group_id, $created_purchase->user_id_customer);
 
                     // Create a new payment record
@@ -621,6 +626,7 @@ class PurchaseController extends Controller
     {
         // Initialize array to store purchase information
         $arr_purchase_customer = [];
+        $arr_purchase_data = [];
         $final_format = [];
 
         // Authorize the user
@@ -634,7 +640,69 @@ class PurchaseController extends Controller
 
         // Loop through purchases 
         foreach ($purchases as $purchase) {
-            $this->addPurchaseInfoToCustomerArray($arr_purchase_customer, $purchase);
+            foreach ($this->fillable_attr_purchase->arrPurchaseData() as $arrPurchaseData) {
+                if ($arrPurchaseData == 'count') {
+                    $arr_purchase_data[$arrPurchaseData] = 1;
+                } else {
+                    $arr_purchase_data[$arrPurchaseData] = $purchase->{$arrPurchaseData};
+                }
+            }
+
+            // Get the user ID of the customer
+            $user_id_customer = $purchase->user_id_customer;
+
+            // Check if customer already exists in the array
+            if (!isset($arr_purchase_customer[$user_id_customer])) {
+                $arr_purchase_customer[$user_id_customer] = [
+                    'payment' => [],
+                    'items' => [],
+                ];
+            }
+
+            // Add payment information
+            $arr_purchase_customer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $purchase->purchase_group_id)
+                ->where('user_id', $user_id_customer)
+                ->get()
+                ->toArray();
+
+            // Encrypt specified payment IDs
+            foreach ($arr_purchase_customer[$user_id_customer]['payment'] as &$payment) {
+                foreach ($payment as $key => $value) {
+                    if ($key == 'id') {
+                        unset($payment[$key]); // Unset 'id' key
+                    }
+                    if (in_array($key, ["payment_id", "user_id", "purchase_group_id", "voucher_id"])) {
+                        $payment[$key] = Crypt::encrypt($value);
+                    }
+                }
+            }
+
+
+            // Check if the item already exists in the customer's items
+            $found = false;
+            foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
+                if ($this->purchaseMatchesItem($item, $purchase)) {
+                    $item['count']++;
+                    $item['array_purchase_id'][] = $purchase->purchase_id; // Add purchase ID to array
+                    $found = true;
+                    break;
+                }
+            }
+
+            // If not found, add the item
+            if (!$found) {
+                $purchase_data['array_purchase_id'] = [$purchase->purchase_id];
+                $arr_purchase_customer[$user_id_customer]['items'][] = $purchase_data;
+            }
+
+            // Encrypt specified purchase IDs
+            foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
+                foreach ($item as $key => $value) {
+                    if (in_array($key, ["purchase_id", "inventory_product_id", "inventory_id", "purchase_group_id"])) {
+                        $item[$key] = Crypt::encrypt($value);
+                    }
+                }
+            }
         }
 
         foreach ($arr_purchase_customer as &$customer) {
@@ -827,14 +895,15 @@ class PurchaseController extends Controller
         // Encrypt specified payment IDs
         foreach ($arr_purchase_customer[$user_id_customer]['payment'] as &$payment) {
             foreach ($payment as $key => $value) {
-                if(){
-                    
+                if ($key == 'id') {
+                    unset($payment[$key]); // Unset 'id' key
                 }
                 if (in_array($key, ["payment_id", "user_id", "purchase_group_id", "voucher_id"])) {
                     $payment[$key] = Crypt::encrypt($value);
                 }
             }
         }
+
 
         // Check if the item already exists in the customer's items
         $found = false;

@@ -45,6 +45,9 @@ Route::middleware(['jwt.auth'])->group(function () {
     $PurchaseController = PurchaseController::class;
     $PaymentController = PaymentController::class;
 
+    // Checking token
+    Route::get('/check-token', [$AuthController, 'checkToken']);
+
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
         Route::post('/verify-email', [$AuthController, 'verifyEmail']);

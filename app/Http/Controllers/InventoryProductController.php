@@ -28,24 +28,6 @@ class InventoryProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    // public function index(Request $request)
-    // {
-    //     // Authorize the user
-    //     $user = $this->helper->authorizeUser($request);
-    //     if (empty($user->user_id)) {
-    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-    //     }
-
-    //     $inventoryProduct = InventoryProductModel::get();
-
-    //     return response()->json(
-    //         [
-    //             'message' => 'Successfully Retrieve Data',
-    //             'result' => $inventoryProduct
-    //         ],
-    //         Response::HTTP_OK
-    //     );
-    // }
     public function index(Request $request)
     {
         $arr_inventory = [];
@@ -84,7 +66,7 @@ class InventoryProductController extends Controller
             );
 
             // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_product_id, $this->fillable_attr_inventory_children->arrModelWithId());
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {

@@ -31,6 +31,7 @@ class AuthController extends Controller
         $this->helper = $helper;
     }
 
+
     public function indexHistory()
     {
         $decryptedData = [];
@@ -56,6 +57,20 @@ class AuthController extends Controller
             ],
             Response::HTTP_OK
         );
+    }
+
+    public function checkToken(Request $request)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return response()->json([
+            'message' => 'Inventory records parent store successfully',
+            'access_token' => $user->session_token,
+        ], Response::HTTP_OK);
     }
 
     /**
