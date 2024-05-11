@@ -85,24 +85,25 @@ class AuthController extends Controller
                 'title' => 'Menu',
                 'path' => '/menu',
                 'icon' => 'heroicons-outline:view-grid',
+                'path_key' => 'inventory/parent/index'
             ],
             [
                 'title' => 'Dashboard',
                 'path' => '/dashboard',
                 'icon' => 'heroicons-outline:chart-pie',
-                'api' => 'payment/dashboard'
+                'path_key' => 'payment/dashboard'
             ],
             [
                 'title' => 'Inventory',
                 'path' => '/inventory',
                 'icon' => 'heroicons-outline:cube',
-                'api' => 'inventory/parent/index'
+                'path_key' => 'inventory/parent/index'
             ],
             [
                 'title' => 'Users',
                 'path' => '/users',
                 'icon' => 'heroicons-outline:user-group',
-                'api' => 'admin-accounts/index'
+                'path_key' => 'admin-accounts/index'
             ],
             [
                 'title' => 'Orders',
