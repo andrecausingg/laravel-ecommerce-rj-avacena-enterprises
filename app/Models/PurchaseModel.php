@@ -140,4 +140,59 @@ class PurchaseModel extends Model
             'count',
         ];
     }
+
+    public function getApiAccountCrudSettings()
+    {
+        $prefix = 'inventory/parent/';
+        $apiWithPayloads = [
+            'minus-qty' => [
+                'purchase_id',
+                'purchase_group_id',
+                'inventory_id',
+                'inventory_product_id',
+                'user_id_customer',
+                'eu_device',
+            ],
+            'add-qty' => [
+                'purchase_id',
+                'purchase_group_id',
+                'inventory_id',
+                'inventory_product_id',
+                'user_id_customer',
+                'eu_device',
+            ]
+        ];
+        $methods = [
+            'minus-qty' => 'POST',
+            'add-qty' => 'POST',
+        ];
+        $buttonNames = [
+            'update' => 'update',
+            'destroy' => 'delete',
+        ];
+        $icons = [
+            'update' => null,
+            'destroy' =>  null,
+        ];
+        $actions = [
+            'update' => 'modal',
+            'destroy' => 'modal',
+        ];
+
+        $prefix = 'purchase/';
+
+        // $payloads = [
+        //     'delete-all-qty' => ['purchase_id', 'purchase_group_id', 'user_id_customer'],
+        // ];
+
+        // $functions = [];
+
+        // foreach ($payloads as $key => $payload) {
+        //     $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
+        // }
+
+        // return $functions;
+
+        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+    }
 }

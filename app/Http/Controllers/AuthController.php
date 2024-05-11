@@ -83,22 +83,22 @@ class AuthController extends Controller
         $nav_links_admin = [
             [
                 'title' => 'Menu',
-                'path' => '/app/menu',
+                'path' => '/menu',
                 'icon' => 'heroicons-outline:view-grid',
             ],
             [
                 'title' => 'Dashboard',
-                'path' => '/app/dashboard',
+                'path' => '/dashboard',
                 'icon' => 'heroicons-outline:chart-pie',
             ],
             [
                 'title' => 'Inventory',
-                'path' => '/app/inventory',
+                'path' => '/inventory',
                 'icon' => 'heroicons-outline:cube',
             ],
             [
                 'title' => 'Users',
-                'path' => '/app/users',
+                'path' => '/users',
                 'icon' => 'heroicons-outline:user-group',
             ],
             [
@@ -107,22 +107,22 @@ class AuthController extends Controller
                 'submenus' => [
                     [
                         'title' => 'Customer Order',
-                        'path' => '/app/customer-order',
+                        'path' => '/customer-order',
                         'icon' => 'heroicons-outline:user-group',
                     ],
                     [
                         'title' => 'Return Order',
-                        'path' => '/app/return-order',
+                        'path' => '/return-order',
                         'icon' => 'heroicons-outline:user-group',
                     ],
                     [
                         'title' => 'Failed Delivery',
-                        'path' => '/app/failed-delivery',
+                        'path' => '/failed-delivery',
                         'icon' => 'heroicons-outline:user-group',
                     ],
                     [
                         'title' => 'Cancellation',
-                        'path' => '/app/cancellation',
+                        'path' => '/cancellation',
                         'icon' => 'heroicons-outline:user-group',
                     ],
                 ],
