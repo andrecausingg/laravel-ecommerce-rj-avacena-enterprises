@@ -28,7 +28,6 @@ class PurchaseController extends Controller
     {
         $status = 'NOT PAID';
         $ctr = 0;
-        $arr_data_fresh_create = [];
         $arr_store_fresh_create = [];
 
         // Authorize the user
@@ -328,7 +327,6 @@ class PurchaseController extends Controller
         $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
         $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
         $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
-
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
             ->where('inventory_id', $decrypted_inventory_id)
@@ -634,8 +632,6 @@ class PurchaseController extends Controller
         $grouped_purchases = [];
         $crud_settings = $this->fillable_attr_purchase->getApiAccountCrudSettings();
 
-
-
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -928,75 +924,6 @@ class PurchaseController extends Controller
         // Return the total amount
         return $total_amount;
     }
-
-
-    // CHILD addPurchaseInfoToCustomerArray
-    private function purchaseMatchesItem($item, $purchase)
-    {
-        return (
-            $item['inventory_product_id'] == $purchase->inventory_product_id &&
-            $item['inventory_group_id'] == $purchase->inventory_group_id &&
-            $item['purchase_group_id'] == $purchase->purchase_group_id &&
-            $item['item_code'] == $purchase->item_code &&
-            $item['name'] == $purchase->name &&
-            $item['category'] == $purchase->category &&
-            $item['design'] == $purchase->design &&
-            $item['size'] == $purchase->size &&
-            $item['color'] == $purchase->color &&
-            $item['retail_price'] == $purchase->retail_price &&
-            $item['discounted_price'] == $purchase->discounted_price
-        );
-    }
-
-    // CHILD getUserIdMenuCustomer
-    private function calculateTotalDiscountedPrice($purchase_ids)
-    {
-        $total_discount_price = 0;
-
-        // Iterate through each purchase ID
-        foreach ($purchase_ids as $purchase_id) {
-            // Find the purchase with the given ID
-            $purchase = PurchaseModel::where('purchase_id', $purchase_id)->first();
-
-            // Add its discounted price to the total discounted price
-            if ($purchase) {
-                $total_discount_price += $purchase->discounted_price;
-            }
-        }
-
-        return $total_discount_price;
-    }
-
-    // CHILD OF functionsApi
-    private function generateFunction($prefix, $api, $payload)
-    {
-        return [
-            'api' => $prefix . $api,
-            'payload' => $payload,
-        ];
-    }
-
-
-    // CHILD OF getUserIdMenuCustomer
-    private function functionsApi()
-    {
-        $prefix = 'purchase/';
-
-        $payloads = [
-            'minus-qty' => ['purchase_id', 'purchase_group_id', 'inventory_product_id', 'inventory_group_id', 'user_id_customer'],
-            'add-qty' => ['purchase_id', 'purchase_group_id', 'inventory_product_id', 'inventory_group_id', 'user_id_customer'],
-            'delete-all-qty' => ['purchase_id', 'purchase_group_id', 'user_id_customer'],
-        ];
-
-        $functions = [];
-
-        foreach ($payloads as $key => $payload) {
-            $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
-        }
-
-        return $functions;
-    }
-
 
     /**
      * Display a listing of the resource.
