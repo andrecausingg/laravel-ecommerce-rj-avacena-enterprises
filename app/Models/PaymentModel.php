@@ -18,7 +18,7 @@ class PaymentModel extends Model
         'purchase_group_id',
         'voucher_id',
 
-        'payment_method', 
+        'payment_method',
         'total_discounted_amount',
         'total_amount',
         'money',
@@ -35,5 +35,22 @@ class PaymentModel extends Model
     public function getFillableAttributes(): array
     {
         return $this->fillable;
+    }
+
+    public function getTodaysTranction(): array
+    {
+        return [
+            'user_id',
+            'created_at',
+            'total_amount',
+            'status',
+        ];
+    }
+
+    public function arrToConvertToReadableDateTime(): array
+    {
+        return  [
+            'created_at', 'updated_at', 'deleted_at'
+        ];
     }
 }

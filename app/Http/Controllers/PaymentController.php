@@ -40,7 +40,7 @@ class PaymentController extends Controller
             'message' => 'Successfully get dashboard data.',
             'stock' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
-            'today_transaction' => $today_transaction
+            'today_transaction' =>  $this->getTodayTransaction()
         ], Response::HTTP_OK);
     }
 
@@ -101,6 +101,7 @@ class PaymentController extends Controller
             'money' => $request->money,
             'change' => $request->money - $payment->total_amount,
             'status' => $status,
+            'paid_at' => Carbon::now()
         ]);
 
         if (!$paying) {
@@ -110,7 +111,7 @@ class PaymentController extends Controller
         $payment = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
             ->where('purchase_group_id',  $decrypted_purchase_group_id)
             ->update([
-                'status' => $status
+                'status' => $status,
             ]);
 
         if (!$payment) {
@@ -133,13 +134,13 @@ class PaymentController extends Controller
         $arr_sale = [];
 
         // Get the current month's sales total
-        $arr_sale['month']['current'] = PaymentModel::whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+        $arr_sale['month']['current'] = PaymentModel::whereYear('paid_at', now()->year)
+            ->whereMonth('paid_at', now()->month)
             ->sum('total_amount');
 
         // Get the previous month's sales total
-        $arr_sale['month']['previous'] = PaymentModel::whereYear('created_at', now()->subMonth()->year)
-            ->whereMonth('created_at', now()->subMonth()->month)
+        $arr_sale['month']['previous'] = PaymentModel::whereYear('paid_at', now()->subMonth()->year)
+            ->whereMonth('paid_at', now()->subMonth()->month)
             ->sum('total_amount');
 
         // Calculate the percentage increase or decrease for monthly sales
@@ -150,11 +151,11 @@ class PaymentController extends Controller
         }
 
         // Get the current year's sales total
-        $arr_sale['year']['current'] = PaymentModel::whereYear('created_at', now()->year)
+        $arr_sale['year']['current'] = PaymentModel::whereYear('paid_at', now()->year)
             ->sum('total_amount');
 
         // Get the previous year's sales total
-        $arr_sale['year']['previous'] = PaymentModel::whereYear('created_at', now()->subYear()->year)
+        $arr_sale['year']['previous'] = PaymentModel::whereYear('paid_at', now()->subYear()->year)
             ->sum('total_amount');
 
         // Calculate the percentage increase or decrease for yearly sales
@@ -165,17 +166,34 @@ class PaymentController extends Controller
         }
 
         // Get today's sales total
-        $arr_sale['today']['current'] = PaymentModel::whereDate('created_at', now()->toDateString())
+        $arr_sale['today']['current'] = PaymentModel::whereDate('paid_at', now()->toDateString())
             ->sum('total_amount');
 
         return [$arr_sale];
     }
-
     private function getTodayTransaction()
     {
+        $arr_today_transaction = [];
+
         // Get today's Transaction
-        $today_transaction = PaymentModel::whereDate('created_at', now()->toDateString())->get();
+        $today_transactions = PaymentModel::whereDate('paid_at', now()->toDateString())->get()->toArray();
+
+        // Assuming $this->fillable_attr_payment->getTodaysTranction() returns an array of attributes to fetch
+        foreach ($this->fillable_attr_payment->getTodaysTranction() as $attribute) {
+            // Check if the attribute exists in the payment model
+            if (array_key_exists($attribute, $today_transactions[0])) {
+                $arr_today_transaction[$attribute] = $today_transactions[0][$attribute];
+
+                // Check if the column needs formatting and value is not null
+                if (in_array($attribute, $this->fillable_attr_payment->arrToConvertToReadableDateTime()) && $arr_today_transaction[$attribute] !== null) {
+                    $arr_today_transaction[$attribute] = $this->helper->convertReadableTimeDate($arr_today_transaction[$attribute]);
+                }
+            }
+        }
+
+        return $arr_today_transaction;
     }
+
 
     /**
      * Display a listing of the resource.
