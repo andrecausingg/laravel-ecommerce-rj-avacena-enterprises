@@ -9,12 +9,14 @@ use Illuminate\Support\Carbon;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
+use App\Models\PurchaseModel;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
-       
+
     protected $helper, $fillable_attr_inventorys, $fillable_attr_inventory_children;
 
     public function __construct(Helper $helper, InventoryModel $fillable_attr_inventorys, InventoryProductModel $fillable_attr_inventory_children)
@@ -57,6 +59,20 @@ class InventoryController extends Controller
             $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
             $arr_inventory_item['variant'] =  $inventory_children->count();
             $arr_inventory_item['stock'] = $inventory_children->sum('stock');
+
+
+            // TODO : fix the total sales
+            // Calculate total sales for all inventory items including both discounted and retail prices
+            $total_sales = 0;
+            foreach ($inventory_children as $child) {
+                if ($child->discounted_price != null) {
+                    $total_sales += $child->discounted_price;
+                } else {
+                    $total_sales += $child->retail_price;
+                }
+            }
+            $arr_inventory_item['total_sales'] = $total_sales;
+
 
             // Format Api
             $crud_action = $this->helper->formatApi(

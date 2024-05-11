@@ -58,7 +58,6 @@ class Helper
         }
     }
 
-
     // Unset column dont want to include to save on database
     public function unsetColumn($unsets, $fillableAttr)
     {

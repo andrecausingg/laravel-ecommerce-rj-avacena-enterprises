@@ -26,6 +26,7 @@ class PaymentController extends Controller
         $this->fillable_attr_inventory_product = $fillable_attr_inventory_product;
         $this->fillable_attr_payment = $fillable_attr_payment;
     }
+
     public function dashboard(Request $request)
     {
         // Authorize the user
@@ -34,16 +35,17 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-
-
         return response()->json([
             'message' => 'Successfully get dashboard data.',
             'stock' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
-            'today_transaction' =>  $this->getTodayTransaction()
+            'today_transaction' => $this->getTodayTransaction(),
+            'chart' => [
+                'year' => $this->getChatSales(),
+                'month' => $this->getChatSales()
+            ],
         ], Response::HTTP_OK);
     }
-
 
     public function payment(Request $request)
     {
@@ -176,24 +178,71 @@ class PaymentController extends Controller
     {
         $arr_today_transaction = [];
 
-        // Get today's Transaction
-        $today_transactions = PaymentModel::whereDate('paid_at', now()->toDateString())->get()->toArray();
+        // Get today's transactions
+        $today_transactions = PaymentModel::whereDate('paid_at', Carbon::now()->toDateString())->get()->toArray();
 
-        // Assuming $this->fillable_attr_payment->getTodaysTranction() returns an array of attributes to fetch
-        foreach ($this->fillable_attr_payment->getTodaysTranction() as $attribute) {
-            // Check if the attribute exists in the payment model
-            if (array_key_exists($attribute, $today_transactions[0])) {
-                $arr_today_transaction[$attribute] = $today_transactions[0][$attribute];
+        // Check if there are any transactions for today
+        if (!empty($today_transactions)) {
+            // Loop through each transaction
+            foreach ($today_transactions as $transaction) {
+                // Initialize an array to store transaction attributes
+                $transaction_data = [];
 
-                // Check if the column needs formatting and value is not null
-                if (in_array($attribute, $this->fillable_attr_payment->arrToConvertToReadableDateTime()) && $arr_today_transaction[$attribute] !== null) {
-                    $arr_today_transaction[$attribute] = $this->helper->convertReadableTimeDate($arr_today_transaction[$attribute]);
+                // Assuming $this->fillable_attr_payment->getTodaysTranction() returns an array of attributes to fetch
+                foreach ($this->fillable_attr_payment->getTodaysTranction() as $attribute) {
+                    // Check if the attribute exists in the transaction
+                    if (array_key_exists($attribute, $transaction)) {
+                        $value = $transaction[$attribute];
+
+                        // Check if the column needs formatting and value is not null
+                        if (in_array($attribute, $this->fillable_attr_payment->arrToConvertToReadableDateTime()) && $value !== null) {
+                            $value = $this->helper->convertReadableTimeDate($value);
+                        }
+
+                        // Store the attribute and its value in the transaction data array
+                        $transaction_data[$attribute] = $value;
+                    }
                 }
+
+                // Add the transaction data to the array of today's transactions
+                $arr_today_transaction[] = $transaction_data;
             }
         }
 
         return $arr_today_transaction;
     }
+
+    private function getTopSellingProducts(){
+        
+    }
+
+
+    private function getChatSales()
+    {
+        // Array to store monthly sales
+        $monthly_sales = [];
+
+        // Get the current year
+        $current_year = now()->year;
+
+        // Loop through each month
+        for ($month = 1; $month <= 12; $month++) {
+            // Get the current month's sales total
+            $total_sales = PaymentModel::whereYear('paid_at', $current_year)
+                ->whereMonth('paid_at', $month)
+                ->sum('total_amount');
+
+            // Add the month name and total sales to the array
+            $monthly_sales[] = [
+                'name' => date('M', mktime(0, 0, 0, $month, 1)),
+                'total' => $total_sales,
+            ];
+        }
+
+        return $monthly_sales;
+    }
+
+
 
 
     /**
