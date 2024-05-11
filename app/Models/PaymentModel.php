@@ -25,6 +25,7 @@ class PaymentModel extends Model
         'change',
         'status',
 
+        'paid_at',
         'deleted_at',
         'created_at',
         'updated_at',

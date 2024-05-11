@@ -402,7 +402,7 @@ class Helper
     // Store Multiple Data
     public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '')
     {
-        
+
         $arr_attributes_store = [];
 
         foreach ($arr_store_fields as $arr_store_field) {
@@ -495,11 +495,12 @@ class Helper
 
     public function convertReadableTimeDate($data)
     {
-        $carbon_date = Carbon::parse($data);
+        // Set the timezone for Carbon to 'Asia/Manila'
+        // Carbon::setToStringFormat('F j, Y g:i a');
+        $carbon_date = Carbon::parse($data)->setTimezone('Asia/Manila');
         $value = $carbon_date->format('F j, Y g:i a');
 
         return $value;
     }
 
-    // public function formatTheDateAndTime{}
 }

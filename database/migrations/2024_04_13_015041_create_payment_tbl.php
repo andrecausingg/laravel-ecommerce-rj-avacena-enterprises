@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('status')->default('NOT PAID');
 
             // Date | Time
-            $table->timestamp('paid_at');
+            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

@@ -87,6 +87,7 @@ class PaymentController extends Controller
         $payment = PaymentModel::where('payment_id', $decrypted_payment_id)
             ->where('user_id', $decrypted_user_id_customer)
             ->where('purchase_group_id', $decrypted_purchase_group_id)
+            ->where('status', 'NOT PAID')
             ->first();
 
         if (!$payment) {
