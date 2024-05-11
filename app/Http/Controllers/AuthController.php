@@ -68,10 +68,75 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message' => 'Inventory records parent store successfully',
             'access_token' => $user->session_token,
         ], Response::HTTP_OK);
     }
+
+    public function roleNavLinks(Request $request)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $nav_links_admin = [
+            [
+                'title' => 'Menu',
+                'path' => '/app/menu',
+                'icon' => 'heroicons-outline:view-grid',
+            ],
+            [
+                'title' => 'Dashboard',
+                'path' => '/app/dashboard',
+                'icon' => 'heroicons-outline:chart-pie',
+            ],
+            [
+                'title' => 'Inventory',
+                'path' => '/app/inventory',
+                'icon' => 'heroicons-outline:cube',
+            ],
+            [
+                'title' => 'Users',
+                'path' => '/app/users',
+                'icon' => 'heroicons-outline:user-group',
+            ],
+            [
+                'title' => 'Orders',
+                'icon' => 'heroicons-outline:clipboard-list',
+                'submenus' => [
+                    [
+                        'title' => 'Customer Order',
+                        'path' => '/app/customer-order',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Return Order',
+                        'path' => '/app/return-order',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Failed Delivery',
+                        'path' => '/app/failed-delivery',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Cancellation',
+                        'path' => '/app/cancellation',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                ],
+            ],
+        ];
+
+
+        if ($user->role === 'SUPER_ADMIN') {
+            return response()->json([
+                'nav_links' => $nav_links_admin,
+            ], Response::HTTP_OK);
+        }
+    }
+
 
     /**
      * PARENT LOGIN

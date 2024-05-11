@@ -125,9 +125,10 @@ class PurchaseModel extends Model
     {
         return [
             'purchase_id',
-            'inventory_product_id',
-            'inventory_id',
             'purchase_group_id',
+            'user_id_customer',
+            'inventory_id',
+            'inventory_product_id',
             'item_code',
             'name',
             'category',

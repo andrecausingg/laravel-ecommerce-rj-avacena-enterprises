@@ -22,12 +22,6 @@ class PurchaseController extends Controller
         $this->fillable_attr_purchase = $fillable_attr_purchase;
         $this->fillable_attr_inventory_product = $fillable_attr_inventory_product;
         $this->fillable_attr_payment = $fillable_attr_payment;
-
-        // $this->UnsetPurchaseStorePurchaseInventory = config('system.purchase.UnsetPurchaseStorePurchaseInventory');
-        // $this->UnsetAddQtyPurchases = config('system.purchase.UnsetAddQtyPurchase');
-        // $this->fillAttrPurchases = $purchaseModel->getFillableAttributes();
-        // $this->fillAttrInventoryProducts = $inventoryProductModel->getFillableAttributes();
-        // $this->fillAttrPayment = $paymentModel->getFillableAttributes();
     }
 
     public function store(Request $request)
@@ -307,8 +301,8 @@ class PurchaseController extends Controller
         $validator = Validator::make($request->all(), [
             'purchase_id' => 'required|string',
             'purchase_group_id' => 'required|string',
-            'inventory_product_id' => 'required|string',
             'inventory_id' => 'required|string',
+            'inventory_product_id' => 'required|string',
             'user_id_customer' => 'required|string',
             'eu_device' => 'required|string',
         ]);
@@ -329,8 +323,12 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
-        $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
+        $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
+        $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
         $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
+        $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
+        $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
             ->where('inventory_id', $decrypted_inventory_id)
@@ -387,7 +385,6 @@ class PurchaseController extends Controller
                 Response::HTTP_NOT_FOUND
             );
         }
-
 
         return response()->json(
             [
@@ -625,9 +622,7 @@ class PurchaseController extends Controller
     public function getUserIdMenuCustomer(Request $request)
     {
         // Initialize array to store purchase information
-        $arr_purchase_customer = [];
-        $arr_purchase_data = [];
-        $final_format = [];
+        $grouped_purchases = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -636,98 +631,127 @@ class PurchaseController extends Controller
         }
 
         // Fetch purchases
-        $purchases = PurchaseModel::where('user_id_menu', $user->user_id)->where('status', 'NOT PAID')->get();
+        $purchases = PurchaseModel::where('user_id_menu', $user->user_id)
+            ->where('status', 'NOT PAID')
+            ->get();
+
+        // Initialize an empty array to store grouped purchases
+        $grouped_purchases = [];
 
         // Loop through purchases 
         foreach ($purchases as $purchase) {
-            foreach ($this->fillable_attr_purchase->arrPurchaseData() as $arrPurchaseData) {
-                if ($arrPurchaseData == 'count') {
-                    $arr_purchase_data[$arrPurchaseData] = 1;
-                } else {
-                    $arr_purchase_data[$arrPurchaseData] = $purchase->{$arrPurchaseData};
+            // Generate a key based on the user_id_customer
+            $key = $purchase->user_id_customer;
+
+            // Check if the key already exists in the grouped purchases array
+            if (isset($grouped_purchases[$key])) {
+                // If the key exists, check if the same purchase details already exist
+                $found = false;
+                foreach ($grouped_purchases[$key] as &$grouped_purchase) {
+                    if (
+                        $grouped_purchase['purchase_group_id'] === $purchase->purchase_group_id &&
+                        $grouped_purchase['inventory_id'] === $purchase->inventory_id &&
+                        $grouped_purchase['inventory_product_id'] === $purchase->inventory_product_id &&
+                        $grouped_purchase['item_code'] === $purchase->item_code &&
+                        $grouped_purchase['name'] === $purchase->name &&
+                        $grouped_purchase['category'] === $purchase->category &&
+                        $grouped_purchase['design'] === $purchase->design &&
+                        $grouped_purchase['size'] === $purchase->size &&
+                        $grouped_purchase['color'] === $purchase->color &&
+                        $grouped_purchase['retail_price'] === $purchase->retail_price &&
+                        $grouped_purchase['discounted_price'] === $purchase->discounted_price
+                    ) {
+                        // If the same purchase details exist, increment the count and update total_price
+                        $grouped_purchase['count']++;
+                        if ($purchase->discounted_price != 0) {
+                            $grouped_purchase['total_price'] = $purchase->discounted_price * $grouped_purchase['count'];
+                        } else {
+                            $grouped_purchase['total_price'] = $purchase->retail_price * $grouped_purchase['count'];
+                        }
+                        $found = true;
+                        break;
+                    }
                 }
-            }
-
-            // Get the user ID of the customer
-            $user_id_customer = $purchase->user_id_customer;
-
-            // Check if customer already exists in the array
-            if (!isset($arr_purchase_customer[$user_id_customer])) {
-                $arr_purchase_customer[$user_id_customer] = [
-                    'payment' => [],
-                    'items' => [],
+                // If the same purchase details not found, add the new purchase details
+                if (!$found) {
+                    $total_price = ($purchase->discounted_price != 0) ? $purchase->discounted_price : $purchase->retail_price;
+                    $grouped_purchases[$key][] = [
+                        'purchase_id' => $purchase->purchase_id,
+                        'purchase_group_id' => $purchase->purchase_group_id,
+                        'user_id_customer' => $purchase->user_id_customer,
+                        'inventory_id' => $purchase->inventory_id,
+                        'inventory_product_id' => $purchase->inventory_product_id,
+                        'item_code' => $purchase->item_code,
+                        'name' => $purchase->name,
+                        'category' => $purchase->category,
+                        'design' => $purchase->design,
+                        'size' => $purchase->size,
+                        'color' => $purchase->color,
+                        'retail_price' => $purchase->retail_price,
+                        'discounted_price' => $purchase->discounted_price,
+                        'count' => 1,
+                        'total_price' => $total_price,
+                    ];
+                }
+            } else {
+                // If the key doesn't exist, initialize a new customer's purchases array    
+                $total_price = ($purchase->discounted_price != 0) ? $purchase->discounted_price : $purchase->retail_price;
+                $grouped_purchases[$key][] = [
+                    'purchase_id' => $purchase->purchase_id,
+                    'purchase_group_id' => $purchase->purchase_group_id,
+                    'user_id_customer' => $purchase->user_id_customer,
+                    'inventory_id' => $purchase->inventory_id,
+                    'inventory_product_id' => $purchase->inventory_product_id,
+                    'item_code' => $purchase->item_code,
+                    'name' => $purchase->name,
+                    'category' => $purchase->category,
+                    'design' => $purchase->design,
+                    'size' => $purchase->size,
+                    'color' => $purchase->color,
+                    'retail_price' => $purchase->retail_price,
+                    'discounted_price' => $purchase->discounted_price,
+                    'count' => 1,
+                    'total_price' => $total_price,
                 ];
             }
+        }
 
-            // Add payment information
-            $arr_purchase_customer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $purchase->purchase_group_id)
+        // Add payment information
+        $arr_purchase_customer = [];
+        foreach ($grouped_purchases as $user_id_customer => $items) {
+            $arr_purchase_customer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $items[0]['purchase_group_id'])
                 ->where('user_id', $user_id_customer)
                 ->get()
                 ->toArray();
+            $arr_purchase_customer[$user_id_customer]['items'] = $items;
+        }
 
-            // Encrypt specified payment IDs
-            foreach ($arr_purchase_customer[$user_id_customer]['payment'] as &$payment) {
-                foreach ($payment as $key => $value) {
-                    if ($key == 'id') {
-                        unset($payment[$key]); // Unset 'id' key
-                    }
-                    if (in_array($key, ["payment_id", "user_id", "purchase_group_id", "voucher_id"])) {
-                        $payment[$key] = Crypt::encrypt($value);
-                    }
-                }
-            }
-
-
-            // Check if the item already exists in the customer's items
-            $found = false;
-            foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
-                if ($this->purchaseMatchesItem($item, $purchase)) {
-                    $item['count']++;
-                    $item['array_purchase_id'][] = $purchase->purchase_id; // Add purchase ID to array
-                    $found = true;
-                    break;
-                }
-            }
-
-            // If not found, add the item
-            if (!$found) {
-                $purchase_data['array_purchase_id'] = [$purchase->purchase_id];
-                $arr_purchase_customer[$user_id_customer]['items'][] = $purchase_data;
-            }
-
-            // Encrypt specified purchase IDs
-            foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
-                foreach ($item as $key => $value) {
-                    if (in_array($key, ["purchase_id", "inventory_product_id", "inventory_id", "purchase_group_id"])) {
-                        $item[$key] = Crypt::encrypt($value);
-                    }
-                }
+        // Encrypt payment information
+        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
+            foreach ($customer_data['payment'] as &$payment_info) {
+                $payment_info['payment_id'] = Crypt::encrypt($payment_info['payment_id']);
+                $payment_info['user_id'] = Crypt::encrypt($payment_info['user_id']);
+                $payment_info['purchase_group_id'] = Crypt::encrypt($payment_info['purchase_group_id']);
+                $payment_info['voucher_id'] = Crypt::encrypt($payment_info['voucher_id']);
+                unset($payment_info['id']);
             }
         }
 
-        foreach ($arr_purchase_customer as &$customer) {
-            foreach ($customer['items'] as &$item) {
-                // Get unique purchase IDs for the item
-                $purchase_id = array_unique($item['array_purchase_id']);
-                $item['array_purchase_id'] = array_values($purchase_id);
-
-                // Calculate total discounted price for the item
-                $totalDiscountedPrice = $this->calculateTotalDiscountedPrice($purchase_id);
-
-                // Assign total discounted price to the item
-                $item['array_discounted_price'] = $totalDiscountedPrice;
-
-                // Assign functionsApi to the item's function
-                $item['action'] = [$this->functionsApi()];
+        // Encrypt purchase items information
+        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
+            foreach ($customer_data['items'] as &$item) {
+                $item['purchase_id'] = Crypt::encrypt($item['purchase_id']);
+                $item['purchase_group_id'] = Crypt::encrypt($item['purchase_group_id']);
+                $item['user_id_customer'] = Crypt::encrypt($item['user_id_customer']);
+                $item['inventory_id'] = Crypt::encrypt($item['inventory_id']);
+                $item['inventory_product_id'] = Crypt::encrypt($item['inventory_product_id']);
             }
         }
-
-        $final_format[] = $arr_purchase_customer;
 
         // Prepare response
         $response_data = [
             'message' => 'Data retrieved successfully',
-            'data' => $final_format,
+            'data' => $arr_purchase_customer,
         ];
 
         return response()->json($response_data, Response::HTTP_OK);

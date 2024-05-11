@@ -16,9 +16,9 @@ class PaymentModel extends Model
 
         'user_id',
         'purchase_group_id',
+        'voucher_id',
 
         'payment_method', 
-        'voucher',
         'total_discounted_amount',
         'total_amount',
         'money',
