@@ -350,11 +350,11 @@ class PurchaseController extends Controller
             );
         }
 
-        $purchase = PurchaseModel::where('purchase_id', $request->purchase_id)
-            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
-            ->where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id')
-            ->where('user_id_customer', $request->user_id_customer)
+        $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
+            ->where('purchase_group_id', $decrypted_purchase_group_id)
+            ->where('inventory_id', $decrypted_inventory_id)
+            ->where('inventory_product_id', $decrypted_inventory_product_id)
+            ->where('user_id_customer', $decrypted_user_id_customer)
             ->where('user_id_menu', $user->user_id)
             ->first();
 
@@ -369,9 +369,9 @@ class PurchaseController extends Controller
 
         $purchase->delete();
 
-        $total_amount_payment = $this->totalAmountPayment(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
-        $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
+        $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
+        $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
+            ->where('purchase_group_id', $decrypted_purchase_group_id)
             ->first()
             ->update([
                 'total_amount' => $total_amount_payment['total_amount'],
@@ -388,8 +388,8 @@ class PurchaseController extends Controller
 
         return response()->json(
             [
-                'message' => 'Purchase and Payment records stored successfully',
-                // 'message_minus_stock' => $resultMinusStock,
+                'message' => 'Success minus on item',
+                'parameter' => $purchase
             ],
             Response::HTTP_OK
         );
@@ -407,8 +407,8 @@ class PurchaseController extends Controller
         $validator = Validator::make($request->all(), [
             'purchase_id' => 'required|string',
             'purchase_group_id' => 'required|string',
+            'inventory_id' => 'required|string',
             'inventory_product_id' => 'required|string',
-            'inventory_group_id' => 'required|string',
             'user_id_customer' => 'required|string',
             'eu_device' => 'required|string',
         ]);
@@ -429,8 +429,14 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id')
+        $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
+        $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+        $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
+        $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
+        $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
+        $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
+            ->where('inventory_id', $decrypted_inventory_id)
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
@@ -449,11 +455,11 @@ class PurchaseController extends Controller
             );
         }
 
-        $purchase = PurchaseModel::where('purchase_id', $request->purchase_id)
-            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
-            ->where('inventory_product_id', $request->inventory_product_id)
-            ->where('inventory_group_id')
-            ->where('user_id_customer', $request->user_id_customer)
+        $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
+            ->where('purchase_group_id', $decrypted_purchase_group_id)
+            ->where('inventory_id', $decrypted_inventory_id)
+            ->where('inventory_product_id', $decrypted_inventory_product_id)
+            ->where('user_id_customer', $decrypted_user_id_customer)
             ->where('user_id_menu', $user->user_id)
             ->first();
 
@@ -466,15 +472,13 @@ class PurchaseController extends Controller
             );
         }
 
-        // Convert $purchase to an array and remove unnecessary attributes
-        // $purchaseAttributes = $purchase->toArray();
-        // foreach ($this->UnsetAddQtyPurchases as $UnsetAddQtyPurchase) {
-        //     unset($purchaseAttributes[$UnsetAddQtyPurchase]);
-        // }
+        $arr_store = [];
+        foreach ($this->fillable_attr_purchase->arrAddQtyPurchases() as $arrAddQtyPurchases) {
+            $arr_store[$arrAddQtyPurchases] = $purchase->$arrAddQtyPurchases;
+        }
 
         // Create a new purchase using the attributes of $purchase
-        $created = PurchaseModel::create($this->fillable_attr_purchase->arrAddQtyPurchases());
-
+        $created = PurchaseModel::create($arr_store);
         if (!$created) {
             return response()->json(
                 [
@@ -495,9 +499,9 @@ class PurchaseController extends Controller
             );
         }
 
-        $total_amount_payment = $this->totalAmountPayment(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
-        $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
+        $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
+        $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
+            ->where('purchase_group_id', $decrypted_purchase_group_id)
             ->first()
             ->update([
                 'total_amount' => $total_amount_payment['total_amount'],
@@ -512,11 +516,10 @@ class PurchaseController extends Controller
             );
         }
 
-
         return response()->json(
             [
-                'message' => 'Purchase and Payment records stored successfully',
-                // 'message_minus_stock' => $resultMinusStock,
+                'message' => 'Success add on item',
+                'parameter' => $purchase
             ],
             Response::HTTP_OK
         );
@@ -556,8 +559,16 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
+        $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
+        $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+        $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
+        $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
+        $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
         foreach ($request->purchase_id as $purchase_id) {
-            $purchase = PurchaseModel::where('purchase_id', $purchase_id)->first();
+            $decrypted_purchase_id = Crypt::decrypt($purchase_id);
+
+            $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)->first();
             if (!$purchase) {
                 return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
             }
@@ -569,8 +580,8 @@ class PurchaseController extends Controller
         }
 
         // Update stock after deleting all purchases
-        $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase->inventory_product_id)
-            ->where('inventory_group_id', $purchase->inventory_group_id)
+        $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
+            ->where('inventory_id', $decrypted_inventory_id)
             ->first();
         if (!$inventory_product) {
             return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
@@ -580,9 +591,9 @@ class PurchaseController extends Controller
             'stock' => max(0, $inventory_product->stock + count($deleted_purchase_id)),
         ]);
 
-        $total_amount_payment = $this->totalAmountPaymentDeleteAll(Crypt::decrypt($request->purchase_group_id), $request->user_id_customer);
-        $update_payment = PaymentModel::where('user_id', $request->user_id_customer)
-            ->where('purchase_group_id', Crypt::decrypt($request->purchase_group_id))
+        $total_amount_payment = $this->totalAmountPaymentDeleteAll($decrypted_purchase_group_id, $decrypted_user_id_customer);
+        $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
+            ->where('purchase_group_id', $decrypted_purchase_group_id)
             ->first();
 
         if (!$update_payment) {
@@ -600,7 +611,6 @@ class PurchaseController extends Controller
                 return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
         }
-
 
         // Check if payment record exists
         if (!$update_payment) {
@@ -635,9 +645,6 @@ class PurchaseController extends Controller
             ->where('status', 'NOT PAID')
             ->get();
 
-        // Initialize an empty array to store grouped purchases
-        $grouped_purchases = [];
-
         // Loop through purchases 
         foreach ($purchases as $purchase) {
             // Generate a key based on the user_id_customer
@@ -661,6 +668,11 @@ class PurchaseController extends Controller
                         $grouped_purchase['retail_price'] === $purchase->retail_price &&
                         $grouped_purchase['discounted_price'] === $purchase->discounted_price
                     ) {
+                        // Initialize arr_purchase_id if it's not already set
+                        if (!isset($grouped_purchase['arr_purchase_id'])) {
+                            $grouped_purchase['arr_purchase_id'] = [];
+                        }
+                        $grouped_purchase['arr_purchase_id'][] = $purchase->purchase_id;
                         // If the same purchase details exist, increment the count and update total_price
                         $grouped_purchase['count']++;
                         if ($purchase->discounted_price != 0) {
@@ -691,6 +703,7 @@ class PurchaseController extends Controller
                         'discounted_price' => $purchase->discounted_price,
                         'count' => 1,
                         'total_price' => $total_price,
+                        'arr_purchase_id' => [$purchase->purchase_id], // Initialize arr_purchase_id with the first purchase ID
                     ];
                 }
             } else {
@@ -712,6 +725,7 @@ class PurchaseController extends Controller
                     'discounted_price' => $purchase->discounted_price,
                     'count' => 1,
                     'total_price' => $total_price,
+                    'arr_purchase_id' => [$purchase->purchase_id], // Initialize arr_purchase_id with the first purchase ID
                 ];
             }
         }
@@ -756,6 +770,7 @@ class PurchaseController extends Controller
 
         return response()->json($response_data, Response::HTTP_OK);
     }
+
 
     // CHILD store
     private function generateGroupPurchaseId()
@@ -886,75 +901,6 @@ class PurchaseController extends Controller
         return $total_amount;
     }
 
-
-    private function addPurchaseInfoToCustomerArray(&$arr_purchase_customer, $purchase)
-    {
-        $purchase_data = [];
-
-        foreach ($this->fillable_attr_purchase->arrPurchaseData() as $arr_purchase_data) {
-            if ($arr_purchase_data == 'count') {
-                $purchase_data[$arr_purchase_data] = 1;
-            } else {
-                $purchase_data[$arr_purchase_data] = $purchase->{$arr_purchase_data};
-            }
-        }
-
-        // Get the user ID of the customer
-        $user_id_customer = $purchase->user_id_customer;
-
-        // Check if customer already exists in the array
-        if (!isset($arr_purchase_customer[$user_id_customer])) {
-            $arr_purchase_customer[$user_id_customer] = [
-                'payment' => [],
-                'items' => [],
-            ];
-        }
-
-        // Add payment information
-        $arr_purchase_customer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $purchase->purchase_group_id)
-            ->where('user_id', $user_id_customer)
-            ->get()
-            ->toArray();
-
-        // Encrypt specified payment IDs
-        foreach ($arr_purchase_customer[$user_id_customer]['payment'] as &$payment) {
-            foreach ($payment as $key => $value) {
-                if ($key == 'id') {
-                    unset($payment[$key]); // Unset 'id' key
-                }
-                if (in_array($key, ["payment_id", "user_id", "purchase_group_id", "voucher_id"])) {
-                    $payment[$key] = Crypt::encrypt($value);
-                }
-            }
-        }
-
-
-        // Check if the item already exists in the customer's items
-        $found = false;
-        foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
-            if ($this->purchaseMatchesItem($item, $purchase)) {
-                $item['count']++;
-                $item['array_purchase_id'][] = $purchase->purchase_id; // Add purchase ID to array
-                $found = true;
-                break;
-            }
-        }
-
-        // If not found, add the item
-        if (!$found) {
-            $purchase_data['array_purchase_id'] = [$purchase->purchase_id];
-            $arr_purchase_customer[$user_id_customer]['items'][] = $purchase_data;
-        }
-
-        // Encrypt specified purchase IDs
-        foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
-            foreach ($item as $key => $value) {
-                if (in_array($key, ["purchase_id", "inventory_product_id", "inventory_id", "purchase_group_id"])) {
-                    $item[$key] = Crypt::encrypt($value);
-                }
-            }
-        }
-    }
 
     // CHILD addPurchaseInfoToCustomerArray
     private function purchaseMatchesItem($item, $purchase)

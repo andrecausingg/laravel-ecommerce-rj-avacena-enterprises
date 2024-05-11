@@ -178,7 +178,7 @@ class InventoryController extends Controller
             }
 
             // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->arrStoreData($this->fillable_attr_inventorys->arrToStores(), $user_input);
+            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $user_input);
             $created = InventoryModel::create($result_to_create);
             if (!$created) {
                 return response()->json(
@@ -378,7 +378,7 @@ class InventoryController extends Controller
             ];
 
             // Update Multiple Data
-            $result_update_multi_data = $this->helper->arrUpdateData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
+            $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
             if ($result_update_multi_data) {
                 return $result_update_multi_data;
             }

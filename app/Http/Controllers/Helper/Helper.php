@@ -400,7 +400,7 @@ class Helper
     }
 
     // Store Multiple Data
-    public function arrStoreData($arr_store_fields, $user_input_data, $file_name = '')
+    public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '')
     {
         
         $arr_attributes_store = [];
@@ -430,7 +430,7 @@ class Helper
         }
     }
 
-    public function arrUpdateData($model, $arr_update_fields, $user_input_data, $file_name = '')
+    public function arrUpdateMultipleData($model, $arr_update_fields, $user_input_data, $file_name = '')
     {
         // Update the inventory info
         foreach ($arr_update_fields as $arr_update_field) {

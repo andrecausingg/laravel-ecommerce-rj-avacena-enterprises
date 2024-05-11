@@ -199,7 +199,7 @@ class InventoryProductController extends Controller
             }
 
             // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->arrStoreData($this->fillable_attr_inventory_children->arrToStores(), $user_input, $file_name);
+            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventory_children->arrToStores(), $user_input, $file_name);
             $created = InventoryProductModel::create($result_to_create);
             if (!$created) {
                 return response()->json(
@@ -377,7 +377,7 @@ class InventoryProductController extends Controller
             ];
 
             // Update Multiple Data
-            $result_update_multi_data = $this->helper->arrUpdateData($inventory, $this->fillable_attr_inventory_children->arrToUpdates(), $user_input, $file_name);
+            $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventory_children->arrToUpdates(), $user_input, $file_name);
             if ($result_update_multi_data) {
                 return $result_update_multi_data;
             }
