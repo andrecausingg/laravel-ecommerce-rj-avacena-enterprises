@@ -559,7 +559,6 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
-        $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
         $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
         $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
         $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
@@ -633,6 +632,9 @@ class PurchaseController extends Controller
     {
         // Initialize array to store purchase information
         $grouped_purchases = [];
+        $crud_settings = $this->fillable_attr_purchase->getApiAccountCrudSettings();
+
+
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -673,6 +675,19 @@ class PurchaseController extends Controller
                             $grouped_purchase['arr_purchase_id'] = [];
                         }
                         $grouped_purchase['arr_purchase_id'][] = $purchase->purchase_id;
+
+                        if (!isset($grouped_purchase['action'])) {
+                            $grouped_purchase['action'] = [];
+                        }
+                        $grouped_purchase['action'] = $this->helper->formatApi(
+                            $crud_settings['prefix'],
+                            $crud_settings['api_with_payloads'],
+                            $crud_settings['methods'],
+                            $crud_settings['button_names'],
+                            $crud_settings['icons'],
+                            $crud_settings['actions']
+                        );
+
                         // If the same purchase details exist, increment the count and update total_price
                         $grouped_purchase['count']++;
                         if ($purchase->discounted_price != 0) {
@@ -680,6 +695,7 @@ class PurchaseController extends Controller
                         } else {
                             $grouped_purchase['total_price'] = $purchase->retail_price * $grouped_purchase['count'];
                         }
+
                         $found = true;
                         break;
                     }
@@ -740,6 +756,18 @@ class PurchaseController extends Controller
             $arr_purchase_customer[$user_id_customer]['items'] = $items;
         }
 
+        // Encrypt purchase IDs
+        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
+            foreach ($customer_data['items'] as &$item) {
+                // Encrypt each purchase ID in arr_purchase_id
+                $encrypted_purchase_ids = [];
+                foreach ($item['arr_purchase_id'] as $purchase_id) {
+                    $encrypted_purchase_ids[] = Crypt::encrypt($purchase_id);
+                }
+                $item['arr_purchase_id'] = $encrypted_purchase_ids;
+            }
+        }
+
         // Encrypt payment information
         foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
             foreach ($customer_data['payment'] as &$payment_info) {
@@ -762,6 +790,7 @@ class PurchaseController extends Controller
             }
         }
 
+
         // Prepare response
         $response_data = [
             'message' => 'Data retrieved successfully',
@@ -770,7 +799,6 @@ class PurchaseController extends Controller
 
         return response()->json($response_data, Response::HTTP_OK);
     }
-
 
     // CHILD store
     private function generateGroupPurchaseId()

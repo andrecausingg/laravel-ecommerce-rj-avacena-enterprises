@@ -107,7 +107,7 @@ class InventoryProductModel extends Model
     public function getApiAccountCrudSettings()
     {
         $prefix = 'inventory/product/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'update' => $this->arrToUpdates(),
             'destroy' => ['inventory_id', 'eu_device']
         ];
@@ -115,7 +115,7 @@ class InventoryProductModel extends Model
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
-        $buttonNames = [
+        $button_names = [
             'update' => 'update',
             'destroy' => 'delete',
         ];
@@ -128,13 +128,13 @@ class InventoryProductModel extends Model
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'inventory/product/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'store' => $this->arrToStores(),
             'show/' => [
                 'id',
@@ -146,7 +146,7 @@ class InventoryProductModel extends Model
             'show/' => 'GET',
         ];
 
-        $buttonNames = [
+        $button_names = [
             'store' => 'create',
             'show/' => null,
         ];
@@ -161,7 +161,7 @@ class InventoryProductModel extends Model
             'show/' => null,
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 
     public function arrToConvertToReadableDateTime(): array

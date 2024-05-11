@@ -130,11 +130,11 @@ class Helper
         }
     }
 
-    public function formatApi($prefix, $apiWithPayloads, $methods, $buttonNames, $icons, $actions)
+    public function formatApi($prefix, $api_with_payloads, $methods, $button_names, $icons, $actions)
     {
         $functions = [];
 
-        foreach ($apiWithPayloads as $key => $payload) {
+        foreach ($api_with_payloads as $key => $payload) {
             // Remove forward slash from the key
             $cleanedKey = rtrim($key, '/');
 
@@ -144,7 +144,7 @@ class Helper
                 'payload' => $payload,
                 'method' => $method,
                 'icon' => $icons[$key],
-                'button_name' => $this->upperCase($buttonNames[$key]),
+                'button_name' => $this->upperCase($button_names[$key]),
                 'action' => $actions[$key],
             ];
         }

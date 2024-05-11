@@ -145,7 +145,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     public function getApiAccountCrudSettings()
     {
         $prefix = 'admin-accounts/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'update' => ['user_id', 'phone_number', 'email', 'password', 'role', 'status', 'eu_device'],
             'destroy' => ['user_id', 'eu_device']
         ];
@@ -153,7 +153,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
-        $buttonNames = [
+        $button_names = [
             'update' => 'update',
             'destroy' => 'delete',
         ];
@@ -166,13 +166,13 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'admin-accounts/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'store' => [
                 'phone_number',
                 'email',
@@ -192,7 +192,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'show/' => 'GET',
         ];
 
-        $buttonNames = [
+        $button_names = [
             'store' => 'create',
             'show/' => null,
         ];
@@ -207,7 +207,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'show/' => null,
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 
     public function arrModelWithId(): array

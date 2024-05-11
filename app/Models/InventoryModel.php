@@ -72,7 +72,7 @@ class InventoryModel extends Model
     public function getApiAccountCrudSettings()
     {
         $prefix = 'inventory/parent/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'update' => $this->arrToUpdates(),
             'destroy' => ['inventory_id', 'eu_device']
         ];
@@ -80,7 +80,7 @@ class InventoryModel extends Model
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
-        $buttonNames = [
+        $button_names = [
             'update' => 'update',
             'destroy' => 'delete',
         ];
@@ -93,13 +93,13 @@ class InventoryModel extends Model
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'inventory/parent/';
-        $apiWithPayloads = [
+        $api_with_payloads = [
             'store' => $this->arrToStores(),
             'show/' => [
                 'id',
@@ -115,7 +115,7 @@ class InventoryModel extends Model
             'product/show/' => 'GET',
         ];
 
-        $buttonNames = [
+        $button_names = [
             'store' => 'create',
             'show/' => null,
             'product/show/' => null,
@@ -133,6 +133,6 @@ class InventoryModel extends Model
             'product/show/' => 'GET',
         ];
 
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 }

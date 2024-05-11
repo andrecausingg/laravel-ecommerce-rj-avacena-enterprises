@@ -143,8 +143,8 @@ class PurchaseModel extends Model
 
     public function getApiAccountCrudSettings()
     {
-        $prefix = 'inventory/parent/';
-        $apiWithPayloads = [
+        $prefix = 'purchase/';
+        $api_with_payloads = [
             'minus-qty' => [
                 'purchase_id',
                 'purchase_group_id',
@@ -160,39 +160,37 @@ class PurchaseModel extends Model
                 'inventory_product_id',
                 'user_id_customer',
                 'eu_device',
+            ],
+            'delete-all' => [
+                'purchase_id',
+                'purchase_group_id',
+                'user_id_customer',
+                'eu_device',
             ]
         ];
         $methods = [
             'minus-qty' => 'POST',
             'add-qty' => 'POST',
+            'delete-all' => 'POST',
         ];
-        $buttonNames = [
-            'update' => 'update',
-            'destroy' => 'delete',
+        $button_names = [
+            'minus-qty' => 'minus qty',
+            'add-qty' => 'add qty',
+            'delete-all' => 'delete',
         ];
         $icons = [
-            'update' => null,
-            'destroy' =>  null,
+            'minus-qty' => null,
+            'add-qty' => null,
+            'delete-all' => null,
         ];
         $actions = [
-            'update' => 'modal',
-            'destroy' => 'modal',
+            'minus-qty' => null,
+            'add-qty' => null,
+            'delete-all' => null,
         ];
 
         $prefix = 'purchase/';
 
-        // $payloads = [
-        //     'delete-all-qty' => ['purchase_id', 'purchase_group_id', 'user_id_customer'],
-        // ];
-
-        // $functions = [];
-
-        // foreach ($payloads as $key => $payload) {
-        //     $functions[$key] = $this->generateFunction($prefix, "{$key}", $payload);
-        // }
-
-        // return $functions;
-
-        return compact('prefix', 'apiWithPayloads', 'methods', 'buttonNames', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
     }
 }

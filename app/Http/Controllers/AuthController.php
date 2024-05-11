@@ -129,7 +129,6 @@ class AuthController extends Controller
             ],
         ];
 
-
         if ($user->role === 'SUPER_ADMIN') {
             return response()->json([
                 'nav_links' => $nav_links_admin,
