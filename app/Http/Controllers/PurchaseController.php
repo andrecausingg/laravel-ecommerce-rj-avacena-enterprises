@@ -68,9 +68,10 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
+
         // Decrypted Variables
-        $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
-        $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+        $decrypted_inventory_product_id = $request->inventory_product_id != "" && $request->inventory_product_id != null ? Crypt::decrypt($request->inventory_product_id) : null;
+        $decrypted_purchase_group_id = isset($request->purchase_group_id) &&  $request->purchase_group_id != "" && $request->purchase_group_id != null ? Crypt::decrypt($request->purchase_group_id) : null;
 
         $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
             ->first();
@@ -84,7 +85,7 @@ class PurchaseController extends Controller
 
         // Add New Item on purchase_group_id
         if (
-            $decrypted_inventory_product_id != '' &&  $decrypted_purchase_group_id != null
+            $decrypted_inventory_product_id != '' &&  $decrypted_purchase_group_id != null &&  $decrypted_purchase_group_id != false
             && $request->user_id_customer != '' && $request->user_id_customer != null
         ) {
             do {
@@ -628,13 +629,10 @@ class PurchaseController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get the user ID
-        $user_id = $user->user_id;
-
         // Fetch purchases
-        $purchases = PurchaseModel::where('user_id_menu', $user_id)->where('status', 'NOT PAID')->get();
+        $purchases = PurchaseModel::where('user_id_menu', $user->user_id)->where('status', 'NOT PAID')->get();
 
-        // Loop through purchases
+        // Loop through purchases 
         foreach ($purchases as $purchase) {
             $this->addPurchaseInfoToCustomerArray($arr_purchase_customer, $purchase);
         }
@@ -652,10 +650,9 @@ class PurchaseController extends Controller
                 $item['array_discounted_price'] = $totalDiscountedPrice;
 
                 // Assign functionsApi to the item's function
-                $item['function'] = [$this->functionsApi()];
+                $item['action'] = [$this->functionsApi()];
             }
         }
-
 
         $final_format[] = $arr_purchase_customer;
 
@@ -797,25 +794,18 @@ class PurchaseController extends Controller
         return $total_amount;
     }
 
-    // CHILD getUserIdMenuCustomer
+
     private function addPurchaseInfoToCustomerArray(&$arr_purchase_customer, $purchase)
     {
-        // Extract purchase information
-        $purchase_Data = [
-            'purchase_id' => $purchase->purchase_id,
-            'inventory_product_id' => $purchase->inventory_product_id,
-            'inventory_id' => $purchase->inventory_id,
-            'purchase_group_id' => $purchase->purchase_group_id,
-            'item_code' => $purchase->item_code,
-            'name' => $purchase->name,
-            'category' => $purchase->category,
-            'design' => $purchase->design,
-            'size' => $purchase->size,
-            'color' => $purchase->color,
-            'retail_price' => $purchase->retail_price,
-            'discounted_price' => $purchase->discounted_price,
-            'count' => 1,
-        ];
+        $purchase_data = [];
+
+        foreach ($this->fillable_attr_purchase->arrPurchaseData() as $arr_purchase_data) {
+            if ($arr_purchase_data == 'count') {
+                $purchase_data[$arr_purchase_data] = 1;
+            } else {
+                $purchase_data[$arr_purchase_data] = $purchase->{$arr_purchase_data};
+            }
+        }
 
         // Get the user ID of the customer
         $user_id_customer = $purchase->user_id_customer;
@@ -834,6 +824,18 @@ class PurchaseController extends Controller
             ->get()
             ->toArray();
 
+        // Encrypt specified payment IDs
+        foreach ($arr_purchase_customer[$user_id_customer]['payment'] as &$payment) {
+            foreach ($payment as $key => $value) {
+                if(){
+                    
+                }
+                if (in_array($key, ["payment_id", "user_id", "purchase_group_id", "voucher_id"])) {
+                    $payment[$key] = Crypt::encrypt($value);
+                }
+            }
+        }
+
         // Check if the item already exists in the customer's items
         $found = false;
         foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
@@ -847,8 +849,17 @@ class PurchaseController extends Controller
 
         // If not found, add the item
         if (!$found) {
-            $purchase_Data['array_purchase_id'] = [$purchase->purchase_id];
-            $arr_purchase_customer[$user_id_customer]['items'][] = $purchase_Data;
+            $purchase_data['array_purchase_id'] = [$purchase->purchase_id];
+            $arr_purchase_customer[$user_id_customer]['items'][] = $purchase_data;
+        }
+
+        // Encrypt specified purchase IDs
+        foreach ($arr_purchase_customer[$user_id_customer]['items'] as &$item) {
+            foreach ($item as $key => $value) {
+                if (in_array($key, ["purchase_id", "inventory_product_id", "inventory_id", "purchase_group_id"])) {
+                    $item[$key] = Crypt::encrypt($value);
+                }
+            }
         }
     }
 

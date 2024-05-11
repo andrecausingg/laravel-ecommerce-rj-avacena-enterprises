@@ -120,4 +120,23 @@ class PurchaseModel extends Model
             'payment_id' => 'payment_id-',
         ];
     }
+
+    public function arrPurchaseData(): array
+    {
+        return [
+            'purchase_id',
+            'inventory_product_id',
+            'inventory_id',
+            'purchase_group_id',
+            'item_code',
+            'name',
+            'category',
+            'design',
+            'size',
+            'color',
+            'retail_price',
+            'discounted_price',
+            'count',
+        ];
+    }
 }

@@ -255,7 +255,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Invalid credential'
-        ], Response::HTTP_OK);
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     /**
