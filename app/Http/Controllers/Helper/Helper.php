@@ -129,7 +129,7 @@ class Helper
         }
     }
 
-    public function formatApi($prefix, $payloads, $method, $button_name, $icon, $action)
+    public function formatApi($prefix, $payloads, $method, $button_name, $icon, $container)
     {
         $arr_action = [];
 
@@ -140,7 +140,7 @@ class Helper
                 'method' => $method[$key] ?? null,
                 'icon' => $icon[$key] ?? null,
                 'button_name' => $this->upperCase($button_name[$key] ?? null),
-                'action' => $action[$key] ?? null,
+                'container' => $container[$key] ?? null,
             ];
 
             $arr_action[] = $action;

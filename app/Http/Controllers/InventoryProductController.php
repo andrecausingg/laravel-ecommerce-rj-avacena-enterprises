@@ -33,6 +33,7 @@ class InventoryProductController extends Controller
         $arr_inventory = [];
         $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
+        $view_settings = $this->fillable_attr_inventory_children->getViewRowTable();
         $arr_inventory_item = [];
 
         // Authorize the user
@@ -55,57 +56,71 @@ class InventoryProductController extends Controller
                 }
             }
 
+            // ***************************** //
             // Format Api
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
-                $crud_settings['api_with_payloads'],
+                $crud_settings['payload'],
                 $crud_settings['method'],
-                $crud_settings['button_names'],
-                $crud_settings['icons'],
-                $crud_settings['actions']
+                $crud_settings['button_name'],
+                $crud_settings['icon'],
+                $crud_settings['container']
             );
 
-            // Checking Id on other tbl if exist unset the the api
-            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_product_id, $this->fillable_attr_inventory_children->arrModelWithId());
-            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            // Checking Id on other tbl if exist unset the api
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
+            // Unset actions based on conditions
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {
-                    unset($crud_action[$unsetAction]);
+                    $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+                        return $action['button_name'] !== ucfirst($unsetAction);
+                    });
                 }
             }
 
             // Add the format Api Crud
-            $arr_inventory_item['action'] = $crud_action;
+            $arr_inventory_item['action'] = array_values($crud_action);
+            // ***************************** //
 
+            // ***************************** //
+            // Add details on action crud
+            foreach ($arr_inventory_item['action'] as &$action) {
+                // Check if 'details' key doesn't exist, then add it
+                if (!isset($action['details'])) {
+                    $action['details'] = [];
+                }
 
-            // Iterate over the keys returned by arrDetails() function
-            foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
-                // Add details to the $arr_details array
-                $arr_details[$arrDetails] = $arr_inventory_item[$arrDetails];
+                // Populate details for each attribute
+                foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
+                    $action['details'][] = [
+                        'label' => "Product " . ucfirst($arrDetails),
+                        'type' => 'input',
+                        'value' => $arr_inventory_item[$arrDetails]
+                    ];
+                }
             }
-            // Add details on update action
-            $arr_inventory_item['action']['update']['details'] = $arr_details;
-            // Add details on destroy action if it exists
-            if (isset($arr_inventory_item['action']['destroy'])) {
-                $arr_inventory_item['action']['destroy']['details'] = $arr_details;
-            }
+            // ***************************** //
 
-            // Data
-            $arr_inventory[] = $arr_inventory_item;
+            // Add view on row item
+            $arr_inventory_item['view'] = [[
+                'url' => $view_settings['url'] . $arr_inventory_item['inventory_product_id'],
+                'method' => $view_settings['method']
+            ]];
+
         }
 
         // Final response structure
         $response = [
-            'inventory_product' => $arr_inventory,
+            'inventory_product' => $arr_inventory_item,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
-            'buttons' => [$this->helper->formatApi(
+            'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
-                $relative_settings['api_with_payloads'],
+                $relative_settings['payload'],
                 $relative_settings['method'],
-                $relative_settings['button_names'],
-                $relative_settings['icons'],
-                $relative_settings['actions']
-            )],
+                $relative_settings['button_name'],
+                $relative_settings['icon'],
+                $relative_settings['container']
+            ),
             // 'filter' => $filter
         ];
 
@@ -436,7 +451,7 @@ class InventoryProductController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'inventory_id' => 'required|string',
+            'inventory_product_id' => 'required|string',
             'eu_device' => 'required|string',
         ]);
 
@@ -450,7 +465,7 @@ class InventoryProductController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventory = InventoryProductModel::where('inventory_product_id', Crypt::decrypt($request->inventory_id))->first();
+        $inventory = InventoryProductModel::where('inventory_product_id', Crypt::decrypt($request->inventory_product_id))->first();
         if (!$inventory) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }

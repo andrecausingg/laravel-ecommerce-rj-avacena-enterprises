@@ -72,8 +72,8 @@ class InventoryModel extends Model
     public function getApiAccountCrudSettings()
     {
         $prefix = 'inventory/parent/';
-        $payloads = [
-            'update' => ['inventory_id', 'name', 'category'],
+        $payload = [
+            'update' => ['inventory_id', 'name', 'category', 'eu_device'],
             'destroy' => ['inventory_id', 'eu_device']
         ];
         $method = [
@@ -88,19 +88,19 @@ class InventoryModel extends Model
             'update' => "radix-icons:pencil-1",
             'destroy' =>  "radix-icons:trash",
         ];
-        $action = [
+        $container = [
             'update' => 'modal',
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'payloads', 'method', 'button_name', 'icon', 'action');
+        return compact('prefix', 'payload', 'method', 'button_name', 'icon', 'container');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'inventory/parent/';
-        $payloads = [
-            'store' => $this->arrToStores(),
+        $payload = [
+            'store' => ['name', 'category', 'eu_device']
         ];
 
         $method = [
@@ -115,16 +115,16 @@ class InventoryModel extends Model
             'store' => null,
         ];
 
-        $action = [
+        $container = [
             'store' => 'modal',
         ];
 
-        return compact('prefix', 'payloads', 'method', 'button_name', 'icon', 'action');
+        return compact('prefix', 'payload', 'method', 'button_name', 'icon', 'container');
     }
 
     public function getViewRowTable()
     {
-        $prefix = 'inventory/parent';
+        $prefix = 'inventory/parent/';
 
         $url = $prefix . 'product/show/';
         $method = 'GET';

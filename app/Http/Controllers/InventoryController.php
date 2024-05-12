@@ -95,11 +95,11 @@ class InventoryController extends Controller
             // Format Api
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
-                $crud_settings['payloads'],
+                $crud_settings['payload'],
                 $crud_settings['method'],
                 $crud_settings['button_name'],
                 $crud_settings['icon'],
-                $crud_settings['action']
+                $crud_settings['container']
             );
 
             // Checking Id on other tbl if exist unset the api
@@ -136,7 +136,6 @@ class InventoryController extends Controller
             }
             // ***************************** //
 
-
             // Add view on row item
             $arr_inventory_item['view'] = [[
                 'url' => $view_settings['url'] . $arr_parent_inventory_data['inventory_id'],
@@ -153,11 +152,11 @@ class InventoryController extends Controller
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
-                $relative_settings['payloads'],
+                $relative_settings['payload'],
                 $relative_settings['method'],
                 $relative_settings['button_name'],
                 $relative_settings['icon'],
-                $relative_settings['action']
+                $relative_settings['container']
             ),
             // 'filter' => $filter
         ];

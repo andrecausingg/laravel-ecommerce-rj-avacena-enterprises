@@ -86,7 +86,7 @@ class InventoryProductModel extends Model
     public function unsetActions(): array
     {
         return [
-            'destroy',
+            'delete',
         ];
     }
 
@@ -107,7 +107,7 @@ class InventoryProductModel extends Model
     public function getApiAccountCrudSettings()
     {
         $prefix = 'inventory/product/';
-        $api_with_payloads = [
+        $payload = [
             'update' => [
                 'inventory_product_id',
                 'inventory_id',
@@ -124,60 +124,70 @@ class InventoryProductModel extends Model
                 'discounted_price',
                 'unit_supplier_price',
                 'stock',
+                'eu_device'
             ],
-            'destroy' => ['inventory_id', 'eu_device']
+            'destroy' => ['inventory_product_id', 'eu_device']
         ];
         $method = [
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
-        $button_names = [
-            'update' => 'update',
+        $button_name = [
+            'update' => 'edit',
             'destroy' => 'delete',
         ];
-        $icons = [
-            'update' => null,
-            'destroy' =>  null,
+        $icon = [
+            'update' => "radix-icons:pencil-1",
+            'destroy' =>  "radix-icons:trash",
         ];
-        $actions = [
+        $container = [
             'update' => 'modal',
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'payload', 'method', 'button_name', 'icon', 'container');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'inventory/product/';
-        $api_with_payloads = [
-            'store' => $this->arrToStores(),
-            'show/' => [
-                'id',
-            ],
+        $payload = [
+            'store' => [
+                'inventory_id',
+                'item_code',
+                'image',
+                'name',
+                'category',
+                'description',
+                'supplier_name',
+                'design',
+                'size',
+                'color',
+                'retail_price',
+                'discounted_price',
+                'unit_supplier_price',
+                'stock',
+                'eu_device'
+            ]
         ];
 
         $method = [
             'store' => 'POST',
-            'show/' => 'GET',
         ];
 
-        $button_names = [
+        $button_name = [
             'store' => 'create',
-            'show/' => null,
         ];
 
-        $icons = [
+        $icon = [
             'store' => null,
-            'show/' => null,
         ];
 
-        $actions = [
+        $container = [
             'store' => 'modal',
-            'show/' => null,
         ];
 
-        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'payload', 'method', 'button_name', 'icon', 'container');
     }
 
     public function arrToConvertToReadableDateTime(): array
@@ -204,5 +214,15 @@ class InventoryProductModel extends Model
             'unit_supplier_price',
             'stock',
         ];
+    }
+
+
+    public function getViewRowTable()
+    {
+        $prefix = 'inventory/product/';
+        $url = $prefix . 'show/';
+        $method = 'GET';
+
+        return compact('url',  'method');
     }
 }
