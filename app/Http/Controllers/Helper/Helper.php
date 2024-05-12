@@ -129,7 +129,7 @@ class Helper
         }
     }
 
-    public function formatApi($prefix, $api_with_payloads, $methods, $button_names, $icons, $actions)
+    public function formatApi($prefix, $api_with_payloads, $method, $button_names, $icons, $actions)
     {
         $functions = [];
 
@@ -137,7 +137,7 @@ class Helper
             // Remove forward slash from the key
             $cleanedKey = rtrim($key, '/');
 
-            $method = $methods[$key] ?? null;
+            $method = $method[$key] ?? null;
             $functions[$cleanedKey] = [
                 'url' => $prefix . $key,
                 'payload' => $payload,

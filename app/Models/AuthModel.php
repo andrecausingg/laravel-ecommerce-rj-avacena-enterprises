@@ -149,7 +149,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'update' => ['user_id', 'phone_number', 'email', 'password', 'role', 'status', 'eu_device'],
             'destroy' => ['user_id', 'eu_device']
         ];
-        $methods = [
+        $method = [
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
@@ -166,7 +166,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
     }
 
     public function getApiAccountRelativeSettings()
@@ -187,7 +187,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             ]
         ];
 
-        $methods = [
+        $method = [
             'store' => 'POST',
             'show/' => 'GET',
         ];
@@ -207,7 +207,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'show/' => null,
         ];
 
-        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
     }
 
     public function arrModelWithId(): array

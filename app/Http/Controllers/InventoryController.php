@@ -34,6 +34,7 @@ class InventoryController extends Controller
         $arr_inventory = [];
         $crud_settings = $this->fillable_attr_inventorys->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_inventorys->getApiAccountRelativeSettings();
+        $view_settings = $this->fillable_attr_inventorys->getViewRowTable();
         $arr_inventory_item = [];
         $arr_parent_inventory_data = [];
 
@@ -60,21 +61,24 @@ class InventoryController extends Controller
             $arr_inventory_item['variant'] =  $inventory_children->count();
             $arr_inventory_item['stock'] = $inventory_children->sum('stock');
 
-
-            // TODO : fix the total sales
+            // TODO : check if correct total sales
             // Calculate total sales for all inventory items including both discounted and retail prices
             $total_sales = 0;
             foreach ($inventory_children as $child) {
-                if ($child->discounted_price != null) {
-                    $total_sales += $child->retail_price;
-                } else {
-                    $total_sales += $child->retail_price;
+                $purchases = PurchaseModel::where('inventory_id', $child->inventory_id)
+                    ->where('inventory_product_id', $child->inventory_product_id)
+                    ->get();
+                foreach ($purchases as $purchase) {
+                    if ($purchase->discounted_price != null) {
+                        $total_sales += $purchase->discounted_price;
+                    } else {
+                        $total_sales += $purchase->retail_price;
+                    }
                 }
             }
             $arr_inventory_item['total_sales'] = $total_sales;
 
-            // TODO : fix the total sales
-            // Calculate total sales for all inventory items including both discounted and retail prices
+            // TODO : fix total discounted
             $ctr_total_discounted = 0;
             foreach ($inventory_children as $child) {
                 if ($child->discounted_price != null) {
@@ -83,33 +87,36 @@ class InventoryController extends Controller
             }
             $arr_inventory_item['total_discounted'] = $ctr_total_discounted;
 
-
             // TODO : fix the total return once ecommerce done
             $arr_inventory_item['total_return'] = 0;
 
-
+            // ***************************** //
             // Format Api
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
                 $crud_settings['api_with_payloads'],
-                $crud_settings['methods'],
+                $crud_settings['method'],
                 $crud_settings['button_names'],
                 $crud_settings['icons'],
                 $crud_settings['actions']
             );
-
             // Checking Id on other tbl if exist unset the the api
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
-
             // Check if 'is_exist' is 'yes' in the first element and then unset it
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_inventorys->unsetActions() as $unsetAction) {
                     unset($crud_action[$unsetAction]);
                 }
             }
-
             // Add the format Api Crud
-            $arr_inventory_item['action'] = $crud_action;
+            $arr_inventory_item['action'] = [$crud_action];
+            // ***************************** //
+
+            $arr_inventory_item['view'] = [[
+                'url' => $view_settings['url'] . $arr_parent_inventory_data['inventory_id'],
+                'method' => $view_settings['method']
+            ]];
+
 
             // Data
             $arr_inventory[] = $arr_inventory_item;
@@ -119,14 +126,14 @@ class InventoryController extends Controller
         $response = [
             'inventory' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
-            'relative' => $this->helper->formatApi(
+            'buttons' => [$this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['api_with_payloads'],
-                $relative_settings['methods'],
+                $relative_settings['method'],
                 $relative_settings['button_names'],
                 $relative_settings['icons'],
                 $relative_settings['actions']
-            ),
+            )],
             // 'filter' => $filter
         ];
 

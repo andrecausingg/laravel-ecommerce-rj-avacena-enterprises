@@ -59,7 +59,7 @@ class InventoryProductController extends Controller
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
                 $crud_settings['api_with_payloads'],
-                $crud_settings['methods'],
+                $crud_settings['method'],
                 $crud_settings['button_names'],
                 $crud_settings['icons'],
                 $crud_settings['actions']
@@ -85,14 +85,14 @@ class InventoryProductController extends Controller
         $response = [
             'inventory_product' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
-            'relative' => $this->helper->formatApi(
+            'buttons' => [$this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['api_with_payloads'],
-                $relative_settings['methods'],
+                $relative_settings['method'],
                 $relative_settings['button_names'],
                 $relative_settings['icons'],
                 $relative_settings['actions']
-            ),
+            )],
             // 'filter' => $filter
         ];
 

@@ -76,7 +76,7 @@ class InventoryModel extends Model
             'update' => $this->arrToUpdates(),
             'destroy' => ['inventory_id', 'eu_device']
         ];
-        $methods = [
+        $method = [
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
@@ -93,7 +93,7 @@ class InventoryModel extends Model
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
     }
 
     public function getApiAccountRelativeSettings()
@@ -109,7 +109,7 @@ class InventoryModel extends Model
             ]
         ];
 
-        $methods = [
+        $method = [
             'store' => 'POST',
             'show/' => 'GET',
             'product/show/' => 'GET',
@@ -133,6 +133,13 @@ class InventoryModel extends Model
             'product/show/' => 'GET',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+    }
+
+    public function getViewRowTable()
+    {
+        $url = 'inventory/parent/';
+        $method = 'GET';
+        return compact('url',  'method');
     }
 }

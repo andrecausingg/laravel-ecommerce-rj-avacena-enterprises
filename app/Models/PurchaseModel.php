@@ -168,7 +168,7 @@ class PurchaseModel extends Model
                 'eu_device',
             ]
         ];
-        $methods = [
+        $method = [
             'minus-qty' => 'POST',
             'add-qty' => 'POST',
             'delete-all' => 'POST',
@@ -191,6 +191,6 @@ class PurchaseModel extends Model
 
         $prefix = 'purchase/';
 
-        return compact('prefix', 'api_with_payloads', 'methods', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
     }
 }

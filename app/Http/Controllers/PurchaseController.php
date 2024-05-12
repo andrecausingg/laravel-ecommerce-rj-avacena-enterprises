@@ -678,7 +678,7 @@ class PurchaseController extends Controller
                         $grouped_purchase['action'] = $this->helper->formatApi(
                             $crud_settings['prefix'],
                             $crud_settings['api_with_payloads'],
-                            $crud_settings['methods'],
+                            $crud_settings['method'],
                             $crud_settings['button_names'],
                             $crud_settings['icons'],
                             $crud_settings['actions']
