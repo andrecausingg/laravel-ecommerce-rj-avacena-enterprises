@@ -105,7 +105,7 @@ class InventoryController extends Controller
 
         // Final response structure
         $response = [
-            'data' => $arr_inventory,
+            'inventory' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
             'relative' => [$this->helper->formatApi(
                 $relative_settings['prefix'],
@@ -121,7 +121,7 @@ class InventoryController extends Controller
         return response()->json(
             [
                 'message' => 'Successfully Retrieve Data',
-                'result' => [$response]
+                'data' => $response
             ],
             Response::HTTP_OK
         );
