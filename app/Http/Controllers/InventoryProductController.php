@@ -77,6 +77,19 @@ class InventoryProductController extends Controller
             // Add the format Api Crud
             $arr_inventory_item['action'] = $crud_action;
 
+
+            // Iterate over the keys returned by arrDetails() function
+            foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
+                // Add details to the $arr_details array
+                $arr_details[$arrDetails] = $arr_inventory_item[$arrDetails];
+            }
+            // Add details on update action
+            $arr_inventory_item['action']['update']['details'] = $arr_details;
+            // Add details on destroy action if it exists
+            if (isset($arr_inventory_item['action']['destroy'])) {
+                $arr_inventory_item['action']['destroy']['details'] = $arr_details;
+            }
+
             // Data
             $arr_inventory[] = $arr_inventory_item;
         }

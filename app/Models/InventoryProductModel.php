@@ -186,4 +186,23 @@ class InventoryProductModel extends Model
             'created_at', 'updated_at', 'deleted_at'
         ];
     }
+
+    public function arrDetails(): array
+    {
+        return [
+            'item_code',
+            'image',
+            'name',
+            'category',
+            'description',
+            'supplier_name',
+            'design',
+            'size',
+            'color',
+            'retail_price',
+            'discounted_price',
+            'unit_supplier_price',
+            'stock',
+        ];
+    }
 }

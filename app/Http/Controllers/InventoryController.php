@@ -37,6 +37,7 @@ class InventoryController extends Controller
         $view_settings = $this->fillable_attr_inventorys->getViewRowTable();
         $arr_inventory_item = [];
         $arr_parent_inventory_data = [];
+        $arr_details = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -112,13 +113,13 @@ class InventoryController extends Controller
             $arr_inventory_item['action'] = [$crud_action];
             // ***************************** //
 
-            // Add details on update
-            $arr_details = [
-                'name' => $arr_inventory_item['name'],
-                'category' => $arr_inventory_item['category'],
-            ];
+            // ***************************** //
+            // Add details on action crud
+            foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
+                $arr_details[$arrDetails] = $arr_inventory_item[$arrDetails];
+            }
+            // Add details on update and delete
             $arr_inventory_item['action'][0]['update']['details'] = $arr_details;
-
             // Add details on destroy
             if (isset($arr_inventory_item['action'][0]['destroy'])) {
                 $arr_details = [
@@ -127,6 +128,8 @@ class InventoryController extends Controller
                 ];
                 $arr_inventory_item['action'][0]['destroy']['details'] = $arr_details;
             }
+            // Add details on action crud
+            // ***************************** //
 
             // Add view on row item
             $arr_inventory_item['view'] = [[

@@ -144,4 +144,11 @@ class InventoryModel extends Model
         $method = 'GET';
         return compact('url',  'method');
     }
+
+    public function arrDetails(): array
+    {
+        return [
+            'name', 'category'
+        ];
+    }
 }
