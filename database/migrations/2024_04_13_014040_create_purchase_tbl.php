@@ -16,7 +16,7 @@ return new class extends Migration
 
             // This Table I.Ds
             $table->text('purchase_id')->unique()->nullable();
-            $table->text('purchase_group_id');
+            $table->text('purchase_group_id')->nullable();
 
             // User I.Ds
             $table->text('user_id_customer')->nullable();

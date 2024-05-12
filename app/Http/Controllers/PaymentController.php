@@ -40,10 +40,10 @@ class PaymentController extends Controller
             'stock' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
             'today_transaction' => $this->getTodayTransaction(),
-            'chart' => [
+            'chart' => [[
                 'year' => $this->getChatSales(),
                 'month' => $this->getChatSales()
-            ],
+            ]],
         ], Response::HTTP_OK);
     }
 
@@ -179,7 +179,7 @@ class PaymentController extends Controller
         $arr_today_transaction = [];
 
         // Get today's transactions
-        $today_transactions = PaymentModel::whereDate('paid_at', Carbon::now()->toDateString())->get()->toArray();
+        $today_transactions = PaymentModel::whereDate('created', Carbon::now()->toDateString())->get()->toArray();
 
         // Check if there are any transactions for today
         if (!empty($today_transactions)) {
@@ -212,7 +212,8 @@ class PaymentController extends Controller
         return $arr_today_transaction;
     }
 
-    private function getTopSellingProducts(){
+    private function getTopSellingProducts()
+    {
         
     }
 

@@ -140,7 +140,6 @@ class AuthController extends Controller
         }
     }
 
-
     /**
      * PARENT LOGIN
      * Login

@@ -22,7 +22,7 @@ return new class extends Migration
             $table->text('ip_address');
             $table->text('user_action');
             $table->longText('details');
-            $table->text('user_device');
+            $table->longText('user_device');
 
             // Date | Time
             $table->timestamps();
@@ -31,7 +31,7 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * Reverse the migrations
      */
     public function down(): void
     {

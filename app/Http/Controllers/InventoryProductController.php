@@ -101,7 +101,7 @@ class InventoryProductController extends Controller
         return response()->json(
             [
                 'message' => 'Successfully Retrieve Data',
-                'result' => $response
+                'result' => [$response]
             ],
             Response::HTTP_OK
         );

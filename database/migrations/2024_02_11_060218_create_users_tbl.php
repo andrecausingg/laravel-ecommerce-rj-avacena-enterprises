@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('status');
 
             // Verifications
-            $table->integer('verification_number');
+            $table->integer('verification_number')->nullable();
             $table->longText('verification_key')->nullable();
 
             // Token
