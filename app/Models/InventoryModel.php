@@ -51,7 +51,7 @@ class InventoryModel extends Model
     public function unsetActions(): array
     {
         return [
-            'destroy',
+            'delete',
         ];
     }
 

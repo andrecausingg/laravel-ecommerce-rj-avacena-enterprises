@@ -88,7 +88,7 @@ class InventoryController extends Controller
             }
             $arr_inventory_item['total_discounted'] = $ctr_total_discounted;
 
-            // TODO : fix the total return once ecommerce done
+            // TODO : fix the total return once e-commerce done
             $arr_inventory_item['total_return'] = 0;
 
             // ***************************** //
@@ -101,35 +101,38 @@ class InventoryController extends Controller
                 $crud_settings['icon'],
                 $crud_settings['action']
             );
-            // Checking Id on other tbl if exist unset the the api
+
+            // Checking Id on other tbl if exist unset the api
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
-            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            // Unset actions based on conditions
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_inventorys->unsetActions() as $unsetAction) {
-                    unset($crud_action[$unsetAction]);
+                    $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+                        return $action['button_name'] !== ucfirst($unsetAction);
+                    });
                 }
             }
+
             // Add the format Api Crud
-            $arr_inventory_item['action'] = $crud_action;
+            $arr_inventory_item['action'] = array_values($crud_action);
             // ***************************** //
 
             // ***************************** //
             // Add details on action crud
-            $details = [];
-            foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                $details[] = ['label' => "Product " . ucfirst($arrDetails), 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
-            }
-
-            // Add details on update and delete
-            $arr_inventory_item['action'][0]['details'] = $details;
-
-            // Add details on destroy
-            if (isset($arr_inventory_item['action'][1])) {
-                $details = [];
-                foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                    $details[] = ['label' => "Product " . ucfirst($arrDetails), 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
+            foreach ($arr_inventory_item['action'] as &$action) {
+                // Check if 'details' key doesn't exist, then add it
+                if (!isset($action['details'])) {
+                    $action['details'] = [];
                 }
-                $arr_inventory_item['action'][1]['details'] = $details;
+
+                // Populate details for each attribute
+                foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
+                    $action['details'][] = [
+                        'label' => "Product " . ucfirst($arrDetails),
+                        'type' => 'input',
+                        'value' => $arr_inventory_item[$arrDetails]
+                    ];
+                }
             }
             // ***************************** //
 
