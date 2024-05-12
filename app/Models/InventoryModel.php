@@ -86,7 +86,7 @@ class InventoryModel extends Model
         ];
         $icon = [
             'update' => "radix-icons:pencil-1",
-            'destroy' =>  null,
+            'destroy' =>  "radix-icons:trash",
         ];
         $action = [
             'update' => 'modal',
