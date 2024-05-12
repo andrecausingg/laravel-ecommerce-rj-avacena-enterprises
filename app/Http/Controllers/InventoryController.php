@@ -117,7 +117,7 @@ class InventoryController extends Controller
             // Add details on action crud
             $details = [];
             foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                $details[] = ['label' => $arrDetails, 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
+                $details[] = ['label' => "Product " . ucfirst($arrDetails), 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
             }
 
             // Add details on update and delete
@@ -127,11 +127,12 @@ class InventoryController extends Controller
             if (isset($arr_inventory_item['action'][1])) {
                 $details = [];
                 foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                    $details[] = ['label' => "Product" . ucfirst($arrDetails), 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
+                    $details[] = ['label' => "Product " . ucfirst($arrDetails), 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
                 }
                 $arr_inventory_item['action'][1]['details'] = $details;
             }
             // ***************************** //
+
 
             // Add view on row item
             $arr_inventory_item['view'] = [[
