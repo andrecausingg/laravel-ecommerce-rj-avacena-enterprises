@@ -75,9 +75,7 @@ class InventoryProductController extends Controller
             }
 
             // Add the format Api Crud
-            $arr_inventory_item['action'] = [
-                $crud_action
-            ];
+            $arr_inventory_item['action'] = $crud_action;
 
             // Data
             $arr_inventory[] = $arr_inventory_item;
@@ -87,14 +85,14 @@ class InventoryProductController extends Controller
         $response = [
             'inventory_product' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
-            'relative' => [$this->helper->formatApi(
+            'relative' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['api_with_payloads'],
                 $relative_settings['methods'],
                 $relative_settings['button_names'],
                 $relative_settings['icons'],
                 $relative_settings['actions']
-            )],
+            ),
             // 'filter' => $filter
         ];
 

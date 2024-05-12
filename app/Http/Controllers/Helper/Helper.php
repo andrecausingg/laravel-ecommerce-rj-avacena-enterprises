@@ -139,7 +139,7 @@ class Helper
 
             $method = $methods[$key] ?? null;
             $functions[$cleanedKey] = [
-                'api' => $prefix . $key,
+                'url' => $prefix . $key,
                 'payload' => $payload,
                 'method' => $method,
                 'icon' => $icons[$key],

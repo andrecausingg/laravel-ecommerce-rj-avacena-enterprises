@@ -66,12 +66,26 @@ class InventoryController extends Controller
             $total_sales = 0;
             foreach ($inventory_children as $child) {
                 if ($child->discounted_price != null) {
-                    $total_sales += $child->discounted_price;
+                    $total_sales += $child->retail_price;
                 } else {
                     $total_sales += $child->retail_price;
                 }
             }
             $arr_inventory_item['total_sales'] = $total_sales;
+
+            // TODO : fix the total sales
+            // Calculate total sales for all inventory items including both discounted and retail prices
+            $ctr_total_discounted = 0;
+            foreach ($inventory_children as $child) {
+                if ($child->discounted_price != null) {
+                    $ctr_total_discounted++;
+                }
+            }
+            $arr_inventory_item['total_discounted'] = $ctr_total_discounted;
+
+
+            // TODO : fix the total return once ecommerce done
+            $arr_inventory_item['total_return'] = 0;
 
 
             // Format Api
@@ -95,9 +109,7 @@ class InventoryController extends Controller
             }
 
             // Add the format Api Crud
-            $arr_inventory_item['action'] = [
-                $crud_action
-            ];
+            $arr_inventory_item['action'] = $crud_action;
 
             // Data
             $arr_inventory[] = $arr_inventory_item;
@@ -107,14 +119,14 @@ class InventoryController extends Controller
         $response = [
             'inventory' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
-            'relative' => [$this->helper->formatApi(
+            'relative' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['api_with_payloads'],
                 $relative_settings['methods'],
                 $relative_settings['button_names'],
                 $relative_settings['icons'],
                 $relative_settings['actions']
-            )],
+            ),
             // 'filter' => $filter
         ];
 
