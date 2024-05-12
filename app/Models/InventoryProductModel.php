@@ -108,7 +108,23 @@ class InventoryProductModel extends Model
     {
         $prefix = 'inventory/product/';
         $api_with_payloads = [
-            'update' => $this->arrToUpdates(),
+            'update' => [
+                'inventory_product_id',
+                'inventory_id',
+                'item_code',
+                'image',
+                'name',
+                'category',
+                'description',
+                'supplier_name',
+                'design',
+                'size',
+                'color',
+                'retail_price',
+                'discounted_price',
+                'unit_supplier_price',
+                'stock',
+            ],
             'destroy' => ['inventory_id', 'eu_device']
         ];
         $method = [

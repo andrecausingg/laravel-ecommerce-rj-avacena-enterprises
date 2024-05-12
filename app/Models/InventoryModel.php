@@ -73,7 +73,7 @@ class InventoryModel extends Model
     {
         $prefix = 'inventory/parent/';
         $api_with_payloads = [
-            'update' => $this->arrToUpdates(),
+            'update' => ['inventory_id', 'name', 'category'],
             'destroy' => ['inventory_id', 'eu_device']
         ];
         $method = [
@@ -138,7 +138,9 @@ class InventoryModel extends Model
 
     public function getViewRowTable()
     {
-        $url = 'inventory/parent/';
+        $prefix = 'inventory/parent';
+
+        $url = $prefix . 'product/show/';
         $method = 'GET';
         return compact('url',  'method');
     }

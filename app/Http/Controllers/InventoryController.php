@@ -112,11 +112,27 @@ class InventoryController extends Controller
             $arr_inventory_item['action'] = [$crud_action];
             // ***************************** //
 
+            // Add details on update
+            $arr_details = [
+                'name' => $arr_inventory_item['name'],
+                'category' => $arr_inventory_item['category'],
+            ];
+            $arr_inventory_item['action'][0]['update']['details'] = $arr_details;
+
+            // Add details on destroy
+            if (isset($arr_inventory_item['action'][0]['destroy'])) {
+                $arr_details = [
+                    'name' => $arr_inventory_item['name'],
+                    'category' => $arr_inventory_item['category'],
+                ];
+                $arr_inventory_item['action'][0]['destroy']['details'] = $arr_details;
+            }
+
+            // Add view on row item
             $arr_inventory_item['view'] = [[
                 'url' => $view_settings['url'] . $arr_parent_inventory_data['inventory_id'],
                 'method' => $view_settings['method']
             ]];
-
 
             // Data
             $arr_inventory[] = $arr_inventory_item;
