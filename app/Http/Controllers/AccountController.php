@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AccountController extends Controller
 {
-    
+
     protected $helper, $fillable_attr_auth;
 
     public function __construct(Helper $helper, AuthModel $fillable_attr_auth)
@@ -65,11 +65,11 @@ class AccountController extends Controller
                     $decrypted_auth_user['userInfo'] = [
                         'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
                     ];
-                    $decrypted_auth_user['id'] = Crypt::encrypt($auth_user->{$column});
+                    $decrypted_auth_user[$column] = Crypt::encrypt($auth_user->{$column});
 
                     // Add to column_name if it doesn't exist
-                    if (!in_array($this->helper->transformColumnName('Id'), $column_name)) {
-                        $column_name[] = $this->helper->transformColumnName('Id');
+                    if (!in_array($this->helper->transformColumnName($column), $column_name)) {
+                        $column_name[] = $this->helper->transformColumnName($column);
                     }
                 } elseif ($column == 'email') {
                     $decrypted_auth_user[$column] = $auth_user->{$column} ? Crypt::decrypt($auth_user->{$column}) : null;
@@ -85,7 +85,7 @@ class AccountController extends Controller
                         $column_name[] = 'password';
                     }
                 } elseif ($column == 'role') {
-                    // Add 'role' to column_name if it doesn't exist
+                    // Add 'role' to column_name if exist
                     if (!in_array($this->helper->transformColumnName($column), $column_name)) {
                         $column_name[] = $this->helper->transformColumnName($column);
                     }
@@ -104,7 +104,10 @@ class AccountController extends Controller
                     // Check if the column needs formatting and value is not null
                     if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
                         $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
+                    }else{
+                        $decrypted_auth_user[$column] = $auth_user->{$column};
                     }
+
                 }
             }
 
@@ -131,6 +134,19 @@ class AccountController extends Controller
             $decrypted_auth_user['action'] = [
                 $crud_action
             ];
+
+
+            // Iterate over the keys returned by arrDetails() function
+            foreach ($this->fillable_attr_auth->getFillableAttributes() as $getFillableAttributes) {
+                // Add details to the $arr_details array
+                $arr_details[$getFillableAttributes] = $decrypted_auth_user[$getFillableAttributes] ?? null;
+            }
+            // Add details on update action
+            $decrypted_auth_user['action'][0]['update']['details'] = $arr_details;
+            // Add details on destroy action if it exists
+            if (isset($decrypted_auth_user['action']['destroy'])) {
+                $decrypted_auth_user['action'][0]['destroy']['details'] = $arr_details;
+            }
 
             // Add the decrypted user data to the array
             $decrypted_auth_users[] = $decrypted_auth_user;
@@ -206,9 +222,9 @@ class AccountController extends Controller
 
         foreach ($unset_results as $column) {
             if ($column == 'user_id') {
-                $userInfo = UserInfoModel::where('user_id', $auth_user->user_id)->first();
+                $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
                 $decrypted_user_auth['data']['userInfo'] = [
-                    'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+                    'image' => $user_info && $user_info->image ? Crypt::decrypt($user_info->image) : null,
                 ];
                 $decrypted_user_auth['data']['id'] = Crypt::encrypt($auth_user->{$column});
                 $column_name[] = $this->helper->transformColumnName('Id');

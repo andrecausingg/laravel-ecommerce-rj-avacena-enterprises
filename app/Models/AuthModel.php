@@ -227,4 +227,15 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'destroy',
         ];
     }
+
+    public function arrDetails(): array
+    {
+        return [
+            'phone_number',
+            'email',
+            'password',
+            'role',
+            'status',
+        ];
+    }
 }
