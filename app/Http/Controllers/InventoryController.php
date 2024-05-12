@@ -113,23 +113,23 @@ class InventoryController extends Controller
             $arr_inventory_item['action'] = $crud_action;
             // ***************************** //
 
-
             // ***************************** //
             // Add details on action crud
             foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                $arr_details[$arrDetails] = $arr_inventory_item[$arrDetails];
+                $details[] = [$arrDetails => $arr_inventory_item[$arrDetails]];
             }
+
             // Add details on update and delete
-            $arr_inventory_item['action'][0]['details'] = $arr_details;
+            $arr_inventory_item['action'][0]['details'] = $details;
+
             // Add details on destroy
             if (isset($arr_inventory_item['action'][1])) {
-                $arr_details = [
-                    'name' => $arr_inventory_item['name'],
-                    'category' => $arr_inventory_item['category'],
+                $details = [
+                    ['name' => $arr_inventory_item['name']],
+                    ['category' => $arr_inventory_item['category']]
                 ];
-                $arr_inventory_item['action'][1]['details'] = $arr_details;
+                $arr_inventory_item['action'][1]['details'] = $details;
             }
-            // Add details on action crud
             // ***************************** //
 
             // Add view on row item
