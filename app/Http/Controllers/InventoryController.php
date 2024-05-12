@@ -115,8 +115,9 @@ class InventoryController extends Controller
 
             // ***************************** //
             // Add details on action crud
+            $details = [];
             foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                $details[] = [$arrDetails => $arr_inventory_item[$arrDetails]];
+                $details[] = ['label' => $arrDetails, 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
             }
 
             // Add details on update and delete
@@ -124,10 +125,10 @@ class InventoryController extends Controller
 
             // Add details on destroy
             if (isset($arr_inventory_item['action'][1])) {
-                $details = [
-                    ['name' => $arr_inventory_item['name']],
-                    ['category' => $arr_inventory_item['category']]
-                ];
+                $details = [];
+                foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
+                    $details[] = ['label' => $arrDetails, 'type' => 'input', 'value' => $arr_inventory_item[$arrDetails]];
+                }
                 $arr_inventory_item['action'][1]['details'] = $details;
             }
             // ***************************** //
