@@ -95,11 +95,11 @@ class InventoryController extends Controller
             // Format Api
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
-                $crud_settings['api_with_payloads'],
+                $crud_settings['payloads'],
                 $crud_settings['method'],
-                $crud_settings['button_names'],
-                $crud_settings['icons'],
-                $crud_settings['actions']
+                $crud_settings['button_name'],
+                $crud_settings['icon'],
+                $crud_settings['action']
             );
             // Checking Id on other tbl if exist unset the the api
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_parent->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
@@ -110,8 +110,9 @@ class InventoryController extends Controller
                 }
             }
             // Add the format Api Crud
-            $arr_inventory_item['action'] = [$crud_action];
+            $arr_inventory_item['action'] = $crud_action;
             // ***************************** //
+
 
             // ***************************** //
             // Add details on action crud
@@ -119,14 +120,14 @@ class InventoryController extends Controller
                 $arr_details[$arrDetails] = $arr_inventory_item[$arrDetails];
             }
             // Add details on update and delete
-            $arr_inventory_item['action'][0]['update']['details'] = $arr_details;
+            $arr_inventory_item['action'][0]['details'] = $arr_details;
             // Add details on destroy
-            if (isset($arr_inventory_item['action'][0]['destroy'])) {
+            if (isset($arr_inventory_item['action'][1])) {
                 $arr_details = [
                     'name' => $arr_inventory_item['name'],
                     'category' => $arr_inventory_item['category'],
                 ];
-                $arr_inventory_item['action'][0]['destroy']['details'] = $arr_details;
+                $arr_inventory_item['action'][1]['details'] = $arr_details;
             }
             // Add details on action crud
             // ***************************** //
@@ -145,14 +146,14 @@ class InventoryController extends Controller
         $response = [
             'inventory' => $arr_inventory,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
-            'buttons' => [$this->helper->formatApi(
+            'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
-                $relative_settings['api_with_payloads'],
+                $relative_settings['payloads'],
                 $relative_settings['method'],
-                $relative_settings['button_names'],
-                $relative_settings['icons'],
-                $relative_settings['actions']
-            )],
+                $relative_settings['button_name'],
+                $relative_settings['icon'],
+                $relative_settings['action']
+            ),
             // 'filter' => $filter
         ];
 

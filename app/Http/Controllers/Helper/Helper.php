@@ -129,27 +129,26 @@ class Helper
         }
     }
 
-    public function formatApi($prefix, $api_with_payloads, $method, $button_names, $icons, $actions)
+    public function formatApi($prefix, $payloads, $method, $button_name, $icon, $action)
     {
-        $functions = [];
+        $arr_action = [];
 
-        foreach ($api_with_payloads as $key => $payload) {
-            // Remove forward slash from the key
-            $cleanedKey = rtrim($key, '/');
-
-            $method = $method[$key] ?? null;
-            $functions[$cleanedKey] = [
+        foreach ($payloads as $key => $payload) {
+            $action = [
                 'url' => $prefix . $key,
                 'payload' => $payload,
-                'method' => $method,
-                'icon' => $icons[$key],
-                'button_name' => $this->upperCase($button_names[$key]),
-                'action' => $actions[$key],
+                'method' => $method[$key] ?? null,
+                'icon' => $icon[$key] ?? null,
+                'button_name' => $this->upperCase($button_name[$key] ?? null),
+                'action' => $action[$key] ?? null,
             ];
+
+            $arr_action[] = $action;
         }
 
-        return $functions[] = $functions;
+        return $arr_action;
     }
+
 
     public function log($request, $arr_data_logs)
     {
@@ -501,5 +500,4 @@ class Helper
 
         return $value;
     }
-
 }

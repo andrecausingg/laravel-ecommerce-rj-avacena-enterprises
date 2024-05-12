@@ -72,7 +72,7 @@ class InventoryModel extends Model
     public function getApiAccountCrudSettings()
     {
         $prefix = 'inventory/parent/';
-        $api_with_payloads = [
+        $payloads = [
             'update' => ['inventory_id', 'name', 'category'],
             'destroy' => ['inventory_id', 'eu_device']
         ];
@@ -80,60 +80,46 @@ class InventoryModel extends Model
             'update' => 'POST',
             'destroy' => 'DELETE',
         ];
-        $button_names = [
-            'update' => 'update',
+        $button_name = [
+            'update' => 'edit',
             'destroy' => 'delete',
         ];
-        $icons = [
-            'update' => null,
+        $icon = [
+            'update' => "radix-icons:pencil-1",
             'destroy' =>  null,
         ];
-        $actions = [
+        $action = [
             'update' => 'modal',
             'destroy' => 'modal',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'payloads', 'method', 'button_name', 'icon', 'action');
     }
 
     public function getApiAccountRelativeSettings()
     {
         $prefix = 'inventory/parent/';
-        $api_with_payloads = [
+        $payloads = [
             'store' => $this->arrToStores(),
-            'show/' => [
-                'id',
-            ],
-            'product/show/' => [
-                'id',
-            ]
         ];
 
         $method = [
             'store' => 'POST',
-            'show/' => 'GET',
-            'product/show/' => 'GET',
         ];
 
-        $button_names = [
+        $button_name = [
             'store' => 'create',
-            'show/' => null,
-            'product/show/' => null,
         ];
 
-        $icons = [
+        $icon = [
             'store' => null,
-            'show/' => null,
-            'product/show/' => null,
         ];
 
-        $actions = [
+        $action = [
             'store' => 'modal',
-            'show/' => null,
-            'product/show/' => 'GET',
         ];
 
-        return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+        return compact('prefix', 'payloads', 'method', 'button_name', 'icon', 'action');
     }
 
     public function getViewRowTable()
