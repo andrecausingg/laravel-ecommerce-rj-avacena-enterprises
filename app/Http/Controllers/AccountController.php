@@ -39,9 +39,24 @@ class AccountController extends Controller
         // Add action
         $crud_settings = $this->fillable_attr_auth->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_auth->getApiAccountRelativeSettings();
+        $view_settings = $this->fillable_attr_auth->getViewRowTable();
         $decrypted_auth_users = [];
         $column_name = [];
         $filter = [];
+
+        // Filter Column
+        $filter_status = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountStatus());
+        $filter_role = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountRole());
+        $filter[] = [
+            'status' => [
+                'type' => 'select',
+                'option' => $filter_status
+            ],
+            'role' => [
+                'type' => 'select',
+                'option' => $filter_role
+            ]
+        ];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -104,49 +119,79 @@ class AccountController extends Controller
                     // Check if the column needs formatting and value is not null
                     if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
                         $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
-                    }else{
+                    } else {
                         $decrypted_auth_user[$column] = $auth_user->{$column};
                     }
-
                 }
             }
 
+
+            // ***************************** //
+            // Format Api
             $crud_action = $this->helper->formatApi(
                 $crud_settings['prefix'],
-                $crud_settings['api_with_payloads'],
+                $crud_settings['payload'],
                 $crud_settings['method'],
-                $crud_settings['button_names'],
-                $crud_settings['icons'],
-                $crud_settings['actions']
+                $crud_settings['button_name'],
+                $crud_settings['icon'],
+                $crud_settings['container']
             );
 
-            // Checking Id on other tbl if exist unset the the api
+            // Checking Id on other tbl if exist unset the api
             $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillable_attr_auth->arrModelWithId());
-            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            // Unset actions based on conditions
             if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
                 foreach ($this->fillable_attr_auth->unsetActions() as $unsetAction) {
-                    unset($crud_action[$unsetAction]);
+                    $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+                        return $action['button_name'] !== ucfirst($unsetAction);
+                    });
                 }
-                // Unset the first element from the result array
-                array_shift($is_exist_id_other_tbl);
             }
 
-            $decrypted_auth_user['action'] = [
-                $crud_action
-            ];
+            // Add the format Api Crud
+            $decrypted_auth_user['action'] = array_values($crud_action);
+            // ***************************** //
 
+            // ***************************** //
+            // Add details on action crud
+            foreach ($decrypted_auth_user['action'] as &$action) {
+                // Check if 'details' key doesn't exist, then add it
+                if (!isset($action['details'])) {
+                    $action['details'] = [];
+                }
 
-            // Iterate over the keys returned by arrDetails() function
-            foreach ($this->fillable_attr_auth->getFillableAttributes() as $getFillableAttributes) {
-                // Add details to the $arr_details array
-                $arr_details[$getFillableAttributes] = $decrypted_auth_user[$getFillableAttributes] ?? null;
+                // Populate details for each attribute
+                foreach ($this->fillable_attr_auth->arrDetails() as $arrDetails) {
+                    if ($arrDetails == 'role') {
+                        $action['details'][] = [
+                            'label' => ucfirst($arrDetails),
+                            'type' => 'select',
+                            'value' => $decrypted_auth_user[$arrDetails],
+                            'option' => $filter_status
+                        ];
+                    } else if ($arrDetails == 'status') {
+                        $action['details'][] = [
+                            'label' => ucfirst($arrDetails),
+                            'type' => 'select',
+                            'value' => $decrypted_auth_user[$arrDetails],
+                            'option' => $filter_role
+                        ];
+                    } else {
+                        $action['details'][] = [
+                            'label' => ucfirst($arrDetails),
+                            'type' => 'input',
+                            'value' => $decrypted_auth_user[$arrDetails]
+                        ];
+                    }
+                }
             }
-            // Add details on update action
-            $decrypted_auth_user['action'][0]['update']['details'] = $arr_details;
-            // Add details on destroy action if it exists
-            if (isset($decrypted_auth_user['action']['destroy'])) {
-                $decrypted_auth_user['action'][0]['destroy']['details'] = $arr_details;
-            }
+            // ***************************** //
+
+            // Add view on row item
+            $decrypted_auth_user['view'] = [[
+                'url' => $view_settings['url'] . $decrypted_auth_user['user_id'],
+                'method' => $view_settings['method']
+            ]];
 
             // Add the decrypted user data to the array
             $decrypted_auth_users[] = $decrypted_auth_user;
@@ -159,31 +204,27 @@ class AccountController extends Controller
         array_unshift($column_name, "User Info");
         $column_name[] = "Action";
 
-        // Filter Column
-        $filter_status = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountStatus());
-        $filter_role = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountRole());
-        $filter[] = [
-            'status' => $filter_status,
-            'role' => $filter_role
-        ];
 
         // Final response structure
         $response = [
-            'data' => $decrypted_auth_users,
+            'account' => $decrypted_auth_users,
             'column' => $column_name,
-            'relative' => [$this->helper->formatApi(
+            'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
-                $relative_settings['api_with_payloads'],
+                $relative_settings['payload'],
                 $relative_settings['method'],
-                $relative_settings['button_names'],
-                $relative_settings['icons'],
-                $relative_settings['actions']
-            )],
+                $relative_settings['button_name'],
+                $relative_settings['icon'],
+                $relative_settings['container']
+            ),
             'filter' => $filter
         ];
 
         // Display or use the decrypted attributes as needed
-        return response()->json(['messages' => [$response]], Response::HTTP_OK);
+        return response()->json([
+            'messages' => "Successfully Retrieve Data",
+            'data' => $response
+        ], Response::HTTP_OK);
     }
 
     /**

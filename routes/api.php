@@ -61,22 +61,26 @@ Route::middleware(['jwt.auth'])->group(function () {
     });
 
     // User Accounts | ADMIN
-    Route::prefix('admin-accounts')->group(function () use ($AccountController) {
-        Route::get('/index', [$AccountController, 'index']);
-        Route::get('/show/{id}', [$AccountController, 'show']);
-        Route::post('/store', [$AccountController, 'store']);
-        Route::post('/update', [$AccountController, 'update']);
-        Route::delete('/destroy', [$AccountController, 'destroy']);
+    Route::prefix('accounts')->group(function () use ($AccountController) {
+        // User Accounts | ADMIN
+        Route::prefix('admin')->group(function () use ($AccountController) {
+            Route::get('/index', [$AccountController, 'index']);
+            Route::get('/show/{id}', [$AccountController, 'show']);
+            Route::post('/store', [$AccountController, 'store']);
+            Route::post('/update', [$AccountController, 'update']);
+            Route::delete('/destroy', [$AccountController, 'destroy']);
+        });
+
+        // User Accounts | CLIENT
+        Route::prefix('user')->group(function () use ($AccountController) {
+            Route::get('/show/{id}', [$AccountController, 'show']);
+            Route::post('/update-email', [$AccountController, 'updateEmailOnSettingUser']);
+            Route::post('/update-password', [$AccountController, 'updatePasswordOnSettingUser']);
+            Route::post('/resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
+            Route::post('/resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
+        });
     });
 
-    // User Accounts | CLIENT
-    Route::prefix('client-accounts')->group(function () use ($AccountController) {
-        Route::get('/show/{id}', [$AccountController, 'show']);
-        Route::post('/update-email', [$AccountController, 'updateEmailOnSettingUser']);
-        Route::post('/update-password', [$AccountController, 'updatePasswordOnSettingUser']);
-        Route::post('/resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
-        Route::post('/resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
-    });
 
     // Personal User Information
     Route::prefix('user-info')->group(function () use ($UserInfoController, $AuthController) {
