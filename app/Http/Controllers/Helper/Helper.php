@@ -100,6 +100,7 @@ class Helper
 
         return $arr_select_fields;
     }
+    
 
     // Uppercase the Word with dash -
     public function upperCase($buttonName)
@@ -127,6 +128,14 @@ class Helper
         } else {
             return ucwords(str_replace('_', ' ', $columns));
         }
+    }
+
+    function upperCaseFirstRemoveUnderscoreChangetoSpace($string) {
+        // Replace underscores with spaces
+        $string = str_replace('_', ' ', $string);
+    
+        // Capitalize the first letter of each word
+        return ucwords($string);
     }
 
     public function formatApi($prefix, $payloads, $method, $button_name, $icon, $container)

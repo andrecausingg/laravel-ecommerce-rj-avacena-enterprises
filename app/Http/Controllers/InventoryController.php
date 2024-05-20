@@ -118,29 +118,37 @@ class InventoryController extends Controller
             // ***************************** //
 
             // ***************************** //
-            // Add details on action crud
+            // Add function on action crud
             foreach ($arr_inventory_item['action'] as &$action) {
-                // Check if 'details' key doesn't exist, then add it
-                if (!isset($action['details'])) {
-                    $action['details'] = [];
+                // Check if 'function' key doesn't exist, then add it
+                if (!isset($action['function'])) {
+                    $action['function'] = [];
+                }
+                if (!isset($action['function']['details'])) {
+                    $action['function']['details'] = [];
                 }
 
-                // Populate details for each attribute
+                // Populate function for each attribute
                 foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                    $action['details'][] = [
-                        'label' => "Product " . ucfirst($arrDetails),
+                    $action['function']['details'][] = [
+                        'label' => "Product " . $this->helper->upperCaseFirstRemoveUnderscoreChangetoSpace($arrDetails),
                         'type' => 'input',
-                        'value' => $arr_inventory_item[$arrDetails]
                     ];
                 }
+
+                // ***************************** //
+                // Add url on action function crud
+                if (!isset($action['function']['view'])) {
+                    $action['function']['view'] = [];
+                }
+
+                $action['function']['view'] = [
+                    'url' => 'inventory/parent/show/' . $arr_parent_inventory_data['inventory_id'],
+                    'method' => 'GET',
+                ];
+                // ***************************** //
             }
             // ***************************** //
-
-            // Add view on row item
-            $arr_inventory_item['view'] = [[
-                'url' => $view_settings['url'] . $arr_parent_inventory_data['inventory_id'],
-                'method' => $view_settings['method']
-            ]];
 
             // Data
             $arr_inventory[] = $arr_inventory_item;
