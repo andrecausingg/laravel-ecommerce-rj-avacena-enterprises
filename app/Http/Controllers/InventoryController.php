@@ -31,13 +31,12 @@ class InventoryController extends Controller
      */
     public function index(Request $request)
     {
-        $arr_inventory = [];
         $crud_settings = $this->fillable_attr_inventorys->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_inventorys->getApiAccountRelativeSettings();
         $view_settings = $this->fillable_attr_inventorys->getViewRowTable();
         $arr_inventory_item = [];
         $arr_parent_inventory_data = [];
-        $arr_details = [];
+        $all_inventory_items = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -159,12 +158,12 @@ class InventoryController extends Controller
             ]];
 
             // Data
-            $arr_inventory[] = $arr_inventory_item;
+            $all_inventory_items[] = $arr_inventory_item;
         }
 
         // Final response structure
         $response = [
-            'inventory' => $arr_inventory,
+            'inventory' => $all_inventory_items,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],

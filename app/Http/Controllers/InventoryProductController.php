@@ -45,11 +45,9 @@ class InventoryProductController extends Controller
         $inventory_products = InventoryProductModel::get();
         foreach ($inventory_products as $inventory_product) {
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
-                if ($getFillableAttribute == 'inventory_product_id') {
+                if ($getFillableAttribute == 'inventory_product_id' || $getFillableAttribute == 'inventory_id') {
                     $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
-                } else if ($getFillableAttribute == 'inventory_id') {
-                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
-                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                } elseif (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
                     $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
                 } else {
                     $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
@@ -106,11 +104,14 @@ class InventoryProductController extends Controller
                 'url' => $view_settings['url'] . $arr_inventory_item['inventory_product_id'],
                 'method' => $view_settings['method']
             ]];
+
+            // Collect each inventory item
+            $all_inventory_items[] = $arr_inventory_item;
         }
 
         // Final response structure
         $response = [
-            'inventory_product' => $arr_inventory_item,
+            'inventory_product' => $all_inventory_items,
             'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
