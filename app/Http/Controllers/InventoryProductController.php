@@ -106,7 +106,6 @@ class InventoryProductController extends Controller
                 'url' => $view_settings['url'] . $arr_inventory_item['inventory_product_id'],
                 'method' => $view_settings['method']
             ]];
-
         }
 
         // Final response structure
