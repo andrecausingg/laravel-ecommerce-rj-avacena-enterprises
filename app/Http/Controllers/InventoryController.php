@@ -429,6 +429,9 @@ class InventoryController extends Controller
 
         // Input User
         foreach ($request['items'] as $user_input) {
+            // Decrypted id
+            $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
+
             // Validate eu_device
             $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
             if ($result_validate_eu_device) {
@@ -436,8 +439,9 @@ class InventoryController extends Controller
             }
 
             // Check if inventory record exists
-            $inventory = InventoryModel::where('inventory_id', $user_input['inventory_id'])
+            $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)
                 ->first();
+
             if (!$inventory) {
                 return response()->json([
                     'message' => 'Data not found'
