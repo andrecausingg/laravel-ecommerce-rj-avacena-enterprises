@@ -373,13 +373,16 @@ class InventoryProductController extends Controller
         }
 
         foreach ($request['items'] as $user_input) {
+            // Decrypted id
+            $decrypted_inventory_product_id = Crypt::decrypt($user_input['inventory_product_id']);
+
             // Validate eu_device
             $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
             if ($result_validate_eu_device) {
                 return $result_validate_eu_device;
             }
 
-            $inventory = InventoryProductModel::where('inventory_product_id', $user_input['inventory_product_id'])->first();
+            $inventory = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)->first();
             if (!$inventory) {
                 return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
