@@ -66,7 +66,6 @@ class InventoryProductModel extends Model
     public function arrToUpdates(): array
     {
         return [
-            'inventory_id',
             'item_code',
             'image',
             'name',

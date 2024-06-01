@@ -44,8 +44,11 @@ class InventoryProductController extends Controller
 
         $inventory_products = InventoryProductModel::get();
         foreach ($inventory_products as $inventory_product) {
+
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
-                if ($getFillableAttribute == 'inventory_product_id' || $getFillableAttribute == 'inventory_id') {
+                if ($getFillableAttribute == 'inventory_product_id') {
+                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
+                } else if ($getFillableAttribute == 'inventory_id') {
                     $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
                 } elseif (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
                     $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
@@ -169,7 +172,8 @@ class InventoryProductController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'items.*.inventory_id' => 'required|string|max:500',
+            'items.*.inventory_product_id' => 'required|string',
+            'items.*.inventory_id' => 'required|string',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
@@ -198,6 +202,7 @@ class InventoryProductController extends Controller
         }
 
         foreach ($request['items'] as $user_input) {
+
             // Validate eu_device
             $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
             if ($result_validate_eu_device) {
@@ -343,7 +348,7 @@ class InventoryProductController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'items.*.inventory_id' => 'required|string|max:500',
+            'items.*.inventory_product_id' => 'required|string',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
@@ -382,7 +387,8 @@ class InventoryProductController extends Controller
                 return $result_validate_eu_device;
             }
 
-            $inventory = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)->first();
+            $inventory = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
+                ->first();
             if (!$inventory) {
                 return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
