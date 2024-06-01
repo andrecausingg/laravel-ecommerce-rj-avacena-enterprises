@@ -199,8 +199,12 @@ class Helper
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        // $log_update = $log->update([
+        //     'log_id' => 'log_id-'  . $log->id,
+        // ]);
+
         $log_update = $log->update([
-            'log_id' => 'log_id-'  . $log->id,
+            'log_id' => Str::uuid(),
         ]);
 
         // Check if history update failed
