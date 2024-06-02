@@ -828,7 +828,7 @@ class InventoryController extends Controller
         $log_result = $this->helper->log($request, $arr_data_logs);
 
         return response()->json([
-            'message' => 'Successfully created user',
+            'message' => 'Successfully delete data',
             'log_message' => $log_result
         ], Response::HTTP_OK);
     }
