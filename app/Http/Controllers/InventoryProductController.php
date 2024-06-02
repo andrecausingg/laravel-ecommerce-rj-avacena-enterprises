@@ -155,7 +155,6 @@ class InventoryProductController extends Controller
         try {
             // Validation rules for each item in the array
             $validator = Validator::make($request->all(), [
-                'inventory_product_id' => 'required|string',
                 'inventory_id' => 'required|string',
                 'item_code' => 'required|string|max:255',
                 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -276,7 +275,6 @@ class InventoryProductController extends Controller
         //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
         foreach ($request->input('items') as $key => $item) {
             $validator = Validator::make($item, [
-                'inventory_product_id' => 'required|string',
                 'inventory_id' => 'required|string',
                 'item_code' => 'required|string|max:255',
                 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -308,8 +306,8 @@ class InventoryProductController extends Controller
 
         DB::beginTransaction();
         try {
-
             foreach ($request['items'] as $user_input) {
+                $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
 
                 // Validate eu_device
                 $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
@@ -319,7 +317,7 @@ class InventoryProductController extends Controller
                 }
 
                 // Retrieve the inventory record
-                $inventory = InventoryModel::where('inventory_id', $user_input['inventory_id'])->first();
+                $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
                 // Check if inventory record exists
                 if (!$inventory) {
                     DB::rollBack();

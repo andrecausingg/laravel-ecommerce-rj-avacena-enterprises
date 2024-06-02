@@ -112,7 +112,9 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::get('/index', [$InventoryProductController, 'index']);
             Route::get('/show/{id}', [$InventoryProductController, 'show']);
             Route::post('/store', [$InventoryProductController, 'store']);
+            Route::post('/store-multiple', [$InventoryProductController, 'storeMultiple']);
             Route::post('/update', [$InventoryProductController, 'update']);
+            Route::post('/update-multiple', [$InventoryProductController, 'updateMultiple']);
         });
     });
 
