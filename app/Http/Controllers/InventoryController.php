@@ -640,31 +640,51 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Validation rules for each item in the array
-        $validator = Validator::make($request->all(), [
-            'items.*.inventory_id' => 'required|string',
-            'items.*.name' => 'required|string|max:255',
-            'items.*.category' => 'required|string|max:255',
-            'items.*.eu_device' => 'required|string',
-        ]);
+        //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
+        foreach ($request->input('items') as $key => $item) {
+            $validator = Validator::make($item, [
+                'inventory_id' => 'required|string',
+                'name' => 'required|string|max:255',
+                'category' => 'required|string|max:255',
+                'eu_device' => 'required|string',
+            ]);
 
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Add custom validation rule for unique combination of name and category
-        $validator->after(function ($validator) use ($request) {
-            foreach ($request->input('items') as $item) {
+            // Add custom validation rule for unique combination of name and category
+            $validator->after(function ($validator) use ($item) {
                 $exists = InventoryModel::where('name', $item['name'])
                     ->where('category', $item['category'])
                     ->exists();
 
                 if ($exists) {
-                    $validator->errors()->add('items', 'The combination of name and category already exists.');
+                    $validator->errors()->add('name', 'The combination of name and category already exists.');
                 }
+            });
+
+            // Add custom validation rule for unique combination of name and category
+            $validator->after(function ($validator) use ($request) {
+                foreach ($request->input('items') as $item) {
+                    $exists = InventoryModel::where('name', $item['name'])
+                        ->where('category', $item['category'])
+                        ->exists();
+
+                    if ($exists) {
+                        $validator->errors()->add('items', 'The combination of name and category already exists.');
+                    }
+                }
+            });
+
+            //* TO CHECK VALIDATION RETURN ERROR RESPONSE
+            if ($validator->fails()) {
+                $errors = $validator->errors()->toArray();
+                $errors['inventory_id'] = $item['inventory_id'];
+                $validation_errors[] = $errors;
             }
-        });
+        }
+
+        // Return all validation errors if any
+        if (!empty($validation_errors)) {
+            return response()->json(['message' => $validation_errors], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         // Begin transaction
         DB::beginTransaction();
