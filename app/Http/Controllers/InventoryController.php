@@ -197,16 +197,6 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Check if 'items' key exists in the request
-        if (!$request->has('items')) {
-            return response()->json(
-                [
-                    'message' => 'Missing items in the request',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
-
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
