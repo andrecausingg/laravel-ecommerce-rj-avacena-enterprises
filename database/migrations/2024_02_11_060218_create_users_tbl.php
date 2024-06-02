@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('users_tbl', function (Blueprint $table) {
             // Ids
             $table->id();
-            $table->text('user_id')->unique();
+            $table->text('user_id');
 
             // Authentication
             $table->longText('phone_number')->unique()->nullable();
