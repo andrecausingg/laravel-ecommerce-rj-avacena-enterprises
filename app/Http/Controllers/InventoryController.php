@@ -26,9 +26,6 @@ class InventoryController extends Controller
         $this->fillable_attr_inventory_children = $fillable_attr_inventory_children;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $crud_settings = $this->fillable_attr_inventorys->getApiAccountCrudSettings();
@@ -291,9 +288,6 @@ class InventoryController extends Controller
         }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function storeMultiple(Request $request)
     {
         // Initialize an array to store all created items
@@ -424,9 +418,6 @@ class InventoryController extends Controller
         }
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function show(Request $request, string $id)
     {
         $arr_inventory = [];
@@ -620,9 +611,6 @@ class InventoryController extends Controller
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function updateMultiple(Request $request)
     {
         $arr_existing_data = [];
@@ -762,9 +750,6 @@ class InventoryController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Request $request)
     {
         $arr_log_details = [];
