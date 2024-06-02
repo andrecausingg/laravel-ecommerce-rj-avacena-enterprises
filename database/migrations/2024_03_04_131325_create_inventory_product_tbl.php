@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('inventory_product_tbl', function (Blueprint $table) {
             // Ids
             $table->id();
-            $table->text('inventory_product_id')->unique()->nullable();
+            $table->text('inventory_product_id')->nullable();
 
             $table->text('inventory_id');
 

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('payment_tbl', function (Blueprint $table) {
             $table->id();
 
-            $table->text('payment_id')->unique()->nullable();
+            $table->text('payment_id')->nullable();
 
             $table->text('user_id');
             $table->text('purchase_group_id');
