@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -150,73 +151,141 @@ class Helper
     }
 
 
-    public function log($request, $arr_data_logs)
+    // public function log($request, $arr_data_logs)
+    // {
+    //     if ($arr_data_logs['is_history'] == 1) {
+    //         $history = HistoryModel::create([
+    //             'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
+    //             'tbl_name' => 'users_tbl',
+    //             'column_name' => 'password',
+    //             'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
+    //                 $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
+    //                     $arr_data_logs['log_details']['fields']['password']['new'] :
+    //                     null
+    //                 ),
+    //         ]);
+
+    //         // Check if history creation failed
+    //         if (!$history) {
+    //             return response()->json([
+    //                 'message' => 'Failed to store history',
+    //                 'parameter' => $history,
+    //             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+    //         }
+
+    //         // Update history ID
+    //         $history_update = $history->update([
+    //             'history_id' => 'history_id-' . $history->id,
+    //         ]);
+
+    //         // Check if history update failed
+    //         if (!$history_update) {
+    //             return response()->json(['message' => 'Failed to update history ID'], Response::HTTP_INTERNAL_SERVER_ERROR);
+    //         }
+    //     }
+
+    //     $log = LogsModel::create([
+    //         'user_id' => $arr_data_logs['user_id'],
+    //         'is_sensitive' => $arr_data_logs['is_sensitive'],
+    //         'ip_address' => $request->ip(),
+    //         'user_action' => strtoupper($arr_data_logs['user_action']),
+    //         'user_device' => $arr_data_logs['user_device'] != null && $arr_data_logs['user_device'] != '' ? json_encode(Crypt::decrypt($arr_data_logs['user_device']), JSON_PRETTY_PRINT) : null,
+    //         'details' => json_encode($arr_data_logs['log_details'], JSON_PRETTY_PRINT),
+    //     ]);
+
+    //     if (!$log) {
+    //         return response()->json([
+    //             'message' => 'Failed to store logs',
+    //             'parameter' => $log,
+    //         ], Response::HTTP_INTERNAL_SERVER_ERROR);
+    //     }
+
+    //     $log_update = $log->update([
+    //         'log_id' => 'log_id-'  . $log->id,
+    //     ]);
+
+    //     // Check if history update failed
+    //     if (!$log_update) {
+    //         return response()->json([
+    //             'message' => 'Failed to update log ID',
+    //             'parameter' => $log_update,
+    //         ], Response::HTTP_INTERNAL_SERVER_ERROR);
+    //     }
+
+    //     return response()->json(['message' => $arr_data_logs['is_history'] == 1 ? 'Successfully stored logs and history' : 'Successfully stored logs'], Response::HTTP_OK);
+    // }
+
+    public function log(Request $request, array $arr_data_logs)
     {
-        if ($arr_data_logs['is_history'] == 1) {
-            $history = HistoryModel::create([
-                'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
-                'tbl_name' => 'users_tbl',
-                'column_name' => 'password',
-                'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
-                    $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
-                        $arr_data_logs['log_details']['fields']['password']['new'] :
-                        null
-                    ),
-            ]);
+        DB::beginTransaction();
+        try {
+            if ($arr_data_logs['is_history'] == 1) {
+                $history = HistoryModel::create([
+                    'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
+                    'tbl_name' => 'users_tbl',
+                    'column_name' => 'password',
+                    'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
+                        $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
+                            $arr_data_logs['log_details']['fields']['password']['new'] :
+                            null
+                        ),
+                ]);
 
-            // Check if history creation failed
-            if (!$history) {
-                return response()->json([
-                    'message' => 'Failed to store history',
-                    'parameter' => $history,
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                // Check if history creation failed
+                if (!$history) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to store history'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                // Update history ID
+                $history->history_id = 'history_id-' . $history->id;
+                $history->save();
+
+                // Check if history update failed
+                if (!$history->wasChanged('history_id')) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to update history ID'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
             }
 
-            // Update history ID
-            $history_update = $history->update([
-                'history_id' => 'history_id-' . $history->id,
+            $user_device = null;
+            if (!empty($arr_data_logs['user_device'])) {
+                $user_device = json_encode(Crypt::decrypt($arr_data_logs['user_device']), JSON_PRETTY_PRINT);
+            }
+
+            $log = LogsModel::create([
+                'user_id' => $arr_data_logs['user_id'],
+                'is_sensitive' => $arr_data_logs['is_sensitive'],
+                'ip_address' => $request->ip(),
+                'user_action' => strtoupper($arr_data_logs['user_action']),
+                'user_device' => $user_device,
+                'details' => json_encode($arr_data_logs['log_details'], JSON_PRETTY_PRINT),
             ]);
 
-            // Check if history update failed
-            if (!$history_update) {
-                return response()->json(['message' => 'Failed to update history ID'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            if (!$log) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to store logs'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
-        }
 
-        $log = LogsModel::create([
-            'user_id' => $arr_data_logs['user_id'],
-            'is_sensitive' => $arr_data_logs['is_sensitive'],
-            'ip_address' => $request->ip(),
-            'user_action' => strtoupper($arr_data_logs['user_action']),
-            'user_device' => $arr_data_logs['user_device'] != null && $arr_data_logs['user_device'] != '' ? json_encode(Crypt::decrypt($arr_data_logs['user_device']), JSON_PRETTY_PRINT) : null,
-            'details' => json_encode($arr_data_logs['log_details'], JSON_PRETTY_PRINT),
-        ]);
+            $log->log_id = 'log_id-' . $log->id;
+            $log->save();
 
-        if (!$log) {
+            // Check if log update failed
+            if (!$log->wasChanged('log_id')) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to update log ID'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            DB::commit();
             return response()->json([
-                'message' => 'Failed to store logs',
-                'parameter' => $log,
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'message' => $arr_data_logs['is_history'] == 1 ? 'Successfully stored logs and history' : 'Successfully stored logs'
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // $log_update = $log->update([
-        //     'log_id' => 'log_id-'  . $log->id,
-        // ]);
-
-        $log_update = $log->update([
-            'log_id' => Str::uuid(),
-        ]);
-
-        // Check if history update failed
-        if (!$log_update) {
-            return response()->json([
-                'message' => 'Failed to update log ID',
-                'parameter' => $log_update,
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => $arr_data_logs['is_history'] == 1 ? 'Successfully stored logs and history' : 'Successfully stored logs'], Response::HTTP_OK);
     }
+
 
     public function userDevice(Request $request)
     {

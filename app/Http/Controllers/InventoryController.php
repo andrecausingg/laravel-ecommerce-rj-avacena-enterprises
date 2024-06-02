@@ -185,10 +185,126 @@ class InventoryController extends Controller
         );
     }
 
+    public function store(Request $request)
+    {
+        // Initialize an array to store all created items
+        $created_items = [];
+        $eu_device = '';
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Check if 'items' key exists in the request
+        if (!$request->has('items')) {
+            return response()->json(
+                [
+                    'message' => 'Missing items in the request',
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
+            'eu_device' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request) {
+            $exists = InventoryModel::where('name', $request->input('name'))
+                ->where('category', $request->input('category'))
+                ->exists();
+
+            if ($exists) {
+                $validator->errors()->add('items', 'The combination of name and category already exists.');
+            }
+        });
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(
+                [
+                    'message' => $validator->errors(),
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        // Begin transaction
+        DB::beginTransaction();
+
+        try {
+            // Validate eu_device
+            $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
+            if ($result_validate_eu_device) {
+                DB::rollBack();
+                return $result_validate_eu_device;
+            }
+
+            // Create the InventoryModel instance with the selected attributes
+            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $request->all());
+            $created = InventoryModel::create($result_to_create);
+            if (!$created) {
+                DB::rollBack();
+                return response()->json(
+                    [
+                        'message' => 'Failed to store Inventory Parent'
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+
+            // Update the unique I.D
+            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_inventorys->idToUpdate(), $created->id);
+            if ($update_unique_id) {
+                DB::rollBack();
+                return $update_unique_id;
+            }
+
+            $created_items[] = $created;
+            $eu_device = $request->input('eu_device');
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $created_items,
+                'user_action' => 'STORE INVENTORY PARENT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            DB::commit();
+            return response()->json([
+                'message' => 'Inventory records parent store successfully',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function storeMultiple(Request $request)
     {
         // Initialize an array to store all created items
         $created_items = [];
@@ -244,52 +360,68 @@ class InventoryController extends Controller
             );
         }
 
-        foreach ($request['items'] as $user_input) {
-            // Validate eu_device
-            $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
-            if ($result_validate_eu_device) {
-                return $result_validate_eu_device;
+        // Begin transaction
+        DB::beginTransaction();
+
+        try {
+            foreach ($request['items'] as $user_input) {
+                // Validate eu_device
+                $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
+                if ($result_validate_eu_device) {
+                    DB::rollBack();
+                    return $result_validate_eu_device;
+                }
+
+                // Create the InventoryModel instance with the selected attributes
+                $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $user_input);
+                $created = InventoryModel::create($result_to_create);
+                if (!$created) {
+                    DB::rollBack();
+                    return response()->json(
+                        [
+                            'message' => 'Failed to store Inventory Parent'
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+
+                // Update the unique I.D
+                $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_inventorys->idToUpdate(), $created->id);
+                if ($update_unique_id) {
+                    DB::rollBack();
+                    return $update_unique_id;
+                }
+
+                $created_items[] = $created;
+                $eu_device = $user_input['eu_device'];
             }
 
-            // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $user_input);
-            $created = InventoryModel::create($result_to_create);
-            if (!$created) {
-                return response()->json(
-                    [
-                        'message' => 'Failed to store Inventory Parent'
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $created_items,
+                'user_action' => 'STORE INVENTORY PARENT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
             }
 
-            // Update the unique I.D
-            $update_unique_id = $this->helper->updateUniqueId($created, $this->fillable_attr_inventorys->idToUpdate(), $created->id);
-            if ($update_unique_id) {
-                return $update_unique_id;
-            }
-
-            $created_items[] = $created;
-            $eu_device = $user_input['eu_device'];
+            DB::commit();
+            return response()->json([
+                'message' => 'Inventory records parent store successfully',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $created_items,
-            'user_action' => 'STORE INVENTORY PARENT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Inventory records parent store successfully',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
 
     /**
@@ -382,10 +514,117 @@ class InventoryController extends Controller
         );
     }
 
+
+    public function update(Request $request)
+    {
+        $arr_existing_data = [];
+        $changes_for_logs = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'inventory_id' => 'required|string',
+            'name' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request) {
+            $exists = InventoryModel::where('name', $request->input('name'))
+                ->where('category', $request->input('category'))
+                ->exists();
+
+            if ($exists) {
+                $validator->errors()->add('items', 'The combination of name and category already exists.');
+            }
+        });
+
+        // Input User
+        // Decrypted id
+        $decrypted_inventory_id = Crypt::decrypt($request->input('inventory_id'));
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
+
+        // Check if inventory record exists
+        $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
+
+        if (!$inventory) {
+            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Get the changes of the fields
+        $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
+        $changes_for_logs[] = [
+            'inventory_id' => $decrypted_inventory_id,
+            'fields' => $result_changes_item_for_logs,
+        ];
+
+        DB::beginTransaction();
+        try {
+            // Update Multiple Data
+            $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
+            if ($result_update_multi_data) {
+                DB::rollBack();
+                return $result_update_multi_data;
+            }
+
+            $eu_device = $request->input('eu_device');
+
+            // Check if there's Changes Logs
+            $changesCheckResponse = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
+            if ($changesCheckResponse) {
+                DB::rollBack();
+                return $changesCheckResponse;
+            }
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $changes_for_logs,
+                'user_action' => 'UPDATE INVENTORY PARENT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            DB::commit();
+            return response()->json([
+                'message' => 'Inventory records parent update successfully',
+                'log_message' => $log_result,
+                'exist_data' => $arr_existing_data
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request)
+    public function updateMultiple(Request $request)
     {
         $arr_existing_data = [];
         $changes_for_logs = [];
@@ -427,67 +666,81 @@ class InventoryController extends Controller
             }
         });
 
-        // Input User
-        foreach ($request['items'] as $user_input) {
-            // Decrypted id
-            $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
+        // Begin transaction
+        DB::beginTransaction();
 
-            // Validate eu_device
-            $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
-            if ($result_validate_eu_device) {
-                return $result_validate_eu_device;
+        try {
+            // Input User
+            foreach ($request['items'] as $user_input) {
+                // Decrypted id
+                $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
+
+                // Validate eu_device
+                $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
+                if ($result_validate_eu_device) {
+                    DB::rollBack();
+                    return $result_validate_eu_device;
+                }
+
+                // Check if inventory record exists
+                $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
+
+                if (!$inventory) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                // Get the changes of the fields
+                $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
+                $changes_for_logs[] = [
+                    'inventory_id' => $user_input['inventory_id'],
+                    'fields' => $result_changes_item_for_logs,
+                ];
+
+                // Update Multiple Data
+                $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
+                if ($result_update_multi_data) {
+                    DB::rollBack();
+                    return $result_update_multi_data;
+                }
+
+                $eu_device = $user_input['eu_device'];
             }
 
-            // Check if inventory record exists
-            $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)
-                ->first();
-
-            if (!$inventory) {
-                return response()->json([
-                    'message' => 'Data not found'
-                ], Response::HTTP_NOT_FOUND);
+            // Check if theres Changes Logs
+            $changesCheckResponse = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
+            if ($changesCheckResponse) {
+                DB::rollBack();
+                return $changesCheckResponse;
             }
 
-            // Get the changes of the fields
-            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
-            $changes_for_logs[] = [
-                'inventory_id' => $user_input['inventory_id'],
-                'fields' => $result_changes_item_for_logs,
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $changes_for_logs,
+                'user_action' => 'UPDATE INVENTORY PARENT',
             ];
 
-            // Update Multiple Data
-            $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
-            if ($result_update_multi_data) {
-                return $result_update_multi_data;
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
             }
 
-            $eu_device = $user_input['eu_device'];
+            DB::commit();
+            return response()->json([
+                'message' => 'Inventory records parent update successfully',
+                'log_message' => $log_result,
+                'exist_data' => $arr_existing_data
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Check if theres Changes Logs
-        $changesCheckResponse = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
-        if ($changesCheckResponse) {
-            return $changesCheckResponse;
-        }
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $changes_for_logs,
-            'user_action' => 'UPDATE INVENTORY PARENT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Inventory records parent update successfully',
-            'log_message' => $log_result,
-            'exist_data' => $arr_existing_data
-        ], Response::HTTP_OK);
     }
 
     /**

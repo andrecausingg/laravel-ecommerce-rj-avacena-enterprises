@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('logs_tbl', function (Blueprint $table) {
             // Ids
             $table->id();
-            $table->text('log_id')->unique()->nullable();
+            $table->text('log_id')->nullable();
             $table->text('user_id')->nullable();
             
             // 

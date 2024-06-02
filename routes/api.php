@@ -101,8 +101,10 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::get('show/{id}', [$InventoryController, 'show']);
             Route::get('product/show/{id}', [$InventoryController, 'showProduct']);
             Route::post('store', [$InventoryController, 'store']);
+            Route::post('store-multiple', [$InventoryController, 'storeMultiple']);
             Route::get('edit/{id}', [$InventoryController, 'edit']);
             Route::post('update', [$InventoryController, 'update']);
+            Route::post('update-multiple', [$InventoryController, 'updateMultiple']);
             Route::delete('delete', [$InventoryController, 'destroy']);
         });
 
