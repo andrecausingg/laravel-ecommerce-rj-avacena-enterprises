@@ -316,38 +316,48 @@ class InventoryController extends Controller
             );
         }
 
-        // Validation rules for each item in the array
-        $validator = Validator::make($request->all(), [
-            'items.*.name' => 'required|string|max:255',
-            'items.*.category' => 'required|string|max:255',
-            'items.*.eu_device' => 'required|string',
-        ]);
+        //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
+        foreach ($request->input('items') as $key => $item) {
+            $validator = Validator::make($item, [
+                'name' => 'required|string|max:255',
+                'category' => 'required|string|max:255',
+                'eu_device' => 'required|string',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Add custom validation rule for unique combination of name and category
-        $validator->after(function ($validator) use ($request) {
-            foreach ($request->input('items') as $item) {
+            // Add custom validation rule for unique combination of name and category
+            $validator->after(function ($validator) use ($item) {
                 $exists = InventoryModel::where('name', $item['name'])
                     ->where('category', $item['category'])
                     ->exists();
 
                 if ($exists) {
-                    $validator->errors()->add('items', 'The combination of name and category already exists.');
+                    $validator->errors()->add('name', 'The combination of name and category already exists.');
                 }
-            }
-        });
+            });
 
-        // Check if validation fails
-        if ($validator->fails()) {
-            return response()->json(
-                [
-                    'message' => $validator->errors(),
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
+            // Add custom validation rule for unique combination of name and category
+            $validator->after(function ($validator) use ($request) {
+                foreach ($request->input('items') as $item) {
+                    $exists = InventoryModel::where('name', $item['name'])
+                        ->where('category', $item['category'])
+                        ->exists();
+
+                    if ($exists) {
+                        $validator->errors()->add('items', 'The combination of name and category already exists.');
+                    }
+                }
+            });
+
+            //* TO CHECK VALIDATION RETURN ERROR RESPONSE
+            if ($validator->fails()) {
+                $errors = $validator->errors()->toArray();
+                $validation_errors[] = $errors;
+            }
+        }
+
+        // Return all validation errors if any
+        if (!empty($validation_errors)) {
+            return response()->json(['message' => $validation_errors], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Begin transaction
@@ -503,7 +513,6 @@ class InventoryController extends Controller
             Response::HTTP_OK
         );
     }
-
 
     public function update(Request $request)
     {
@@ -782,7 +791,8 @@ class InventoryController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventory = InventoryModel::where('inventory_id', Crypt::decrypt($request->inventory_id))->first();
+        $inventory_id = Crypt::decrypt($request->inventory_id);
+        $inventory = InventoryModel::where('inventory_id', $inventory_id)->first();
         if (!$inventory) {
             return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
         }
@@ -795,31 +805,41 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
         }
 
-        foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $fillable_attr_inventorys) {
-            $arr_log_details['fields'][$fillable_attr_inventorys] = $inventory->$fillable_attr_inventorys;
+        DB::beginTransaction();
+
+        try {
+            foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $fillable_attr_inventorys) {
+                $arr_log_details['fields'][$fillable_attr_inventorys] = $inventory->$fillable_attr_inventorys;
+            }
+
+            // Delete the user
+            if (!$inventory->delete()) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to delete inventory'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'DELETE INVENTORY PARENT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully deleted data',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete data', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Delete the user
-        if (!$inventory->delete()) {
-            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $arr_log_details,
-            'user_action' => 'DELETE INVENTORY PARENT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully delete data',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
 }
