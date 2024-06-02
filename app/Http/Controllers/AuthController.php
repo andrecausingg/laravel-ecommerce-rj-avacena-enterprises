@@ -133,9 +133,13 @@ class AuthController extends Controller
             ],
         ];
 
-        if ($user->role === 'SUPER_ADMIN') {
+        if ($user->role === env('ROLE_SUPER_ADMIN')) {
             return response()->json([
                 'nav_links' => $nav_links_admin,
+            ], Response::HTTP_OK);
+        } else {
+            return response()->json([
+                'message' => 'Invalid role',
             ], Response::HTTP_OK);
         }
     }

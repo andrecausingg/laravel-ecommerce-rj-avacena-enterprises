@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\LogsModel;
 use Illuminate\Http\Request;
 use App\Models\InventoryModel;
 use Illuminate\Support\Carbon;
