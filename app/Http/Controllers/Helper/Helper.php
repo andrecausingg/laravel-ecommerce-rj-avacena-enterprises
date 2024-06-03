@@ -473,15 +473,19 @@ class Helper
     // Store Multiple Data
     public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '')
     {
-
         $arr_attributes_store = [];
+        $arr_encrypted_ids = ['inventory_id'];
 
         foreach ($arr_store_fields as $arr_store_field) {
             if (array_key_exists($arr_store_field, $user_input_data)) {
                 if ($arr_store_field === 'image') {
                     $arr_attributes_store[$arr_store_field] = $file_name;
                 } else {
-                    $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+                    if (in_array($arr_store_field, $arr_encrypted_ids)) {
+                        $arr_attributes_store[$arr_store_field] = Crypt::decrypt($user_input_data[$arr_store_field]);
+                    } else {
+                        $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+                    }
                 }
             }
         }
