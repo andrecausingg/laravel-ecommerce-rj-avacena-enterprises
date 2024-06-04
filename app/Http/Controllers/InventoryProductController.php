@@ -551,7 +551,6 @@ class InventoryProductController extends Controller
         }
     }
 
-
     public function updateMultiple(Request $request)
     {
         $changes_for_log = [];

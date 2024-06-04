@@ -11,10 +11,11 @@ use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
 use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
+use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
-use App\Mail\ResendVerificationMail;
 
+use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
@@ -141,6 +142,86 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Invalid role',
             ], Response::HTTP_OK);
+        }
+    }
+
+
+    public function logout(Request $request)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Expiration Time 1month
+            $expiration_time = Carbon::now()->addSeconds(1);
+            $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+            if (!$new_token) {
+                return response()->json([
+                    'message' => 'Unable to generate a token from user'
+                ], Response::HTTP_OK);
+            }
+
+            $user->session_token = $new_token;
+            $user->session_expire_at = $expiration_time;
+
+            if (!$user->save()) {
+                return response()->json(
+                    ['message' => 'Failed to update session token and expiration'],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+
+            // Arr Logs details
+            $arr_log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'ip_address' => $request->ip(),
+                ]
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->input('eu_device'),
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'LOGOUT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'User logout successfully',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to store inventory records', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
