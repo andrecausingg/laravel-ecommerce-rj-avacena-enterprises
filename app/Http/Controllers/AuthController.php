@@ -13,7 +13,6 @@ use Illuminate\Support\Carbon;
 use App\Mail\ResetPasswordMail;
 use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Illuminate\Support\Facades\Log;
 
 use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
@@ -230,7 +229,6 @@ class AuthController extends Controller
      * Login
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function login(Request $request)
     {
@@ -430,7 +428,6 @@ class AuthController extends Controller
      * Register a new user.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function register(Request $request)
     {

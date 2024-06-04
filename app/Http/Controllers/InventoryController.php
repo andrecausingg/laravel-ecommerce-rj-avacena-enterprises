@@ -33,6 +33,7 @@ class InventoryController extends Controller
         $arr_inventory_item = [];
         $arr_parent_inventory_data = [];
         $all_inventory_items = [];
+        $arr_filter = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -41,7 +42,10 @@ class InventoryController extends Controller
         }
 
         $inventory_parents = InventoryModel::get();
+        // Get all data
         foreach ($inventory_parents as $inventory_parent) {
+
+            // Store on array the specific data
             foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_id') {
                     $arr_parent_inventory_data[$getFillableAttribute] = Crypt::encrypt($inventory_parent->$getFillableAttribute);
@@ -49,6 +53,11 @@ class InventoryController extends Controller
                     $arr_parent_inventory_data[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_parent->$getFillableAttribute);
                 } else {
                     $arr_parent_inventory_data[$getFillableAttribute] = $inventory_parent->$getFillableAttribute;
+                }
+
+                // Get all category and put in filter
+                if ($getFillableAttribute == 'category') {
+                    $arr_filter[] = $inventory_parent->$getFillableAttribute;
                 }
             }
 
@@ -146,7 +155,6 @@ class InventoryController extends Controller
             }
             // ***************************** //
 
-
             // Add view on row item
             $arr_inventory_item['view'] = [[
                 'url' => $view_settings['url'] . $arr_parent_inventory_data['inventory_id'],
@@ -169,7 +177,7 @@ class InventoryController extends Controller
                 $relative_settings['icon'],
                 $relative_settings['container']
             ),
-            // 'filter' => $filter
+            'filter' => $arr_filter,
         ];
 
         return response()->json(
@@ -625,52 +633,33 @@ class InventoryController extends Controller
         if (!$request->has('items') || empty($request['items'])) {
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_id' => 'required|string',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.category' => 'required|string|max:255',
+            'items.*.eu_device' => 'required|string',
+        ]);
 
-        //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
-        foreach ($request->input('items') as $key => $item) {
-            $validator = Validator::make($item, [
-                'inventory_id' => 'required|string',
-                'name' => 'required|string|max:255',
-                'category' => 'required|string|max:255',
-                'eu_device' => 'required|string',
-            ]);
-
-            // Add custom validation rule for unique combination of name and category
-            $validator->after(function ($validator) use ($item) {
-                $exists = InventoryModel::where('name', $item['name'])
-                    ->where('category', $item['category'])
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request) {
+            foreach ($request['items'] as $index => $user_input) {
+                $exists = InventoryModel::where('name', $user_input['name'])
+                    ->where('category', $user_input['category'])
                     ->exists();
 
                 if ($exists) {
-                    $validator->errors()->add('name', 'The combination of name and category already exists.');
+                    $validator->errors()->add("items.$index.name", 'The combination of name and category already exists.');
+                    $validator->errors()->add("items.$index.category", 'The combination of name and category already exists.');
                 }
-            });
-
-            // Add custom validation rule for unique combination of name and category
-            $validator->after(function ($validator) use ($request) {
-                foreach ($request->input('items') as $item) {
-                    $exists = InventoryModel::where('name', $item['name'])
-                        ->where('category', $item['category'])
-                        ->exists();
-
-                    if ($exists) {
-                        $validator->errors()->add('items', 'The combination of name and category already exists.');
-                    }
-                }
-            });
-
-            //* TO CHECK VALIDATION RETURN ERROR RESPONSE
-            if ($validator->fails()) {
-                $errors = $validator->errors()->toArray();
-                $errors['inventory_id'] = $item['inventory_id'];
-                $validation_errors[] = $errors;
             }
+        });
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Return all validation errors if any
-        if (!empty($validation_errors)) {
-            return response()->json(['message' => $validation_errors], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
 
         // Begin transaction
         DB::beginTransaction();
