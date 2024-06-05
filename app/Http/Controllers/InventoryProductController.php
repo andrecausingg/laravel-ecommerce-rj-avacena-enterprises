@@ -24,11 +24,11 @@ class InventoryProductController extends Controller
 
     public function index(Request $request)
     {
-        $arr_inventory = [];
         $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
         $view_settings = $this->fillable_attr_inventory_children->getViewRowTable();
         $arr_inventory_item = [];
+        $all_inventory_items = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -142,52 +142,46 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Check if 'items' key exists in the request
-        if (!$request->has('items')) {
-            return response()->json(
-                ['message' => 'Missing items in the request'],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'inventory_id' => 'required|string',
+            'item_code' => 'required|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'description' => 'nullable',
+            'is_refund' => 'nullable',
+            'name' => 'required|string|max:500',
+            'category' => 'required|string|max:500',
+            'retail_price' => 'required|numeric',
+            'discounted_price' => 'nullable|numeric',
+            'stock' => 'required|numeric',
+            'supplier_name' => 'nullable',
+            'design' => 'nullable|string|max:500',
+            'size' => 'nullable|string|max:500',
+            'color' => 'nullable|string|max:500',
+            'unit_supplier_price' => 'nullable|numeric',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            DB::rollBack();
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
+        if ($result_validate_eu_device) {
+            DB::rollBack();
+            return $result_validate_eu_device;
+        }
+
+
         DB::beginTransaction();
-
         try {
-            // Validation rules for each item in the array
-            $validator = Validator::make($request->all(), [
-                'inventory_id' => 'required|string',
-                'item_code' => 'required|string|max:255',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'description' => 'nullable',
-                'is_refund' => 'nullable',
-                'name' => 'required|string|max:500|unique:inventory_product_tbl,name',
-                'category' => 'required|string|max:500',
-                'retail_price' => 'required|numeric',
-                'discounted_price' => 'nullable|numeric',
-                'stock' => 'required|numeric',
-                'supplier_name' => 'nullable',
-                'design' => 'nullable|string|max:500',
-                'size' => 'nullable|string|max:500',
-                'color' => 'nullable|string|max:500',
-                'unit_supplier_price' => 'nullable|numeric',
-            ]);
-
-            // Check if validation fails
-            if ($validator->fails()) {
-                DB::rollBack();
-                return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-
-            // Validate eu_device
-            $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
-            if ($result_validate_eu_device) {
-                DB::rollBack();
-                return $result_validate_eu_device;
-            }
+            $decrypted_inventory_id = Crypt::decrypt($request->input('inventory_id'));
 
             // Retrieve the inventory record
-            $inventory = InventoryModel::where('inventory_id', $request->input('inventory_id'))->first();
+            $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
             // Check if inventory record exists
             if (!$inventory) {
                 DB::rollBack();
@@ -197,12 +191,12 @@ class InventoryProductController extends Controller
             }
 
             // Handle image upload if it exists for the current item
-            if ($request->has('image') && $request->file('image')->isValid()) {
+            if ($request->hasFile('image') && $request->file('image')->isValid()) {
                 // Handle image upload 
                 $arr_data_file = [
                     'custom_folder' => 'inventory-children',
-                    'file_image' => $request->input('image'),
-                    'image_actual_extension' => $request->input('image')->getClientOriginalExtension(),
+                    'file_image' => $request->file('image'),
+                    'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
                 ];
                 $file_name = $this->helper->handleUploadImage($arr_data_file);
             }
@@ -272,37 +266,41 @@ class InventoryProductController extends Controller
             );
         }
 
-        //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
-        foreach ($request->input('items') as $key => $item) {
-            $validator = Validator::make($item, [
-                'inventory_id' => 'required|string',
-                'item_code' => 'required|string|max:255',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'description' => 'nullable',
-                'is_refund' => 'nullable',
-                'name' => 'required|string|max:500|unique:inventory_product_tbl,name',
-                'category' => 'required|string|max:500',
-                'retail_price' => 'required|numeric',
-                'discounted_price' => 'nullable|numeric',
-                'stock' => 'required|numeric',
-                'supplier_name' => 'nullable',
-                'design' => 'nullable|string|max:500',
-                'size' => 'nullable|string|max:500',
-                'color' => 'nullable|string|max:500',
-                'unit_supplier_price' => 'nullable|numeric',
-            ]);
+        $arr_items_error_fields = $this->fillable_attr_inventory_children->arrToStores();
 
-            //* TO CHECK VALIDATION RETURN ERROR RESPONSE
-            if ($validator->fails()) {
-                $errors = $validator->errors()->toArray();
-                $validation_errors[] = $errors;
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_id' => 'required|string',
+            'items.*.item_code' => 'required|string|max:255',
+            'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'items.*.description' => 'nullable',
+            'items.*.is_refund' => 'nullable',
+            'items.*.name' => 'required|string|max:500',
+            'items.*.category' => 'required|string|max:500',
+            'items.*.retail_price' => 'required|numeric',
+            'items.*.discounted_price' => 'nullable|numeric',
+            'items.*.stock' => 'required|numeric',
+            'items.*.supplier_name' => 'nullable',
+            'items.*.design' => 'nullable|string|max:500',
+            'items.*.size' => 'nullable|string|max:500',
+            'items.*.color' => 'nullable|string|max:500',
+            'items.*.unit_supplier_price' => 'nullable|numeric',
+        ]);
+
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request, $arr_items_error_fields) {
+            foreach ($request['items'] as $index => $user_input) {
+                $exists = InventoryModel::where('name', $user_input['name'])
+                    ->where('category', $user_input['category'])
+                    ->exists();
+
+                if ($exists) {
+                    foreach ($arr_items_error_fields as $field) {
+                        $validator->errors()->add("items.$index.$field", 'Already exists.');
+                    }
+                }
             }
-        }
+        });
 
-        // Return all validation errors if any
-        if (!empty($validation_errors)) {
-            return response()->json(['message' => $validation_errors], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
 
         DB::beginTransaction();
         try {
@@ -444,35 +442,37 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'inventory_product_id' => 'required|string',
+            'item_code' => 'required|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'description' => 'nullable',
+            'is_refund' => 'nullable',
+            'name' => 'required|string|max:500',
+            'category' => 'required|string|max:500',
+            'retail_price' => 'required|numeric',
+            'discounted_price' => 'nullable|numeric',
+            'stock' => 'required|numeric',
+            'supplier_name' => 'nullable',
+            'design' => 'nullable|string|max:500',
+            'size' => 'nullable|string|max:500',
+            'color' => 'nullable|string|max:500',
+            'unit_supplier_price' => 'nullable|numeric',
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            DB::rollBack();
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+
         DB::beginTransaction();
 
         try {
-            // Validation rules for each item in the array
-            $validator = Validator::make($request->all(), [
-                'inventory_product_id' => 'required|string',
-                'item_code' => 'required|string|max:255',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'description' => 'nullable',
-                'is_refund' => 'nullable',
-                'name' => 'required|string|max:500',
-                'category' => 'required|string|max:500',
-                'retail_price' => 'required|numeric',
-                'discounted_price' => 'nullable|numeric',
-                'stock' => 'required|numeric',
-                'supplier_name' => 'nullable',
-                'design' => 'nullable|string|max:500',
-                'size' => 'nullable|string|max:500',
-                'color' => 'nullable|string|max:500',
-                'unit_supplier_price' => 'nullable|numeric',
-                'eu_device' => 'required|string',
-            ]);
-
-            // Check if validation fails
-            if ($validator->fails()) {
-                DB::rollBack();
-                return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
             foreach ($request['items'] as $user_input) {
                 // Decrypted id
                 $decrypted_inventory_product_id = Crypt::decrypt($user_input['inventory_product_id']);
@@ -567,38 +567,40 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
-        //* MAKE FOREACH, CHANGE VALIDATOR KEY NAME
-        foreach ($request->input('items') as $key => $item) {
-            $validator = Validator::make($item, [
-                'inventory_product_id' => 'required|string',
-                'inventory_id' => 'required|string',
-                'item_code' => 'required|string|max:255',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'description' => 'nullable',
-                'is_refund' => 'nullable',
-                'name' => 'required|string|max:500|unique:inventory_product_tbl,name',
-                'category' => 'required|string|max:500',
-                'retail_price' => 'required|numeric',
-                'discounted_price' => 'nullable|numeric',
-                'stock' => 'required|numeric',
-                'supplier_name' => 'nullable',
-                'design' => 'nullable|string|max:500',
-                'size' => 'nullable|string|max:500',
-                'color' => 'nullable|string|max:500',
-                'unit_supplier_price' => 'nullable|numeric',
-            ]);
+        $arr_items_error_fields = $this->fillable_attr_inventory_children->arrToUpdates();
 
-            //* TO CHECK VALIDATION RETURN ERROR RESPONSE
-            if ($validator->fails()) {
-                $errors = $validator->errors()->toArray();
-                $validation_errors[] = $errors;
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_id' => 'required|string',
+            'items.*.item_code' => 'required|string|max:255',
+            'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'items.*.description' => 'nullable',
+            'items.*.is_refund' => 'nullable',
+            'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
+            'items.*.category' => 'required|string|max:500',
+            'items.*.retail_price' => 'required|numeric',
+            'items.*.discounted_price' => 'nullable|numeric',
+            'items.*.stock' => 'required|numeric',
+            'items.*.supplier_name' => 'nullable',
+            'items.*.design' => 'nullable|string|max:500',
+            'items.*.size' => 'nullable|string|max:500',
+            'items.*.color' => 'nullable|string|max:500',
+            'items.*.unit_supplier_price' => 'nullable|numeric',
+        ]);
+
+        // Add custom validation rule for unique combination of name and category
+        $validator->after(function ($validator) use ($request, $arr_items_error_fields) {
+            foreach ($request['items'] as $index => $user_input) {
+                $exists = InventoryModel::where('name', $user_input['name'])
+                    ->where('category', $user_input['category'])
+                    ->exists();
+
+                if ($exists) {
+                    foreach ($arr_items_error_fields as $field) {
+                        $validator->errors()->add("items.$index.$field", 'Already exists.');
+                    }
+                }
             }
-        }
-
-        // Return all validation errors if any
-        if (!empty($validation_errors)) {
-            return response()->json(['message' => $validation_errors], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        });
 
         DB::beginTransaction();
 
