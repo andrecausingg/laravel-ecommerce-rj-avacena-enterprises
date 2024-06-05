@@ -48,6 +48,15 @@ class InventoryModel extends Model
         ];
     }
 
+
+    public function arrToDeletes(): array
+    {
+        return [
+            'name', 'category'
+        ];
+    }
+
+
     public function unsetActions(): array
     {
         return [

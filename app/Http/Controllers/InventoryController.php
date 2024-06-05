@@ -841,4 +841,115 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Failed to delete data', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    public function destroyMultiple(Request $request)
+    {
+        $arr_log_details = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'items.*.inventory_id' => 'required|string',
+            'items.*.eu_device' => 'required|string',
+        ]);
+
+        $arr_items_error_fields = $this->fillable_attr_inventorys->arrToDeletes();
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            $errors = $validator->errors()->toArray();
+            $formattedErrors = [];
+
+            foreach ($request['items'] as $index => $item) {
+                $itemErrors = [];
+
+                foreach ($arr_items_error_fields as $field) {
+                    if (isset($errors["items.$index.$field"])) {
+                        $itemErrors[$field] = array_map(function ($msg) use ($index) {
+                            return preg_replace("/items\.$index\./", '', $msg);
+                        }, $errors["items.$index.$field"]);
+                    }
+                }
+
+                if (!empty($itemErrors)) {
+                    $formattedErrors[$index] = $itemErrors;
+                }
+            }
+
+            return response()->json(['message' => array_values($formattedErrors)], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($request['items'] as $user_input) {
+                // Decrypted id
+                $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
+
+                // Validate eu_device
+                $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
+                if ($result_validate_eu_device) {
+                    DB::rollBack();
+                    return $result_validate_eu_device;
+                }
+
+                // Check if inventory record exists
+                $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
+
+                if (!$inventory) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                // Checking Id on other tbl if exist unset the api
+                $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
+
+                // Check if 'is_exist' is 'yes' in the first element and then unset it
+                if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+                    return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
+                }
+
+                // Get details to log
+                $log_details = [];
+                foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $fillable_attr_inventorys) {
+                    $log_details[$fillable_attr_inventorys] = $inventory->$fillable_attr_inventorys;
+                }
+                $arr_log_details[] = $log_details;
+
+                // Delete the inventory
+                if (!$inventory->delete()) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to delete inventory'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+            }
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request['items'][0]['eu_device'],
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'DELETE INVENTORY PARENT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully deleted data',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete data', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }
