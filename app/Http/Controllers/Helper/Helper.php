@@ -431,14 +431,26 @@ class Helper
     // Update a unique I.D on store and update
     public function updateUniqueId($model, $id_to_updates, $id)
     {
-        // Update the unique id
-        foreach ($id_to_updates as $id_to_updates_key => $id_to_updates_value) {
-            $model->update([$id_to_updates_key => $id_to_updates_value . $id]);
-        }
-        if (!$model->save()) {
-            return response()->json(['message' => 'Failed to update unique id'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        DB::beginTransaction();
+
+        try {
+            // Update the unique id
+            foreach ($id_to_updates as $id_to_updates_key => $id_to_updates_value) {
+                $model->update([$id_to_updates_key => $id_to_updates_value . $id]);
+            }
+
+            if (!$model->save()) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to update unique id'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update unique id', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
 
     public function arrUpdateMultipleData($model, $arr_update_fields, $user_input_data, $file_name = '')
     {
