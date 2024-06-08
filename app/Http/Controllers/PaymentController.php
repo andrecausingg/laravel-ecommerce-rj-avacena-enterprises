@@ -47,7 +47,7 @@ class PaymentController extends Controller
             'chart' => [[
                 'year' => $this->getChartSalesYear(),
                 'month' => $this->getChartSalesMonth(),
-                // 'week' => $this->getChartSalesWeek(),
+                'week' => $this->getChartSalesWeek(),
                 'today' => $this->getChartSalesToday(),
             ]],
         ];
@@ -129,16 +129,44 @@ class PaymentController extends Controller
                 return response()->json(['message' => 'Failed to pay purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
-            $purchaseUpdate = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
+            $purchase_update = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
                 ->where('purchase_group_id',  $decrypted_purchase_group_id)
                 ->update([
                     'status' => $status,
                 ]);
 
-            if (!$purchaseUpdate) {
+            if (!$purchase_update) {
                 // Rollback the transaction and return the error response
                 DB::rollBack();
                 return response()->json(['message' => 'Failed to pay purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Get the items has been update status to DONE
+            $purchase_items = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
+                ->where('purchase_group_id',  $decrypted_purchase_group_id)->where('status',  'DONE')->get();
+            foreach ($purchase_items as $purchase_item) {
+                $items_done[] = $purchase_item;
+            }
+
+            $user_logs['payment'] = $payment;
+            $user_logs['items'] = $items_done;
+            $eu_device = $request->input('eu_device');
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $user_logs,
+                'user_action' => 'PAID',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
             }
 
             // Commit the transaction
@@ -202,6 +230,7 @@ class PaymentController extends Controller
 
         return [$arr_sale];
     }
+
     private function getTodayTransaction()
     {
         $arr_today_transaction = [];
@@ -278,61 +307,30 @@ class PaymentController extends Controller
         return $hourly;
     }
 
-
     private function getChartSalesWeek()
     {
-        // Retrieve weekly sales data from cache if available
-        $weeklySales = Cache::get('weekly_sales');
-        if ($weeklySales === null) {
-            // Initialize array to store daily sales
-            $dailySales = [];
+        // Array to store daily sales
+        $daily_sales = [];
 
-            // Get today's date
-            $currentDate = Carbon::now();
+        // Get the start and end of the current week using Carbon
+        $startOfWeek = Carbon::now()->startOfWeek();
+        $endOfWeek = Carbon::now()->endOfWeek();
 
-            // Get the start of the current week
-            $startOfWeek = $currentDate->startOfWeek();
+        // Loop through each day of the week
+        for ($day = $startOfWeek; $day <= $endOfWeek; $day->addDay()) {
+            // Get the sales total for the current day
+            $total_sales = PaymentModel::whereDate('paid_at', $day)
+                ->sum('total_amount');
 
-            // Get the end of the current week
-            $endOfWeek = $currentDate->endOfWeek();
-
-            // Query database for weekly sales data
-            $weeklySalesData = PaymentModel::selectRaw('DATE(paid_at) as date, SUM(total_amount) as total')
-                ->whereBetween('paid_at', [$startOfWeek, $endOfWeek])
-                ->groupBy('date')
-                ->orderBy('date')
-                ->get();
-
-            // Loop through each day of the week and calculate sales
-            $currentDay = $startOfWeek->copy();
-            while ($currentDay <= $endOfWeek) {
-                $formattedDay = $currentDay->format('D');
-                $totalSales = 0;
-                foreach ($weeklySalesData as $dayData) {
-                    if ($dayData->date == $currentDay->toDateString()) {
-                        $totalSales = $dayData->total;
-                        break;
-                    }
-                }
-                $dailySales[] = [
-                    'day' => $formattedDay,
-                    'total' => $totalSales,
-                ];
-                // Move to the next day
-                $currentDay->addDay();
-            }
-
-            // Cache the data for future requests
-            Cache::put('weekly_sales', $dailySales, Carbon::now()->addMinutes(10));
-
-            // Return weekly sales data
-            return $dailySales;
+            // Add the day and total sales to the array
+            $daily_sales[] = [
+                'day' => $day->format('D'),
+                'total' => $total_sales,
+            ];
         }
 
-        // Return cached weekly sales data
-        return $weeklySales;
+        return $daily_sales;
     }
-
 
     private function getChartSalesMonth()
     {
