@@ -955,8 +955,8 @@ class PurchaseController extends Controller
                     ->take($request->quantity)
                     ->get();
 
-                foreach ($purchases as $purchase_id) {
-                    $purchase = PurchaseModel::where('purchase_id', $purchase_id->purchase_id)->first();
+                foreach ($purchases as $purchase_data) {
+                    $purchase = PurchaseModel::where('purchase_id', $purchase_data->purchase_id)->first();
                     if (!$purchase) {
                         DB::rollBack();
                         return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
@@ -974,8 +974,8 @@ class PurchaseController extends Controller
 
 
                 // Update stock after deleting all purchases
-                $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase_id->inventory_product_id)
-                    ->where('inventory_id', $purchase_id->inventory_id)
+                $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase_data->inventory_product_id)
+                    ->where('inventory_id', $purchase_data->inventory_id)
                     ->first();
                 if (!$inventory_product) {
                     DB::rollBack();
@@ -986,9 +986,9 @@ class PurchaseController extends Controller
                     'stock' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
                 ]);
 
-                $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchases->purchase_group_id, $purchases->user_id_customer);
-                $update_payment = PaymentModel::where('user_id', $purchases->user_id_customer)
-                    ->where('purchase_group_id', $purchases->purchase_group_id)
+                $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchase_data->purchase_group_id, $purchase_data->user_id_customer);
+                $update_payment = PaymentModel::where('user_id', $purchase_data->user_id_customer)
+                    ->where('purchase_group_id', $purchase_data->purchase_group_id)
                     ->first();
 
                 if (!$update_payment) {

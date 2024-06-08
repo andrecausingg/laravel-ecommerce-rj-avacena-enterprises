@@ -57,7 +57,9 @@ class InventoryController extends Controller
 
                 // Get all category and put in filter
                 if ($getFillableAttribute == 'category') {
-                    $arr_filter[] = $inventory_parent->$getFillableAttribute;
+                    if (!in_array($inventory_parent->$getFillableAttribute, $arr_filter)) {
+                        $arr_filter[] = $inventory_parent->$getFillableAttribute;
+                    }
                 }
             }
 
@@ -189,7 +191,6 @@ class InventoryController extends Controller
         );
     }
 
-
     public function show(Request $request, string $id)
     {
         $arr_inventory = [];
@@ -300,17 +301,6 @@ class InventoryController extends Controller
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
-        // Add custom validation rule for unique combination of name and category
-        $validator->after(function ($validator) use ($request) {
-            $exists = InventoryModel::where('name', $request->input('name'))
-                ->where('category', $request->input('category'))
-                ->exists();
-
-            if ($exists) {
-                $validator->errors()->add('message', 'The combination of name and category already exists.');
-            }
-        });
-
         // Check if validation fails
         if ($validator->fails()) {
             return response()->json(
@@ -321,16 +311,25 @@ class InventoryController extends Controller
             );
         }
 
+        $exists = InventoryModel::where('name', $request->input('name'))
+            ->where('category', $request->input('category'))
+            ->exists();
+        if ($exists) {
+            return response()->json([
+                'message' => 'The combination of name and category already exists.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validate eu_device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
+
         // Begin transaction
         DB::beginTransaction();
 
         try {
-            // Validate eu_device
-            $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
-            if ($result_validate_eu_device) {
-                return $result_validate_eu_device;
-            }
-
             // Create the InventoryModel instance with the selected attributes
             $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $request->all());
             $created = InventoryModel::create($result_to_create);
@@ -536,23 +535,20 @@ class InventoryController extends Controller
             return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Add custom validation rule for unique combination of name
-        $validator->after(function ($validator) use ($request) {
-            $exists = InventoryModel::where('name', $request->input('name'))
-                ->where('category', $request->input('category'))
-                ->exists();
-
-            if ($exists) {
-                $validator->errors()->add('message', 'The combination of name and category already exists.');
-            }
-        });
+        $exists = InventoryModel::where('name', $request->input('name'))
+            ->where('category', $request->input('category'))
+            ->exists();
+        if ($exists) {
+            return response()->json([
+                'message' => 'The combination of name and category already exists.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
         if ($result_validate_eu_device) {
             return $result_validate_eu_device;
         }
-
 
         DB::beginTransaction();
         try {
