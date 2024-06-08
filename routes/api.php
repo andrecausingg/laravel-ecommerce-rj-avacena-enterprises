@@ -51,47 +51,47 @@ Route::middleware(['jwt.auth'])->group(function () {
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
-        Route::post('/verify-email', [$AuthController, 'verifyEmail']);
-        Route::post('/resend-code', [$AuthController, 'resendVerificationAuth']);
+        Route::post('verify-email', [$AuthController, 'verifyEmail']);
+        Route::post('resend-code', [$AuthController, 'resendVerificationAuth']);
     });
 
     // Update Password
     Route::prefix('new-password')->group(function () use ($AuthController) {
-        Route::post('/update-password', [$AuthController, 'updatePassword']);
+        Route::post('update-password', [$AuthController, 'updatePassword']);
     });
 
     // User Accounts | ADMIN
     Route::prefix('accounts')->group(function () use ($AccountController) {
         // User Accounts | ADMIN
         Route::prefix('admin')->group(function () use ($AccountController) {
-            Route::get('/index', [$AccountController, 'index']);
-            Route::get('/show/{id}', [$AccountController, 'show']);
-            Route::post('/store', [$AccountController, 'store']);
-            Route::post('/update', [$AccountController, 'update']);
-            Route::delete('/destroy', [$AccountController, 'destroy']);
+            Route::get('index', [$AccountController, 'index']);
+            Route::get('show/{id}', [$AccountController, 'show']);
+            Route::post('store', [$AccountController, 'store']);
+            Route::post('update', [$AccountController, 'update']);
+            Route::delete('destroy', [$AccountController, 'destroy']);
         });
 
         // User Accounts | CLIENT
         Route::prefix('user')->group(function () use ($AccountController) {
-            Route::get('/show/{id}', [$AccountController, 'show']);
-            Route::post('/update-email', [$AccountController, 'updateEmailOnSettingUser']);
-            Route::post('/update-password', [$AccountController, 'updatePasswordOnSettingUser']);
-            Route::post('/resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
-            Route::post('/resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
+            Route::get('show/{id}', [$AccountController, 'show']);
+            Route::post('update-email', [$AccountController, 'updateEmailOnSettingUser']);
+            Route::post('update-password', [$AccountController, 'updatePasswordOnSettingUser']);
+            Route::post('resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
+            Route::post('resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
         });
     });
 
 
     // Personal User Information
     Route::prefix('user-info')->group(function () use ($UserInfoController, $AuthController) {
-        Route::get('/index', [$UserInfoController, 'index']);
-        Route::post('/store', [$UserInfoController, 'store']);
-        Route::post('/update', [$UserInfoController, 'update']);
-        Route::get('/get-personal-info', [$UserInfoController, 'getPersonalInfo']);
+        Route::get('index', [$UserInfoController, 'index']);
+        Route::post('store', [$UserInfoController, 'store']);
+        Route::post('update', [$UserInfoController, 'update']);
+        Route::get('get-personal-info', [$UserInfoController, 'getPersonalInfo']);
 
-        Route::post('/update-email', [$AuthController, 'updateEmailOnSettingUser']);
-        Route::post('/update-password', [$AuthController, 'updatePasswordOnSettingUser']);
-        Route::post('/update-password-and-email/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+        Route::post('update-email', [$AuthController, 'updateEmailOnSettingUser']);
+        Route::post('update-password', [$AuthController, 'updatePasswordOnSettingUser']);
+        Route::post('update-password-and-email/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
     });
 
     // Inventory
@@ -110,30 +110,33 @@ Route::middleware(['jwt.auth'])->group(function () {
         });
 
         Route::prefix('product')->group(function () use ($InventoryProductController) {
-            Route::get('/index', [$InventoryProductController, 'index']);
-            Route::get('/show/{id}', [$InventoryProductController, 'show']);
-            Route::post('/store', [$InventoryProductController, 'store']);
-            Route::post('/store-multiple', [$InventoryProductController, 'storeMultiple']);
-            Route::post('/update', [$InventoryProductController, 'update']);
-            Route::post('/update-multiple', [$InventoryProductController, 'updateMultiple']);
+            Route::get('index', [$InventoryProductController, 'index']);
+            Route::get('show/{id}', [$InventoryProductController, 'show']);
+            Route::post('store', [$InventoryProductController, 'store']);
+            Route::post('store-multiple', [$InventoryProductController, 'storeMultiple']);
+            Route::post('update', [$InventoryProductController, 'update']);
+            Route::post('update-multiple', [$InventoryProductController, 'updateMultiple']);
             Route::delete('delete', [$InventoryProductController, 'destroy']);
+            Route::delete('delete-multiple', [$InventoryProductController, 'destroyMultiple']);
             Route::delete('delete-multiple', [$InventoryProductController, 'destroyMultiple']);
         });
     });
 
     // Purchase
     Route::prefix('purchase')->group(function () use ($PurchaseController) {
-        Route::get('/get-user-id-menu-costumer', [$PurchaseController, 'getUserIdMenuCustomer']);
-        Route::post('/store', [$PurchaseController, 'store']);
-        Route::post('/minus-qty', [$PurchaseController, 'minusQty']);
-        Route::post('/add-qty', [$PurchaseController, 'addQty']);
-        Route::delete('/delete-all-qty', [$PurchaseController, 'deleteQtyAll']);
+        Route::get('get-user-id-menu-costumer', [$PurchaseController, 'getUserIdMenuCustomer']);
+        Route::post('store', [$PurchaseController, 'store']);
+        Route::post('minus-qty', [$PurchaseController, 'minusQty']);
+        Route::post('add-qty', [$PurchaseController, 'addQty']);
+        Route::delete('delete-all-qty', [$PurchaseController, 'deleteQtyAll']);
+        Route::post('update-qty', [$PurchaseController, 'updateQty']);
+
     });
 
     // Payment
     Route::prefix('payment')->group(function () use ($PaymentController) {
-        Route::get('/dashboard', [$PaymentController, 'dashboard']);
-        Route::post('/payment', [$PaymentController, 'payment']);
+        Route::get('dashboard', [$PaymentController, 'dashboard']);
+        Route::post('payment', [$PaymentController, 'payment']);
     });
 
     Route::prefix('log')->group(function () use ($LogController) {

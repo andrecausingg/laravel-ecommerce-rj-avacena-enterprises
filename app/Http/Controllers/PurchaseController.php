@@ -816,6 +816,236 @@ class PurchaseController extends Controller
         }
     }
 
+    public function updateQty(Request $request)
+    {
+        $user_action = '';
+        $status = 'NOT PAID';
+        $ctr = 0;
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            DB::rollBack();
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'purchase_id' => 'required|string',
+            'purchase_group_id' => 'required|string',
+            'inventory_id' => 'required|string',
+            'inventory_product_id' => 'required|string',
+            'user_id_customer' => 'required|string',
+            'quantity' => 'required|numeric|min:1',
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(
+                [
+                    'message' => $validator->errors(),
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+
+        // Start the transaction
+        DB::beginTransaction();
+
+        try {
+            $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
+            $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+            $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
+            $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
+            $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
+            $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
+                ->where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('inventory_id', $decrypted_inventory_id)
+                ->where('inventory_product_id', $decrypted_inventory_product_id)
+                ->where('user_id_customer', $decrypted_user_id_customer)
+                ->first();
+
+            if (!$purchase) {
+                DB::rollBack();
+                return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            $count = PurchaseModel::where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('inventory_id', $decrypted_inventory_id)
+                ->where('inventory_product_id', $decrypted_inventory_product_id)
+                ->where('user_id_customer', $decrypted_user_id_customer)
+                ->count();
+
+            if ($request->quantity > $count) {
+                $user_action = 'ADD QUANTITY ON ITEM';
+                do {
+                    foreach ($this->fillable_attr_purchase->arrToStores() as $arrToStores) {
+                        if ($arrToStores == 'user_id_customer') {
+                            $arr_store_fresh_create[$arrToStores] = $purchase->user_id_customer;
+                        } else if ($arrToStores == 'purchase_group_id') {
+                            $arr_store_fresh_create[$arrToStores] = $purchase->purchase_group_id;
+                        } else if ($arrToStores == 'user_id_menu') {
+                            $arr_store_fresh_create[$arrToStores] = $user->user_id;
+                        } else if ($arrToStores == 'status') {
+                            $arr_store_fresh_create[$arrToStores] = $status;
+                        } else {
+                            $arr_store_fresh_create[$arrToStores] = $purchase->$arrToStores;
+                        }
+                    }
+
+                    // Create a new purchase record
+                    $created_purchase = PurchaseModel::create($arr_store_fresh_create);
+                    if (!$created_purchase) {
+                        DB::rollBack();
+                        return response()->json(
+                            ['message' => 'Failed to store purchase'],
+                            Response::HTTP_INTERNAL_SERVER_ERROR
+                        );
+                    }
+
+                    // Update the unique I.D
+                    $update_unique_id = $this->helper->updateUniqueId($created_purchase, $this->fillable_attr_purchase->idToUpdatePurchase(), $created_purchase->id);
+                    if ($update_unique_id) {
+                        DB::rollBack();
+                        // Retun only if theres an error
+                        return $update_unique_id;
+                    }
+
+                    // Minus Stock
+                    $minus_stock = $this->minusStock($decrypted_inventory_product_id);
+                    if ($minus_stock->getStatusCode() !== Response::HTTP_OK) {
+                        DB::rollBack();
+                        return $minus_stock;
+                    }
+                    $total_amount_payment = $this->totalAmountPayment($created_purchase->purchase_group_id, $created_purchase->user_id_customer);
+
+                    // Update the payment record
+                    $payment = PaymentModel::where('purchase_group_id', $created_purchase->purchase_group_id)->first();
+                    if (!$payment) {
+                        DB::rollBack();
+                        return response()->json(
+                            ['message' => 'Payment record not found'],
+                            Response::HTTP_NOT_FOUND
+                        );
+                    }
+
+                    $payment->update([
+                        'total_amount' => $total_amount_payment['total_amount'],
+                        'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
+                    ]);
+
+                    // Re-fetch the updated payment record
+                    $updated_payment = PaymentModel::where('id', $payment->id)->first();
+
+                    // Store logs for create Purchase
+                    $arr_all_purchase['purchase'][] = $created_purchase;
+                    // Store logs for update Payment
+                    $arr_all_purchase['payment'][] = $updated_payment;
+                } while ($count > $ctr);
+            } else {
+                $user_action = 'MINUS QUANTITY ON ITEM';
+                $purchases = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
+                    ->where('purchase_group_id', $decrypted_purchase_group_id)
+                    ->where('inventory_id', $decrypted_inventory_id)
+                    ->where('inventory_product_id', $decrypted_inventory_product_id)
+                    ->where('user_id_customer', $decrypted_user_id_customer)
+                    ->take($request->quantity)
+                    ->get();
+
+                foreach ($purchases as $purchase_id) {
+                    $purchase = PurchaseModel::where('purchase_id', $purchase_id->purchase_id)->first();
+                    if (!$purchase) {
+                        DB::rollBack();
+                        return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
+                    }
+                    if (!$purchase->delete()) {
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to delete purchase'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+
+                    // Store logs for create Purchase
+                    $arr_all_purchase['purchase'][] = $purchase;
+                    // Store the successfully deleted purchase ID
+                    $deleted_purchase_item[] = $purchase;
+                }
+
+
+                // Update stock after deleting all purchases
+                $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase_id->inventory_product_id)
+                    ->where('inventory_id', $purchase_id->inventory_id)
+                    ->first();
+                if (!$inventory_product) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                $inventory_product->update([
+                    'stock' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
+                ]);
+
+                $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchases->purchase_group_id, $purchases->user_id_customer);
+                $update_payment = PaymentModel::where('user_id', $purchases->user_id_customer)
+                    ->where('purchase_group_id', $purchases->purchase_group_id)
+                    ->first();
+
+                if (!$update_payment) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Payment record not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                $update_payment->update([
+                    'total_amount' => $total_amount_payment['total_amount'],
+                    'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
+                ]);
+
+                // Check if total amount is zero and then delete the payment record
+                if ($total_amount_payment['total_amount'] == 0.00) {
+                    if (!$update_payment->delete()) {
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+                }
+            }
+
+
+            $arr_log_details['fields'] = $arr_all_purchase;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => $user_action,
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json(
+                [
+                    'message' => 'Purchase and Payment records deleted successfully',
+                ],
+                Response::HTTP_OK
+            );
+        } catch (\Exception $e) {
+            // Rollback the transaction in case of any error
+            DB::rollBack();
+            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public function getUserIdMenuCustomer(Request $request)
     {
         // Initialize array to store purchase information
