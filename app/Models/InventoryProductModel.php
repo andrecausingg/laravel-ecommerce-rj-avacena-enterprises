@@ -82,6 +82,15 @@ class InventoryProductModel extends Model
         ];
     }
 
+    public function arrToDeletes(): array
+    {
+        return [
+            'inventory_product_id',
+            'inventory_id',
+            'eu_device',
+        ];
+    }
+
     public function unsetActions(): array
     {
         return [
@@ -92,7 +101,7 @@ class InventoryProductModel extends Model
     public function idToUpdate(): array
     {
         return [
-            'inventory_product_id' => 'inv_product_id-',
+            'inventory_product_id' => 'inventory_product_id-',
         ];
     }
 

@@ -520,8 +520,19 @@ class Helper
         // Set the timezone for Carbon to 'Asia/Manila'
         // Carbon::setToStringFormat('F j, Y g:i a');
         $carbon_date = Carbon::parse($data)->setTimezone('Asia/Manila');
-        $value = $carbon_date->format('F j, Y g:i a');
+        // $value = $carbon_date->format('F j, Y g:i a');
+        $value = $carbon_date->format('F j, Y');
+
 
         return $value;
     }
+
+    // public function convertReadableTimeDate($data)
+    // {
+    //     // Set the timezone for Carbon to 'Asia/Manila'
+    //     $carbon_date = Carbon::parse($data)->setTimezone('Asia/Manila');
+    //     $value = $carbon_date->format('d-m-Y'); // Correct date format
+
+    //     return $value;
+    // }
 }

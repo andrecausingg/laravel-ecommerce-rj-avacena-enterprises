@@ -30,7 +30,7 @@ class InventoryModel extends Model
     public function idToUpdate(): array
     {
         return [
-            'inventory_id' => 'inv_id-',
+            'inventory_id' => 'inventory_id-',
         ];
     }
 

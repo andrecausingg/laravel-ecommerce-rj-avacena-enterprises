@@ -189,6 +189,94 @@ class InventoryController extends Controller
         );
     }
 
+
+    public function show(Request $request, string $id)
+    {
+        $arr_inventory = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $inventory = InventoryModel::where('inventory_id', Crypt::decrypt($id))->first();
+        if (!$inventory) {
+            return response()->json(
+                [
+                    'message' => 'Data not found',
+                ],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $getFillableAttribute) {
+            if ($getFillableAttribute == 'inventory_id') {
+                $arr_inventory[$getFillableAttribute] = Crypt::encrypt($inventory->$getFillableAttribute);
+            } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                $carbon_date = Carbon::parse($inventory->$getFillableAttribute);
+                $value = $carbon_date->format('F j, Y g:i a');
+                $arr_inventory[$getFillableAttribute] = $value;
+            } else {
+                $arr_inventory[$getFillableAttribute] = $inventory->$getFillableAttribute;
+            }
+        }
+
+
+        return response()->json(
+            [
+                "message" => "Successfully Retrieve Data",
+                'result' => $arr_inventory,
+            ],
+            Response::HTTP_OK
+        );
+    }
+
+    public function showProduct(Request $request, string $id)
+    {
+        $arr_inventory_product = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
+        if ($inventory_product->isEmpty()) {
+            return response()->json(
+                [
+                    'message' => 'Data not found',
+                ],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        foreach ($inventory_product->toArray() as $toArray) {
+            $arr_product = [];
+            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
+                if ($getFillableAttribute == 'inventory_product_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if ($getFillableAttribute == 'inventory_id') {
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
+                } else {
+                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
+                }
+            }
+            $arr_inventory_product[] = $arr_product;
+        }
+
+        return response()->json(
+            [
+                "message" => "Successfully Retrieve Data",
+                'result' => $arr_inventory_product,
+            ],
+            Response::HTTP_OK
+        );
+    }
+
     public function store(Request $request)
     {
         // Initialize an array to store all created items
@@ -240,7 +328,6 @@ class InventoryController extends Controller
             // Validate eu_device
             $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
             if ($result_validate_eu_device) {
-                DB::rollBack();
                 return $result_validate_eu_device;
             }
 
@@ -308,14 +395,10 @@ class InventoryController extends Controller
         }
 
         // Check if 'items' key exists in the request
-        if (!$request->has('items')) {
-            return response()->json(
-                [
-                    'message' => 'Missing items in the request',
-                ],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+        if (!$request->has('items') || empty($request['items'])) {
+            return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
+
 
         $arr_items_error_fields = $this->fillable_attr_inventorys->arrToStores();
 
@@ -408,7 +491,7 @@ class InventoryController extends Controller
                 'is_sensitive' => 0,
                 'is_history' => 0,
                 'log_details' => $created_items,
-                'user_action' => 'STORE INVENTORY PARENT',
+                'user_action' => 'STORE MULTIPLE INVENTORY ITEMS PARENT',
             ];
 
             // Logs
@@ -427,93 +510,6 @@ class InventoryController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'An error occurred: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    public function show(Request $request, string $id)
-    {
-        $arr_inventory = [];
-
-        // Authorize the user
-        $user = $this->helper->authorizeUser($request);
-        if (empty($user->user_id)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $inventory = InventoryModel::where('inventory_id', Crypt::decrypt($id))->first();
-        if (!$inventory) {
-            return response()->json(
-                [
-                    'message' => 'Data not found',
-                ],
-                Response::HTTP_NOT_FOUND
-            );
-        }
-
-        foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $getFillableAttribute) {
-            if ($getFillableAttribute == 'inventory_id') {
-                $arr_inventory[$getFillableAttribute] = Crypt::encrypt($inventory->$getFillableAttribute);
-            } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                $carbon_date = Carbon::parse($inventory->$getFillableAttribute);
-                $value = $carbon_date->format('F j, Y g:i a');
-                $arr_inventory[$getFillableAttribute] = $value;
-            } else {
-                $arr_inventory[$getFillableAttribute] = $inventory->$getFillableAttribute;
-            }
-        }
-
-
-        return response()->json(
-            [
-                "message" => "Successfully Retrieve Data",
-                'result' => $arr_inventory,
-            ],
-            Response::HTTP_OK
-        );
-    }
-
-    public function showProduct(Request $request, string $id)
-    {
-        $arr_inventory_product = [];
-
-        // Authorize the user
-        $user = $this->helper->authorizeUser($request);
-        if (empty($user->user_id)) {
-            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
-        if ($inventory_product->isEmpty()) {
-            return response()->json(
-                [
-                    'message' => 'Data not found',
-                ],
-                Response::HTTP_NOT_FOUND
-            );
-        }
-
-        foreach ($inventory_product->toArray() as $toArray) {
-            $arr_product = [];
-            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
-                if ($getFillableAttribute == 'inventory_product_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if ($getFillableAttribute == 'inventory_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
-                } else {
-                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
-                }
-            }
-            $arr_inventory_product[] = $arr_product;
-        }
-
-        return response()->json(
-            [
-                "message" => "Successfully Retrieve Data",
-                'result' => $arr_inventory_product,
-            ],
-            Response::HTTP_OK
-        );
     }
 
     public function update(Request $request)
@@ -551,32 +547,37 @@ class InventoryController extends Controller
             }
         });
 
-        // Input User
-        // Decrypted id
-        $decrypted_inventory_id = Crypt::decrypt($request->input('inventory_id'));
-
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->input('eu_device'));
         if ($result_validate_eu_device) {
             return $result_validate_eu_device;
         }
 
-        // Check if inventory record exists
-        $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
-
-        if (!$inventory) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Get the changes of the fields
-        $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
-        $changes_for_logs[] = [
-            'inventory_id' => $decrypted_inventory_id,
-            'fields' => $result_changes_item_for_logs,
-        ];
 
         DB::beginTransaction();
         try {
+            // Decrypted id
+            $decrypted_inventory_id = Crypt::decrypt($request->input('inventory_id'));
+            // Check if inventory record exists
+            $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
+            if (!$inventory) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Get the changes of the fields
+            $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
+            $changes_for_logs[] = [
+                'inventory_id' => $decrypted_inventory_id,
+                'fields' => $result_changes_item_for_logs,
+            ];
+
+            // Check if there's Changes Logs
+            $result_changes_logs = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
+            if ($result_changes_logs) {
+                DB::rollBack();
+                return $result_changes_logs;
+            }
+
             // Update Multiple Data
             $result_update_multi_data = $this->helper->arrUpdateMultipleData($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
             if ($result_update_multi_data) {
@@ -585,13 +586,6 @@ class InventoryController extends Controller
             }
 
             $eu_device = $request->input('eu_device');
-
-            // Check if there's Changes Logs
-            $changesCheckResponse = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
-            if ($changesCheckResponse) {
-                DB::rollBack();
-                return $changesCheckResponse;
-            }
 
             // Arr Data Logs
             $arr_data_logs = [
@@ -637,7 +631,6 @@ class InventoryController extends Controller
         if (!$request->has('items') || empty($request['items'])) {
             return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
-
 
         $arr_items_error_fields = $this->fillable_attr_inventorys->arrToUpdates();
 
@@ -714,7 +707,7 @@ class InventoryController extends Controller
                 // Get the changes of the fields
                 $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $user_input, '');
                 $changes_for_logs[] = [
-                    'inventory_id' => $user_input['inventory_id'],
+                    'inventory_id' => Crypt::decrypt($user_input['inventory_id']),
                     'fields' => $result_changes_item_for_logs,
                 ];
 
@@ -742,7 +735,7 @@ class InventoryController extends Controller
                 'is_sensitive' => 0,
                 'is_history' => 0,
                 'log_details' => $changes_for_logs,
-                'user_action' => 'UPDATE INVENTORY PARENT',
+                'user_action' => 'UPDATE MULTIPLE INVENTORY ITEMS PARENT',
             ];
 
             // Logs
@@ -790,23 +783,27 @@ class InventoryController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventory_id = Crypt::decrypt($request->inventory_id);
-        $inventory = InventoryModel::where('inventory_id', $inventory_id)->first();
-        if (!$inventory) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Checking Id on other tbl if exist unset the the api
-        $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
-
-        // Check if 'is_exist' is 'yes' in the first element and then unset it
-        if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
-            return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
-        }
-
         DB::beginTransaction();
 
         try {
+            $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
+            $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
+            if (!$inventory) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Checking Id on other tbl if exist unset the the api
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory->inventory_id, $this->fillable_attr_inventorys->arrModelWithId());
+
+            // Check if 'is_exist' is 'yes' in the first element and then unset it
+            if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+                return response()->json([
+                    'message' => 'Can\'t delete because this id exist on other table',
+                    'inventory_id' => $request->inventory_id,
+
+                ], Response::HTTP_NOT_FOUND);
+            }
+
             foreach ($this->fillable_attr_inventorys->getFillableAttributes() as $fillable_attr_inventorys) {
                 $arr_log_details['fields'][$fillable_attr_inventorys] = $inventory->$fillable_attr_inventorys;
             }
@@ -817,9 +814,11 @@ class InventoryController extends Controller
                 return response()->json(['message' => 'Failed to delete inventory'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
+            $eu_device = $request->input('eu_device');
+
             // Arr Data Logs
             $arr_data_logs = [
-                'user_device' => $request->eu_device,
+                'user_device' => $eu_device,
                 'user_id' => $user->user_id,
                 'is_sensitive' => 0,
                 'is_history' => 0,
@@ -829,6 +828,10 @@ class InventoryController extends Controller
 
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
 
             DB::commit();
 
@@ -850,6 +853,11 @@ class InventoryController extends Controller
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Check if 'items' key exists in the request
+        if (!$request->has('items') || empty($request['items'])) {
+            return response()->json(['message' => 'Missing or empty items in the request'], Response::HTTP_BAD_REQUEST);
         }
 
         // Validation rules for each item in the array
@@ -894,15 +902,12 @@ class InventoryController extends Controller
                 // Validate eu_device
                 $result_validate_eu_device = $this->helper->validateEuDevice($user_input['eu_device']);
                 if ($result_validate_eu_device) {
-                    DB::rollBack();
                     return $result_validate_eu_device;
                 }
 
                 // Check if inventory record exists
                 $inventory = InventoryModel::where('inventory_id', $decrypted_inventory_id)->first();
-
                 if (!$inventory) {
-                    DB::rollBack();
                     return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
                 }
 
@@ -911,7 +916,10 @@ class InventoryController extends Controller
 
                 // Check if 'is_exist' is 'yes' in the first element and then unset it
                 if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
-                    return response()->json(['message' => 'Can\'t delete because this id exist on other table'], Response::HTTP_NOT_FOUND);
+                    return response()->json([
+                        'message' => 'Can\'t delete because this id exist on other table',
+                        'inventory_id' => $user_input['inventory_id'],
+                    ], Response::HTTP_NOT_FOUND);
                 }
 
                 // Get details to log
@@ -926,20 +934,26 @@ class InventoryController extends Controller
                     DB::rollBack();
                     return response()->json(['message' => 'Failed to delete inventory'], Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
+
+                $eu_device = $user_input['eu_device'];
             }
 
             // Arr Data Logs
             $arr_data_logs = [
-                'user_device' => $request['items'][0]['eu_device'],
+                'user_device' => $eu_device,
                 'user_id' => $user->user_id,
                 'is_sensitive' => 0,
                 'is_history' => 0,
                 'log_details' => $arr_log_details,
-                'user_action' => 'DELETE INVENTORY PARENT',
+                'user_action' => 'DELETE MULTIPLE INVENTORY ITEMS PARENT',
             ];
 
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
 
             DB::commit();
 

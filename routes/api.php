@@ -116,6 +116,8 @@ Route::middleware(['jwt.auth'])->group(function () {
             Route::post('/store-multiple', [$InventoryProductController, 'storeMultiple']);
             Route::post('/update', [$InventoryProductController, 'update']);
             Route::post('/update-multiple', [$InventoryProductController, 'updateMultiple']);
+            Route::delete('delete', [$InventoryProductController, 'destroy']);
+            Route::delete('delete-multiple', [$InventoryProductController, 'destroyMultiple']);
         });
     });
 
