@@ -307,7 +307,7 @@ class InventoryController extends Controller
                 ->exists();
 
             if ($exists) {
-                $validator->errors()->add('The combination of name and category already exists.');
+                $validator->errors()->add('message', 'The combination of name and category already exists.');
             }
         });
 
@@ -543,7 +543,7 @@ class InventoryController extends Controller
                 ->exists();
 
             if ($exists) {
-                $validator->errors()->add('The combination of name and category already exists.');
+                $validator->errors()->add('items', 'The combination of name and category already exists.');
             }
         });
 
