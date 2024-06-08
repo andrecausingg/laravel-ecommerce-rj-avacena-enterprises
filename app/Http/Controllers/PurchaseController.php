@@ -478,6 +478,25 @@ class PurchaseController extends Controller
                 );
             }
 
+            $arr_log_details['fields'] = $purchase;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'MINUS QUANTITY ITEM',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
             // Commit the transaction
             DB::commit();
 
@@ -626,6 +645,25 @@ class PurchaseController extends Controller
                 );
             }
 
+            $arr_log_details['fields'] = $purchase;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'ADD QUANTITY ITEM',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
             // Commit the transaction
             DB::commit();
 
@@ -643,51 +681,51 @@ class PurchaseController extends Controller
         }
     }
 
-    public function deleteAll(Request $request)
+    public function deleteQtyAll(Request $request)
     {
-        $deleted_purchase_id = [];
+        $deleted_purchase_item = [];
+
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            DB::rollBack();
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'purchase_id' => 'required|array',
+            'purchase_group_id' => 'required|string',
+            'inventory_id' => 'required|string',
+            'inventory_product_id' => 'required|string',
+            'user_id_customer' => 'required|string',
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(
+                [
+                    'message' => $validator->errors(),
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        // Validate Eu Device
+        $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
+        if ($result_validate_eu_device) {
+            return $result_validate_eu_device;
+        }
 
         // Start the transaction
         DB::beginTransaction();
-
         try {
-            // Authorize the user
-            $user = $this->helper->authorizeUser($request);
-            if (empty($user->user_id)) {
-                DB::rollBack();
-                return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
-            }
-
-            // Validation rules for each item in the array
-            $validator = Validator::make($request->all(), [
-                'purchase_id' => 'required|array',
-                'purchase_group_id' => 'required|string',
-                'user_id_customer' => 'required|string',
-                'eu_device' => 'required|string',
-            ]);
-
-            // Check if validation fails
-            if ($validator->fails()) {
-                DB::rollBack();
-                return response()->json(
-                    [
-                        'message' => $validator->errors(),
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
-            }
-
-            // Validate Eu Device
-            $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
-            if ($result_validate_eu_device) {
-                DB::rollBack();
-                return $result_validate_eu_device;
-            }
-
             $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
             $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
             $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
             $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
 
             foreach ($request->purchase_id as $purchase_id) {
                 $decrypted_purchase_id = Crypt::decrypt($purchase_id);
@@ -701,9 +739,11 @@ class PurchaseController extends Controller
                     DB::rollBack();
                     return response()->json(['message' => 'Failed to delete purchase'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 }
+
                 // Store the successfully deleted purchase ID
-                $deleted_purchase_id[] = $purchase_id;
+                $deleted_purchase_item[] = $purchase;
             }
+
 
             // Update stock after deleting all purchases
             $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
@@ -715,7 +755,7 @@ class PurchaseController extends Controller
             }
 
             $inventory_product->update([
-                'stock' => max(0, $inventory_product->stock + count($deleted_purchase_id)),
+                'stock' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
             ]);
 
             $total_amount_payment = $this->totalAmountPaymentDeleteAll($decrypted_purchase_group_id, $decrypted_user_id_customer);
@@ -734,11 +774,30 @@ class PurchaseController extends Controller
             ]);
 
             // Check if total amount is zero and then delete the payment record
-            if ($total_amount_payment == 0) {
+            if ($total_amount_payment['total_amount'] == 0.00) {
                 if (!$update_payment->delete()) {
                     DB::rollBack();
                     return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 }
+            }
+
+            $arr_log_details['fields'] = $deleted_purchase_item;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'DELETE ALL QUANTITY SINGLE ITEM',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
             }
 
             // Commit the transaction
@@ -747,7 +806,6 @@ class PurchaseController extends Controller
             return response()->json(
                 [
                     'message' => 'Purchase and Payment records deleted successfully',
-                    'deleted_purchase_ids' => $deleted_purchase_id,
                 ],
                 Response::HTTP_OK
             );
@@ -1046,6 +1104,11 @@ class PurchaseController extends Controller
     private function totalAmountPaymentDeleteAll($purchase_group_id, $customer_id)
     {
         $total_amount = 0.00;
+        $total_discounted_amount = 0.00;
+        $arr_to_data = [];
+
+        // Start transaction
+        DB::beginTransaction();
 
         // Retrieve all purchases with the given purchase group ID
         $purchases = PurchaseModel::where('purchase_group_id', $purchase_group_id)
@@ -1053,25 +1116,38 @@ class PurchaseController extends Controller
             ->get();
 
         if ($purchases->isEmpty()) {
-            return $total_amount;
+            // Rollback the transaction if no purchases found
+            DB::rollBack();
+            $arr_to_data['total_amount'] = 0.00;
+            $arr_to_data['total_discounted_amount'] = 0.00;
+
+            return $arr_to_data;
         }
 
         foreach ($purchases as $purchase) {
             $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase->inventory_product_id)
-                ->where('inventory_group_id', $purchase->inventory_group_id)
                 ->first();
 
             if (!$inventory_product) {
-                // Inventory product not found for the current purchase
+                // Rollback the transaction if inventory product not found for any purchase
+                DB::rollBack();
                 return response()->json(['message' => 'Inventory product not found for purchase ID ' . $purchase->id], Response::HTTP_NOT_FOUND);
             }
 
             // Add the price of the inventory product to the total amount
             $total_amount += $purchase->discounted_price != 0.00 ? $purchase->discounted_price : $purchase->retail_price;
+            $total_discounted_amount += $purchase->discounted_price;
         }
 
+        // Commit the transaction if all purchases are processed successfully
+        DB::commit();
+
+
+        $arr_to_data['total_amount'] = $total_amount;
+        $arr_to_data['total_discounted_amount'] = $total_discounted_amount;
+
         // Return the total amount
-        return $total_amount;
+        return $arr_to_data;
     }
 
     /**

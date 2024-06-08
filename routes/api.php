@@ -127,7 +127,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('/store', [$PurchaseController, 'store']);
         Route::post('/minus-qty', [$PurchaseController, 'minusQty']);
         Route::post('/add-qty', [$PurchaseController, 'addQty']);
-        Route::post('/delete-all-qty', [$PurchaseController, 'deleteAll']);
+        Route::delete('/delete-all-qty', [$PurchaseController, 'deleteQtyAll']);
     });
 
     // Payment
