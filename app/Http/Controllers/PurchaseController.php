@@ -821,6 +821,7 @@ class PurchaseController extends Controller
         $user_action = '';
         $status = 'NOT PAID';
         $ctr = 0;
+        $arr_all_purchase = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -842,12 +843,9 @@ class PurchaseController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
-            return response()->json(
-                [
-                    'message' => $validator->errors(),
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
+            return response()->json([
+                'message' => $validator->errors(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
 
@@ -879,20 +877,29 @@ class PurchaseController extends Controller
                 ->where('user_id_customer', $decrypted_user_id_customer)
                 ->count();
 
-            if ($request->quantity > $count) {
+            if ($request->quantity == $count) {
+                return response()->json([
+                    'message' => " The quantity remains unchanged. Please modify it."
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else if ($request->quantity > $count) {
                 $user_action = 'ADD QUANTITY ON ITEM';
                 do {
                     foreach ($this->fillable_attr_purchase->arrToStores() as $arrToStores) {
-                        if ($arrToStores == 'user_id_customer') {
-                            $arr_store_fresh_create[$arrToStores] = $purchase->user_id_customer;
-                        } else if ($arrToStores == 'purchase_group_id') {
-                            $arr_store_fresh_create[$arrToStores] = $purchase->purchase_group_id;
-                        } else if ($arrToStores == 'user_id_menu') {
-                            $arr_store_fresh_create[$arrToStores] = $user->user_id;
-                        } else if ($arrToStores == 'status') {
-                            $arr_store_fresh_create[$arrToStores] = $status;
-                        } else {
-                            $arr_store_fresh_create[$arrToStores] = $purchase->$arrToStores;
+                        switch ($arrToStores) {
+                            case 'user_id_customer':
+                                $arr_store_fresh_create[$arrToStores] = $purchase->user_id_customer;
+                                break;
+                            case 'purchase_group_id':
+                                $arr_store_fresh_create[$arrToStores] = $purchase->purchase_group_id;
+                                break;
+                            case 'user_id_menu':
+                                $arr_store_fresh_create[$arrToStores] = $user->user_id;
+                                break;
+                            case 'status':
+                                $arr_store_fresh_create[$arrToStores] = $status;
+                                break;
+                            default:
+                                $arr_store_fresh_create[$arrToStores] = $purchase->$arrToStores;
                         }
                     }
 
@@ -944,6 +951,8 @@ class PurchaseController extends Controller
                     $arr_all_purchase['purchase'][] = $created_purchase;
                     // Store logs for update Payment
                     $arr_all_purchase['payment'][] = $updated_payment;
+
+                    $ctr++;
                 } while ($count > $ctr);
             } else if ($request->quantity < $count) {
                 $user_action = 'MINUS QUANTITY ON ITEM';
@@ -971,9 +980,6 @@ class PurchaseController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'Failed to delete purchase'], Response::HTTP_INTERNAL_SERVER_ERROR);
                     }
-
-                    // Store logs for create Purchase
-                    $arr_all_purchase['purchase'][] = $purchase;
 
                     // Update stock after deleting all purchases
                     $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase_data->inventory_product_id)
@@ -1010,6 +1016,11 @@ class PurchaseController extends Controller
                             return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
                         }
                     }
+
+                    // Store logs for create Purchase
+                    $arr_all_purchase['purchase'][] = $purchase;
+                    // Store logs for update Payment
+                    $arr_all_purchase['payment'][] = $update_payment;
                 }
             }
 
@@ -1036,12 +1047,9 @@ class PurchaseController extends Controller
             // Commit the transaction
             DB::commit();
 
-            return response()->json(
-                [
-                    'message' => 'Purchase and Payment records deleted successfully',
-                ],
-                Response::HTTP_OK
-            );
+            return response()->json([
+                'message' => 'Quantity updated successfully.',
+            ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();

@@ -6,8 +6,10 @@ use App\Models\PaymentModel;
 use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\InventoryProductModel;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
@@ -29,22 +31,29 @@ class PaymentController extends Controller
 
     public function dashboard(Request $request)
     {
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        return response()->json([
+        // Retrieve data if not cached
+        $dashboardData = [
             'message' => 'Successfully get dashboard data.',
             'stock' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
             'today_transaction' => $this->getTodayTransaction(),
             'chart' => [[
-                'year' => $this->getChatSales(),
-                'month' => $this->getChatSales()
+                'year' => $this->getChartSalesYear(),
+                'month' => $this->getChartSalesMonth(),
+                // 'week' => $this->getChartSalesWeek(),
+                'today' => $this->getChartSalesToday(),
             ]],
-        ], Response::HTTP_OK);
+        ];
+
+
+        return response()->json($dashboardData, Response::HTTP_OK);
     }
 
     public function payment(Request $request)
@@ -59,10 +68,10 @@ class PaymentController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'money' => 'required|numeric|min:1',
             'payment_id' => 'required|string',
-            'user_id' => 'required|string',
             'purchase_group_id' => 'required|string',
+            'user_id' => 'required|string',
+            'money' => 'required|numeric|min:1',
             'eu_device' => 'required|string',
         ]);
 
@@ -82,46 +91,65 @@ class PaymentController extends Controller
             return $result_validate_eu_device;
         }
 
-        $decrypted_payment_id = Crypt::decrypt($request->payment_id);
-        $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
-        $decrypted_user_id_customer = Crypt::decrypt($request->user_id);
+        // Start a transaction
+        DB::beginTransaction();
+        try {
+            $decrypted_payment_id = Crypt::decrypt($request->payment_id);
+            $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+            $decrypted_user_id_customer = Crypt::decrypt($request->user_id);
 
-        $payment = PaymentModel::where('payment_id', $decrypted_payment_id)
-            ->where('user_id', $decrypted_user_id_customer)
-            ->where('purchase_group_id', $decrypted_purchase_group_id)
-            ->where('status', 'NOT PAID')
-            ->first();
+            $payment = PaymentModel::where('payment_id', $decrypted_payment_id)
+                ->where('user_id', $decrypted_user_id_customer)
+                ->where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('status', 'NOT PAID')
+                ->first();
 
-        if (!$payment) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
+            if (!$payment) {
+                // Rollback the transaction and return the error response
+                DB::rollBack();
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
 
-        if ($payment->total_amount > $request->money) {
-            return response()->json(['message' => 'Please input an amount greater than your purchase total amount.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+            if ($payment->total_amount > $request->money) {
+                // Rollback the transaction and return the error response
+                DB::rollBack();
+                return response()->json(['message' => 'Please input an amount greater than your purchase total amount.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
-        $paying = $payment->update([
-            'money' => $request->money,
-            'change' => $request->money - $payment->total_amount,
-            'status' => $status,
-            'paid_at' => Carbon::now()
-        ]);
-
-        if (!$paying) {
-            return response()->json(['message' => 'Failed to paid purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $payment = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
-            ->where('purchase_group_id',  $decrypted_purchase_group_id)
-            ->update([
+            $paying = $payment->update([
+                'money' => $request->money,
+                'change' => $request->money - $payment->total_amount,
                 'status' => $status,
+                'paid_at' => Carbon::now()
             ]);
 
-        if (!$payment) {
-            return response()->json(['message' => 'Failed to paid purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+            if (!$paying) {
+                // Rollback the transaction and return the error response
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to pay purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
 
-        return response()->json(['message' => 'Purchase successfully paid.'], Response::HTTP_OK);
+            $purchaseUpdate = PurchaseModel::where('user_id_customer', $decrypted_user_id_customer)
+                ->where('purchase_group_id',  $decrypted_purchase_group_id)
+                ->update([
+                    'status' => $status,
+                ]);
+
+            if (!$purchaseUpdate) {
+                // Rollback the transaction and return the error response
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to pay purchase.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json(['message' => 'Purchase successfully paid.'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction in case of an exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred while processing your payment.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     private function getTotalStock()
@@ -179,7 +207,7 @@ class PaymentController extends Controller
         $arr_today_transaction = [];
 
         // Get today's transactions
-        $today_transactions = PaymentModel::whereDate('created', Carbon::now()->toDateString())->get()->toArray();
+        $today_transactions = PaymentModel::whereDate('created_at', Carbon::now()->toDateString())->get()->toArray();
 
         // Check if there are any transactions for today
         if (!empty($today_transactions)) {
@@ -214,34 +242,158 @@ class PaymentController extends Controller
 
     private function getTopSellingProducts()
     {
-        
+    }
+
+    private function getChartSalesToday()
+    {
+        // Get the current date using Carbon
+        $current_date = Carbon::now();
+
+        // Array to store hourly sales
+        $hourly = [];
+
+        // Loop through each hour of the day from 12 AM to 11 PM
+        for ($hour = 0; $hour <= 23; $hour++) {
+            // Create a Carbon instance for the current hour
+            $current_hour = $current_date->copy()->hour($hour);
+
+            // Get the start and end timestamps for the current hour
+            $start_of_hour = $current_hour->copy()->startOfHour();
+            $end_of_hour = $current_hour->copy()->endOfHour();
+
+            // Get the sales total for the current hour
+            $hourly_total_sales = PaymentModel::whereBetween('paid_at', [$start_of_hour, $end_of_hour])
+                ->sum('total_amount');
+
+            // Format the hour in 12-hour format with AM/PM
+            $formatted_hour = $current_hour->format('h A');
+
+            // Add the hour and total sales to the array
+            $hourly[] = [
+                'hour' => $formatted_hour,
+                'total' => $hourly_total_sales,
+            ];
+        }
+
+        return $hourly;
     }
 
 
-    private function getChatSales()
+    private function getChartSalesWeek()
+    {
+        // Retrieve weekly sales data from cache if available
+        $weeklySales = Cache::get('weekly_sales');
+        if ($weeklySales === null) {
+            // Initialize array to store daily sales
+            $dailySales = [];
+
+            // Get today's date
+            $currentDate = Carbon::now();
+
+            // Get the start of the current week
+            $startOfWeek = $currentDate->startOfWeek();
+
+            // Get the end of the current week
+            $endOfWeek = $currentDate->endOfWeek();
+
+            // Query database for weekly sales data
+            $weeklySalesData = PaymentModel::selectRaw('DATE(paid_at) as date, SUM(total_amount) as total')
+                ->whereBetween('paid_at', [$startOfWeek, $endOfWeek])
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
+
+            // Loop through each day of the week and calculate sales
+            $currentDay = $startOfWeek->copy();
+            while ($currentDay <= $endOfWeek) {
+                $formattedDay = $currentDay->format('D');
+                $totalSales = 0;
+                foreach ($weeklySalesData as $dayData) {
+                    if ($dayData->date == $currentDay->toDateString()) {
+                        $totalSales = $dayData->total;
+                        break;
+                    }
+                }
+                $dailySales[] = [
+                    'day' => $formattedDay,
+                    'total' => $totalSales,
+                ];
+                // Move to the next day
+                $currentDay->addDay();
+            }
+
+            // Cache the data for future requests
+            Cache::put('weekly_sales', $dailySales, Carbon::now()->addMinutes(10));
+
+            // Return weekly sales data
+            return $dailySales;
+        }
+
+        // Return cached weekly sales data
+        return $weeklySales;
+    }
+
+
+    private function getChartSalesMonth()
+    {
+        // Array to store daily sales
+        $daily_sales = [];
+
+        // Get the current date using Carbon
+        $current_date = Carbon::now();
+
+        // Get the start and end of the current month
+        $startOfMonth = $current_date->copy()->startOfMonth();
+        $endOfMonth = $current_date->copy()->endOfMonth();
+
+        // Loop through each day of the current month
+        for ($day = 1; $day <= $endOfMonth->day; $day++) {
+            // Create a Carbon instance for the current day
+            $currentDay = Carbon::create($current_date->year, $current_date->month, $day);
+
+            // Get the current day's sales total
+            $total_sales = PaymentModel::whereDate('paid_at', $currentDay)
+                ->sum('total_amount');
+
+            // Add the day and total sales to the array
+            $daily_sales[] = [
+                'day' => $currentDay->format('d'),
+                'total' => $total_sales,
+            ];
+        }
+
+        return $daily_sales;
+    }
+
+    private function getChartSalesYear()
     {
         // Array to store monthly sales
         $monthly_sales = [];
 
-        // Get the current year
-        $current_year = now()->year;
+        // Get the current year using Carbon
+        $current_year = Carbon::now()->year;
 
-        // Loop through each month
+        // Loop through each month using Carbon
         for ($month = 1; $month <= 12; $month++) {
+            // Create a Carbon instance for the first day of the current month
+            $startOfMonth = Carbon::create($current_year, $month, 1);
+            // Get the last day of the current month
+            $endOfMonth = $startOfMonth->copy()->endOfMonth();
+
             // Get the current month's sales total
-            $total_sales = PaymentModel::whereYear('paid_at', $current_year)
-                ->whereMonth('paid_at', $month)
+            $total_sales = PaymentModel::whereBetween('paid_at', [$startOfMonth, $endOfMonth])
                 ->sum('total_amount');
 
             // Add the month name and total sales to the array
             $monthly_sales[] = [
-                'name' => date('M', mktime(0, 0, 0, $month, 1)),
+                'name' => $startOfMonth->format('M'),
                 'total' => $total_sales,
             ];
         }
 
         return $monthly_sales;
     }
+
 
 
 
