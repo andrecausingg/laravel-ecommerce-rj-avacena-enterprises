@@ -227,10 +227,10 @@ class InventoryProductModel extends Model
 
     public function getViewRowTable()
     {
-        $prefix = 'inventory/product/';
-        $url = $prefix . 'show/';
+        // $prefix = 'inventory/product/';
+        // $url = $prefix . 'show/';
+        $url = '';
         $method = 'GET';
-
         return compact('url',  'method');
     }
 }
