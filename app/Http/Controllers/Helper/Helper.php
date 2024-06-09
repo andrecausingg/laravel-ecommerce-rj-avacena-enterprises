@@ -152,6 +152,7 @@ class Helper
 
     public function log(Request $request, array $arr_data_logs)
     {
+
         DB::beginTransaction();
         try {
             if ($arr_data_logs['is_history'] == 1) {
@@ -159,11 +160,12 @@ class Helper
                     'tbl_id' => $arr_data_logs['log_details']['fields']['user_id'],
                     'tbl_name' => 'users_tbl',
                     'column_name' => 'password',
-                    'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
-                        $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
-                            $arr_data_logs['log_details']['fields']['password']['new'] :
-                            null
-                        ),
+                    'value' => $arr_data_logs['log_details']['fields']['password']['new'],
+                    // 'value' => !is_array($arr_data_logs['log_details']['fields']['password']) ?
+                    //     $arr_data_logs['log_details']['fields']['password'] : (isset($arr_data_logs['log_details']['fields']['password']['new']) ?
+                    //         $arr_data_logs['log_details']['fields']['password']['new'] :
+                    //         null
+                    //     ),
                 ]);
 
                 // Check if history creation failed

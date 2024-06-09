@@ -3,17 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
+use Illuminate\Support\Str;
 use App\Models\HistoryModel;
+use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use App\Mail\VerificationMail;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class AccountController extends Controller
@@ -79,6 +80,7 @@ class AccountController extends Controller
                     $userInfo = UserInfoModel::where('user_id', $auth_user->user_id)->first();
                     $decrypted_auth_user['userInfo'] = [
                         'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+                        'name' => ($userInfo && $userInfo->first_name && $userInfo->last_name) ? (Crypt::decrypt($userInfo->first_name) . " " . Crypt::decrypt($userInfo->last_name)) : ($userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : ($userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null)),
                     ];
                     $decrypted_auth_user[$column] = Crypt::encrypt($auth_user->{$column});
 
@@ -348,97 +350,115 @@ class AccountController extends Controller
             return $result_validate_eu_device;
         }
 
-        $accounts = AuthModel::all();
+        // Begin transaction
+        DB::beginTransaction();
+        try {
+            $accounts = AuthModel::all();
+            // Decrypt and validate email if exist
+            foreach ($accounts as $account) {
+                // Start Decrypt
 
-        // Decrypt and validate email if exist
-        foreach ($accounts as $account) {
-            // Start Decrypt
-
-            if ($request->filled('phone_number')) {
-                $decrypted_phone_number = $account->phone_number ?? Crypt::decrypt($account->phone_number);
-                // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-                if ($decrypted_phone_number === $request->phone_number && $user->phone_verified_at !== null) {
-                    return response()->json(
-                        [
-                            'message' => 'Phone number already exist'
-                        ],
-                        Response::HTTP_UNPROCESSABLE_ENTITY
-                    );
+                if ($request->filled('phone_number')) {
+                    $decrypted_phone_number = $account->phone_number ?? Crypt::decrypt($account->phone_number);
+                    // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
+                    if ($decrypted_phone_number === $request->phone_number && $user->phone_verified_at !== null) {
+                        return response()->json(
+                            [
+                                'message' => 'Phone number already exist'
+                            ],
+                            Response::HTTP_UNPROCESSABLE_ENTITY
+                        );
+                    }
+                }
+                if ($request->filled('email')) {
+                    $decrypted_email = $account->email ?? Crypt::decrypt($account->email);
+                    // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
+                    if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
+                        return response()->json(
+                            [
+                                'message' => 'Email already exist'
+                            ],
+                            Response::HTTP_UNPROCESSABLE_ENTITY
+                        );
+                    }
                 }
             }
-            if ($request->filled('email')) {
-                $decrypted_email = $account->email ?? Crypt::decrypt($account->email);
-                // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-                if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
-                    return response()->json(
-                        [
-                            'message' => 'Email already exist'
-                        ],
-                        Response::HTTP_UNPROCESSABLE_ENTITY
-                    );
+
+            // Store only have value   
+            foreach ($this->fillable_attr_auth->arrStoreFields() as $arrStoreField) {
+                if ($arrStoreField == 'user_id') {
+                    $arr_validates[$arrStoreField] = $user_id;
+                } else if ($arrStoreField == 'phone_number' && $request->filled('phone_number')) {
+                    $arr_validates[$arrStoreField] = Crypt::encrypt($request->phone_number);
+                } else if ($arrStoreField == 'email' && $request->filled('email')) {
+                    $arr_validates[$arrStoreField] = Crypt::encrypt($request->email);
+                } else if ($arrStoreField == 'password') {
+                    $arr_validates[$arrStoreField] = Hash::make($request->password);
+                } else if ($arrStoreField == 'verification_number') {
+                    $arr_validates[$arrStoreField] = $verification_number;
+                } else if ($arrStoreField == 'phone_verified_at' && $request->filled('phone_number')) {
+                    $arr_validates[$arrStoreField] = Carbon::now();
+                } else if ($arrStoreField == 'email_verified_at' && $request->filled('email')) {
+                    $arr_validates[$arrStoreField] = Carbon::now();
+                } else {
+                    $arr_validates[$arrStoreField] = $request->$arrStoreField;
                 }
             }
-        }
 
-        // Store only have value   
-        foreach ($this->fillable_attr_auth->arrStoreFields() as $arrStoreField) {
-            if ($arrStoreField == 'user_id') {
-                $arr_validates[$arrStoreField] = $user_id;
-            } else if ($arrStoreField == 'phone_number' && $request->filled('phone_number')) {
-                $arr_validates[$arrStoreField] = Crypt::encrypt($request->phone_number);
-            } else if ($arrStoreField == 'email' && $request->filled('email')) {
-                $arr_validates[$arrStoreField] = Crypt::encrypt($request->email);
-            } else if ($arrStoreField == 'password') {
-                $arr_validates[$arrStoreField] = Hash::make($request->password);
-            } else if ($arrStoreField == 'verification_number') {
-                $arr_validates[$arrStoreField] = $verification_number;
-            } else if ($arrStoreField == 'phone_verified_at' && $request->filled('phone_number')) {
-                $arr_validates[$arrStoreField] = Carbon::now();
-            } else if ($arrStoreField == 'email_verified_at' && $request->filled('email')) {
-                $arr_validates[$arrStoreField] = Carbon::now();
-            } else {
-                $arr_validates[$arrStoreField] = $request->$arrStoreField;
+            // Create the user
+            $created = AuthModel::create($arr_validates);
+            if (!$created) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
-        }
 
-        // Create the user
-        $created = AuthModel::create($arr_validates);
-        if (!$created) {
-            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Format the logs
-        $arr_log_details = ['fields' => []];
-        foreach ($arr_validates as $field => $value) {
-            // Only include non-null email and password for encryption
-            if ($field === 'phone_number' || $field === 'email' || $field === 'password') {
-                if ($value !== null) {
-                    $arr_log_details['fields'][$field] = Crypt::encrypt($request->$field);
+            // Format the logs
+            $arr_log_details = ['fields' => []];
+            foreach ($arr_validates as $field => $value) {
+                // Only include non-null email and password for encryption
+                if ($field === 'phone_number' || $field === 'email' || $field === 'password') {
+                    if ($value !== null) {
+                        $arr_log_details['fields'][$field] = Crypt::encrypt($request->$field);
+                    }
+                } else if ($field !== 'verification_number' && $field !== 'phone_verified_at' && $field !== 'email_verified_at') {
+                    // For other fields, include all values
+                    $arr_log_details['fields'][$field] = $value;
                 }
-            } else if ($field !== 'verification_number' && $field !== 'phone_verified_at' && $field !== 'email_verified_at') {
-                // For other fields, include all values
-                $arr_log_details['fields'][$field] = $value;
             }
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 1,
+                'is_history' => 1,
+                'log_details' => $arr_log_details,
+                'user_action' => 'STORE USER ACCOUNT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                // Rollback the transaction
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully created user',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction if an exception occurs
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 1,
-            'log_details' => $arr_log_details,
-            'user_action' => 'STORE USER ACCOUNT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully created user',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     /**
      * UPDATE USER ACCOUNT | ADMIN SIDE
@@ -478,132 +498,150 @@ class AccountController extends Controller
             return $result_validate_eu_device;
         }
 
-        $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
-        // Check if inventory record exists
-        if (!$account) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
+        // Begin a transaction
+        DB::beginTransaction();
 
-        $history = HistoryModel::where('tbl_id', $account->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
-        if (!$history) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Validate if exist phone number or email
-        if ($request->filled('phone_number')) {
-
-            $decrypted_phone_number = Crypt::decrypt($account->email);
-            // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-            if ($decrypted_phone_number === $request->phone_number && $user->phone_number_verified_at !== null) {
-                return response()->json(
-                    [
-                        'message' => 'Phone number already exist'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
+        try {
+            $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
+            // Check if inventory record exists
+            if (!$account) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
-        }
-        if ($request->filled('email')) {
-            $decrypted_email = Crypt::decrypt($account->email);
 
-            // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-            if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
-                return response()->json(
-                    [
-                        'message' => 'Email already exist'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
+            $history = HistoryModel::where('tbl_id', $account->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+            if (!$history) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
-        }
+
+            // Validate if exist phone number or email
+            if ($request->filled('phone_number')) {
+                $decrypted_phone_number = Crypt::decrypt($account->email);
+                // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
+                if ($decrypted_phone_number === $request->phone_number && $user->phone_number_verified_at !== null) {
+                    return response()->json(
+                        [
+                            'message' => 'Phone number already exist'
+                        ],
+                        Response::HTTP_UNPROCESSABLE_ENTITY
+                    );
+                }
+            }
+            if ($request->filled('email')) {
+                $decrypted_email = Crypt::decrypt($account->email);
+
+                if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
+                    return response()->json(
+                        [
+                            'message' => 'Email already exist'
+                        ],
+                        Response::HTTP_UNPROCESSABLE_ENTITY
+                    );
+                }
+            }
 
 
-        // Put on logs not equal value then put on update
-        foreach ($this->fillable_attr_auth->arrUpdateFields() as $arrUpdateFields) {
-            if ($arrUpdateFields == 'phone_number') {
-                if ($request->filled('phone_number')) {
-                    $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
-                    $new_value = $request->arrUpdateFields ?? null;
+            // Put on logs not equal value then put on update
+            foreach ($this->fillable_attr_auth->arrUpdateFields() as $arrUpdateFields) {
+                if ($arrUpdateFields == 'phone_number') {
+                    if ($request->filled('phone_number')) {
+                        $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
+                        $new_value = $request->arrUpdateFields ?? null;
+                        // Check if the value has changed
+                        if ($existing_value !== $new_value) {
+
+                            $changes_for_logs[$arrUpdateFields] = [
+                                'old' => Crypt::encrypt($existing_value),
+                                'new' => Crypt::encrypt($new_value),
+                            ];
+
+                            $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->phone_number);
+                        }
+                    }
+                } else if ($arrUpdateFields == 'email') {
+                    if ($request->filled('email')) {
+                        $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
+                        $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+
+                        // Check if the value has changed
+                        if ($existing_value !== $new_value) {
+                            $changes_for_logs[$arrUpdateFields] = [
+                                'old' => Crypt::encrypt($existing_value),
+                                'new' => Crypt::encrypt($new_value),
+                            ];
+                            $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->email);
+                        }
+                    }
+                } else if ($arrUpdateFields == 'password') {
+                    $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
+                    $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+
                     // Check if the value has changed
-                    if ($existing_value !== $new_value) {
-
+                    if (!Hash::check($new_value, $existing_value)) {
                         $changes_for_logs[$arrUpdateFields] = [
-                            'old' => Crypt::encrypt($existing_value),
+                            'old' => $history->value,
                             'new' => Crypt::encrypt($new_value),
                         ];
-
-                        $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->phone_number);
+                        $arr_validates[$arrUpdateFields] = Hash::make($new_value);
                     }
-                }
-            } else if ($arrUpdateFields == 'email') {
-                if ($request->filled('email')) {
-                    $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
+                } else {
+                    $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
                     $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
 
                     // Check if the value has changed
                     if ($existing_value !== $new_value) {
                         $changes_for_logs[$arrUpdateFields] = [
-                            'old' => Crypt::encrypt($existing_value),
-                            'new' => Crypt::encrypt($new_value),
+                            'old' => $existing_value,
+                            'new' => $new_value,
                         ];
-                        $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->email);
                     }
+                    $arr_validates[$arrUpdateFields] = $request->$arrUpdateFields;
                 }
-            } else if ($arrUpdateFields == 'password') {
-                $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
-                $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
-
-                // Check if the value has changed
-                if (!Hash::check($new_value, $existing_value)) {
-                    $changes_for_logs[$arrUpdateFields] = [
-                        'old' => $history->value,
-                        'new' => Crypt::encrypt($new_value),
-                    ];
-                    $arr_validates[$arrUpdateFields] = Hash::make($new_value);
-                }
-            } else {
-                $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
-                $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
-
-                // Check if the value has changed
-                if ($existing_value !== $new_value) {
-                    $changes_for_logs[$arrUpdateFields] = [
-                        'old' => $existing_value,
-                        'new' => $new_value,
-                    ];
-                }
-                $arr_validates[$arrUpdateFields] = $request->$arrUpdateFields;
             }
+
+            // Update the user
+            $update = $account->update($arr_validates);
+            if (!$update) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Format the logs
+            $arr_log_details['fields']['user_id'] = $account->user_id;
+            $arr_log_details['fields'] = array_merge($arr_log_details['fields'], $changes_for_logs);
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $account->user_id,
+                'is_sensitive' => 1,
+                'is_history' => 1,
+                'log_details' => $arr_log_details,
+                'user_action' => 'UPDATE USER ACCOUNT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                // Rollback the transaction
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully update user account',
+                'log_message' => $log_result
+            ], Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            // Rollback the transaction
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred while processing the request.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Update the user
-        $update = $account->update($arr_validates);
-        if (!$update) {
-            return response()->json(['message' => 'Failed to store'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Format the logs
-        $arr_log_details['fields']['user_id'] = $account->user_id;
-        $arr_log_details['fields'] = array_merge($arr_log_details['fields'], $changes_for_logs);
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $account->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 1,
-            'log_details' => $arr_log_details,
-            'user_action' => 'UPDATE USER ACCOUNT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully update user account',
-            'log_message' => $log_result
-        ], Response::HTTP_CREATED);
     }
+
 
     /**
      * DESTROY USER ACCOUNT | ADMIN SIDE
@@ -614,11 +652,14 @@ class AccountController extends Controller
      */
     public function destroy(Request $request)
     {
+
         $arr_log_details = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -629,64 +670,87 @@ class AccountController extends Controller
         ]);
 
         if ($validator->fails()) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-
-        // dd(Crypt::decrypt($request->user_id));
 
         // Validate eu_device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
+            DB::rollBack();
             return $result_validate_eu_device;
         }
 
-        $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
-        if (!$account) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
-        foreach ($this->fillable_attr_auth->getFillableAttributes() as $getFillableAttributes) {
-            if ($getFillableAttributes == 'password') {
-                $is_exist_id_other_tbls = $this->helper->isExistIdOtherTbl($account->user_id, $this->fillable_attr_auth->arrModelWithId());
-                // Check if exist on other tbl
-                foreach ($is_exist_id_other_tbls as $is_exist_id_other_tbl) {
-                    // Ensure $is_exist_id_other_tbl is an array before accessing its elements
-                    if (is_array($is_exist_id_other_tbl) && isset($is_exist_id_other_tbl['is_exist']) && $is_exist_id_other_tbl['is_exist'] == 'yes') {
-                        return response()->json([
-                            'message' => "Failed to delete because this ID exists in another table.",
-                            'result_is_exist_other_tbl' => $is_exist_id_other_tbls,
-                        ], Response::HTTP_UNPROCESSABLE_ENTITY);
-                    }
-                }
 
-                $arr_log_details['fields'][$getFillableAttributes] = $account->value;
-            } else {
-                $arr_log_details['fields'][$getFillableAttributes] = $account->$getFillableAttributes;
+        // Begin a transaction
+        DB::beginTransaction();
+
+        try {
+            $account = AuthModel::where('user_id', Crypt::decrypt($request->user_id))->first();
+            if (!$account) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
             }
+            foreach ($this->fillable_attr_auth->getFillableAttributes() as $getFillableAttributes) {
+                if ($getFillableAttributes == 'password') {
+                    $is_exist_id_other_tbls = $this->helper->isExistIdOtherTbl($account->user_id, $this->fillable_attr_auth->arrModelWithId());
+                    // Check if exist on other tbl
+                    foreach ($is_exist_id_other_tbls as $is_exist_id_other_tbl) {
+                        // Ensure $is_exist_id_other_tbl is an array before accessing its elements
+                        if (is_array($is_exist_id_other_tbl) && isset($is_exist_id_other_tbl['is_exist']) && $is_exist_id_other_tbl['is_exist'] == 'yes') {
+                            return response()->json([
+                                'message' => "Failed to delete because this ID exists in another table.",
+                                'result_is_exist_other_tbl' => $is_exist_id_other_tbls,
+                            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                        }
+                    }
+
+                    $arr_log_details['fields'][$getFillableAttributes] = $account->value;
+                } else {
+                    $arr_log_details['fields'][$getFillableAttributes] = $account->$getFillableAttributes;
+                }
+            }
+
+            // Delete the user
+            if (!$account->delete()) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to delete'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 1,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' => 'DELETE USER ACCOUNT',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                // Rollback the transaction
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully created user',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Delete the user
-        if (!$account->delete()) {
-            return response()->json(['message' => 'Failed to delete'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 0,
-            'log_details' => $arr_log_details,
-            'user_action' => 'DELETE USER ACCOUNT',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully created user',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     /**
      * UPDATE EMAIL | CLIENT SIDE
@@ -702,6 +766,8 @@ class AccountController extends Controller
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -715,69 +781,90 @@ class AccountController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
+            DB::rollBack();
             return $result_validate_eu_device;
         }
 
-        // Fetch the user from the database
-        $user_auth = AuthModel::where('user_id', $user->user_id)->first();
-        if (!$user_auth) {
-            return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
-        }
 
-        if (Crypt::decrypt($user_auth->email) == $request->new_email) {
-            return response()->json(['message' => 'The new email cannot be the same as the old email. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else if (Crypt::decrypt($user_auth->email) != $request->new_email && !Hash::check($request->input('current_password'), $user_auth->password)) {
-            return response()->json(['message' => 'Incorrect password'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else if (Crypt::decrypt($user_auth->email) != $request->new_email && Hash::check($request->input('current_password'), $user_auth->password) && $user_auth->verification_number != $request->verification_number) {
-            return response()->json(['message' => 'Incorrect verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else {
-            // Update the user's email
-            $user_auth->email = Crypt::encrypt($request->new_email);
-            $user_auth->verification_number = $verification_number;
+        // Begin a transaction
+        DB::beginTransaction();
 
-            // Saving
-            if (!$user_auth->save()) {
-                return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        try {
+            // Fetch the user from the database
+            $user_auth = AuthModel::where('user_id', $user->user_id)->first();
+            if (!$user_auth) {
+                return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
             }
 
-            // Log details
-            $arr_log_details = [
-                'fields' => [
+            if (Crypt::decrypt($user_auth->email) == $request->new_email) {
+                return response()->json(['message' => 'The new email cannot be the same as the old email. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else if (Crypt::decrypt($user_auth->email) != $request->new_email && !Hash::check($request->input('current_password'), $user_auth->password)) {
+                return response()->json(['message' => 'Incorrect password'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else if (Crypt::decrypt($user_auth->email) != $request->new_email && Hash::check($request->input('current_password'), $user_auth->password) && $user_auth->verification_number != $request->verification_number) {
+                return response()->json(['message' => 'Incorrect verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else {
+                // Update the user's email
+                $user_auth->email = Crypt::encrypt($request->new_email);
+                $user_auth->verification_number = $verification_number;
+
+                // Saving
+                if (!$user_auth->save()) {
+                    // Rollback the transaction
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                // Log details
+                $arr_log_details = [
+                    'fields' => [
+                        'user_id' => $user->user_id,
+                        'old_email' => $user->email,
+                        'new_email' => Crypt::encrypt($request->new_email),
+                    ]
+                ];
+
+                // Arr Data Logs
+                $arr_data_logs = [
+                    'user_device' => $request->eu_device,
                     'user_id' => $user->user_id,
-                    'old_email' => $user->email,
-                    'new_email' => Crypt::encrypt($request->new_email),
-                ]
-            ];
+                    'is_sensitive' => 1,
+                    'is_history' => 0,
+                    'log_details' => $arr_log_details,
+                    'user_action' => 'UPDATE EMAIL ON SETTINGS OF USER',
+                ];
 
-            // Arr Data Logs
-            $arr_data_logs = [
-                'user_device' => $request->eu_device,
-                'user_id' => $user->user_id,
-                'is_sensitive' => 1,
-                'is_history' => 0,
-                'log_details' => $arr_log_details,
-                'user_action' => 'UPDATE EMAIL ON SETTINGS OF USER',
-            ];
+                // Logs
+                $log_result = $this->helper->log($request, $arr_data_logs);
+                if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                    // Rollback the transaction
+                    DB::rollBack();
+                    return $log_result;
+                }
 
+                // Commit the transaction
+                DB::commit();
 
-            // Logs
-            $log_result = $this->helper->log($request, $arr_data_logs);
-            if ($log_result) {
-                return $log_result;
+                return response()->json([
+                    'message' => 'Email updated successfully',
+                    'log_message' => $log_result,
+                ], Response::HTTP_OK);
             }
-
-            return response()->json([
-                'message' => 'Email updated successfully',
-                'log_message' => $log_result,
-            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
 
     /**
      * UPDATE PASSWORD | CLIENT SIDE
@@ -793,6 +880,8 @@ class AccountController extends Controller
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -806,67 +895,92 @@ class AccountController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
+            DB::rollBack();
             return $result_validate_eu_device;
         }
 
-        // Fetch the user from the database
-        $user_auth = AuthModel::where('user_id', $user->user_id)->first();
-        // Check if user exists
-        if (!$user_auth) {
-            return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
-        }
+        // Begin a transaction
+        DB::beginTransaction();
 
-        if (Hash::check($request->input('password'), $user_auth->password)) {
-            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else if (!Hash::check($request->input('current_password'), $user_auth->password)) {
-            return response()->json(['message' => 'Incorrect current password'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else if ($user_auth->verification_number != $request->input('verification_number')) {
-            return response()->json(['message' => 'Incorrect Verification Number'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else {
-            // Update the user's password
-            $user_auth->password =  Hash::make($request->input('password'));
-            $user_auth->verification_number = $verification_number;
-
-            // Saving
-            if (!$user_auth->save()) {
-                return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        try {
+            // Fetch the user from the database
+            $user_auth = AuthModel::where('user_id', $user->user_id)->first();
+            // Check if user exists
+            if (!$user_auth) {
+                return response()->json(['message' => 'Intruder'], Response::HTTP_NOT_FOUND);
             }
 
-            // Log details
-            $arr_log_details = [
-                'fields' => [
+            if (Hash::check($request->input('password'), $user_auth->password)) {
+                return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else if (!Hash::check($request->input('current_password'), $user_auth->password)) {
+                return response()->json(['message' => 'Incorrect current password'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else if ($user_auth->verification_number != $request->input('verification_number')) {
+                return response()->json(['message' => 'Incorrect Verification Number'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            } else {
+                // Update the user's password
+                $user_auth->password =  Hash::make($request->input('password'));
+                $user_auth->verification_number = $verification_number;
+
+                // Saving
+                if (!$user_auth->save()) {
+                    // Rollback the transaction
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                // Log details
+                $arr_log_details = [
+                    'fields' => [
+                        'user_id' => $user->user_id,
+                        'password' => [
+                            'old' => Crypt::encrypt($request->input('current_password')),
+                            'new' => Crypt::encrypt($request->input('password')),
+                        ]
+                    ]
+                ];
+
+                // Arr Data Logs
+                $arr_data_logs = [
+                    'user_device' => $request->eu_device,
                     'user_id' => $user->user_id,
-                    'old' => Crypt::encrypt($request->input('current_password')),
-                    'new' => Crypt::encrypt($request->input('password')),
-                ]
-            ];
+                    'is_sensitive' => 1,
+                    'is_history' => 1,
+                    'log_details' => $arr_log_details,
+                    'user_action' => 'UPDATE PASSWORD ON USER SETTING',
+                ];
 
-            // Arr Data Logs
-            $arr_data_logs = [
-                'user_device' => $request->eu_device,
-                'user_id' => $user->user_id,
-                'is_sensitive' => 1,
-                'is_history' => 1,
-                'log_details' => $arr_log_details,
-                'user_action' => 'UPDATE PASSWORD ON USER SETTING',
-            ];
+                // Logs
+                $log_result = $this->helper->log($request, $arr_data_logs);
+                if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                    // Rollback the transaction
+                    DB::rollBack();
+                    return $log_result;
+                }
 
+                // Commit the transaction
+                DB::commit();
 
-            // Logs
-            $log_result = $this->helper->log($request, $arr_data_logs);
-
-            return response()->json([
-                'message' => 'Password updated successfully',
-                'log_message' => $log_result
-            ], Response::HTTP_OK);
+                return response()->json([
+                    'message' => 'Password updated successfully',
+                    'log_message' => $log_result
+                ], Response::HTTP_OK);
+            }
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
 
     /**
      * CHILD updatePasswordOnSettingUser | CLIENT SIDE
@@ -882,6 +996,7 @@ class AccountController extends Controller
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
+            // Rollback the transaction
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -890,58 +1005,87 @@ class AccountController extends Controller
             'eu_device' => 'required|string',
         ]);
         if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+            // Rollback the transaction
+            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
             return $result_validate_eu_device;
         }
 
-        $update_user_verification_number = $user->update([
-            'verification_number' => $verification_number,
-        ]);
 
-        if (!$update_user_verification_number) {
-            return response()->json([
-                'message' => 'Failed to generate verification number',
-            ], Response::HTTP_OK);
-        }
+        // Begin a transaction
+        DB::beginTransaction();
 
-        $email_parts = explode('@', Crypt::decrypt($user->email));
-        $name = [$email_parts[0]];
+        try {
+            // Log Details
+            $log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'old_verification_number' => $user->verification_number,
+                ]
+            ];
 
-        $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
-        if (!$email) {
-            return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+            $update_user_verification_number = $user->update([
+                'verification_number' => $verification_number,
+            ]);
 
-        $arr_log_details = [
-            'fields' => [
+            if (!$update_user_verification_number) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Failed to generate verification number',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $email_parts = explode('@', Crypt::decrypt($user->email));
+            $name = [$email_parts[0]];
+
+            $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
+            if (!$email) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Log Details
+            $log_details['fields']['new_verification_number'] = $verification_number;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
                 'user_id' => $user->user_id,
-                'verification_number' => $user->verification_number
-            ]
-        ];
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'RESEND NEW VERIFICATION CODE UPON USER SETTINGS EMAIL UPDATE',
+            ];
 
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $arr_log_details,
-            'user_action' => 'RESEND NEW VERIFICATION CODE UPON USER SETTINGS EMAIL UPDATE',
-        ];
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                // Rollback the transaction
+                DB::rollBack();
+                return $log_result;
+            }
 
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+            // Commit the transaction
+            DB::commit();
 
-        return response()->json([
-            'message' => 'A new verification code has been sent to your email',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
+            return response()->json([
+                'message' => 'A new verification code has been sent to your email',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
+
 
     /**
      * CHILD updateEmailOnSettingUser | CLIENT SIDE
@@ -957,6 +1101,7 @@ class AccountController extends Controller
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
+            // Rollback the transaction
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -965,56 +1110,83 @@ class AccountController extends Controller
             'eu_device' => 'required|string',
         ]);
         if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
+            // Rollback the transaction
+            return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
             return $result_validate_eu_device;
         }
 
-        $update_user_verification_number = $user->update([
-            'verification_number' => $verification_number,
-        ]);
+        // Begin a transaction
+        DB::beginTransaction();
 
-        if (!$update_user_verification_number) {
-            return response()->json([
-                'message' => 'Failed to generate verification number',
-            ], Response::HTTP_OK);
-        }
+        try {
+            // Log Details
+            $log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'old_verification_number' => $user->verification_number,
+                ]
+            ];
 
-        $email_parts = explode('@', Crypt::decrypt($user->email));
-        $name = [$email_parts[0]];
+            $update_user_verification_number = $user->update([
+                'verification_number' => $verification_number,
+            ]);
 
-        $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
-        if (!$email) {
-            return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+            if (!$update_user_verification_number) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Failed to generate verification number',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
 
-        $arr_log_details = [
-            'fields' => [
+            $email_parts = explode('@', Crypt::decrypt($user->email));
+            $name = [$email_parts[0]];
+
+            $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
+            if (!$email) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Log Details
+            $log_details['fields']['new_verification_number'] = $verification_number;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
                 'user_id' => $user->user_id,
-                'verification_number' => $user->verification_number
-            ]
-        ];
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'RESEND NEW VERIFICATION CODE UPON USER SETTINGS PASSWORD UPDATE',
+            ];
 
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $arr_log_details,
-            'user_action' => 'RESEND NEW VERIFICATION CODE UPON USER SETTINGS PASSWORD UPDATE',
-        ];
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                // Rollback the transaction
+                DB::rollBack();
+                return $log_result;
+            }
 
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+            // Commit the transaction
+            DB::commit();
 
-        return response()->json([
-            'message' => 'A new verification code has been sent to your email',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
+            return response()->json([
+                'message' => 'A new verification code has been sent to your email',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

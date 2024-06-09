@@ -505,161 +505,205 @@ class AuthController extends Controller
      */
     public function emailRegister($request, $arr_data)
     {
-        // Generate a new token for the user
-        $expiration_time = Carbon::now()->addMinutes(120);
-        // Get All Users and Decrypt
-        $users = AuthModel::all();
+        // Begin a transaction
+        DB::beginTransaction();
 
-        // Decrypt
-        foreach ($users as $user) {
-            // Start Decrypt
-            $decrypted_email = Crypt::decrypt($user->email);
+        try {
+            // Generate a new token for the user
+            $expiration_time = Carbon::now()->addMinutes(120);
+            // Get All Users and Decrypt
+            $users = AuthModel::all();
 
-            // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-            if ($decrypted_email === $arr_data['email'] && $user->email_verified_at === null) {
-                $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
-                if (!$new_token) {
+            // Decrypt
+            foreach ($users as $user) {
+                // Start Decrypt
+                $decrypted_email = Crypt::decrypt($user->email);
+
+                // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
+                if ($decrypted_email === $arr_data['email'] && $user->email_verified_at === null) {
+                    $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+                    if (!$new_token) {
+                        // Rollback the transaction
+                        DB::rollBack();
+
+                        return response()->json([
+                            'message' => 'Unable to generate a token from user'
+                        ], Response::HTTP_OK);
+                    }
+
+                    // Update verification_number | password | verify email token
+                    $user->verification_number = $arr_data['verification_number'];
+                    $user->password = Hash::make($arr_data['password']);
+                    $user->verify_email_token = $new_token;
+                    $user->verify_email_token_expire_at = $expiration_time;
+
+                    // Save
+                    if (!$user->save()) {
+                        // Rollback the transaction
+                        DB::rollBack();
+
+                        return response()->json(
+                            [
+                                'message' => 'Error updating password, verification number, new token, and expiration time',
+                            ],
+                            Response::HTTP_INTERNAL_SERVER_ERROR
+                        );
+                    }
+
+                    // Arr Logs details
+                    $arr_log_details = [
+                        'fields' => [
+                            'user_id' => $user->user_id,
+                            'email' => Crypt::encrypt($arr_data['email']),
+                            'password' => Crypt::encrypt($arr_data['password']),
+                        ]
+                    ];
+
+                    // Arr Data Logs
+                    $arr_data_logs = [
+                        'user_device' => $arr_data['eu_device'],
+                        'user_id' => $user->user_id,
+                        'is_sensitive' => 1,
+                        'is_history' => 1,
+                        'log_details' => $arr_log_details,
+                        'user_action' => 'EXISTING ACCOUNT REDIRECTED TO VERIFICATION PAGE',
+                    ];
+
+                    // Logs
+                    $log_result = $this->helper->log($request, $arr_data_logs);
+
+                    // Get the Name of Gmail
+                    $email_parts = explode('@', $arr_data['email']);
+                    $name = [$email_parts[0]];
+
+                    // Send the new token to the user via email
+                    $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
+                    if (!$email) {
+                        // Rollback the transaction
+                        DB::rollBack();
+
+                        return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+
+                    // Commit the transaction
+                    DB::commit();
+
                     return response()->json([
-                        'message' => 'Unable to generate a token from user'
+                        'message' => 'Successfully register email',
+                        'url_token' => '/signup/verify-email?tj=' . $new_token,
+                        'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                        'log_message' => $log_result
                     ], Response::HTTP_OK);
                 }
 
-                // Update verification_number | password | verify email token
-                $user->verification_number = $arr_data['verification_number'];
-                $user->password = Hash::make($arr_data['password']);
-                $user->verify_email_token = $new_token;
-                $user->verify_email_token_expire_at = $expiration_time;
+                // If same email exist and email_verified_at not null send error message
+                else if ($decrypted_email === $arr_data['email'] && $user->email_verified_at !== null) {
+                    // Rollback the transaction
+                    DB::rollBack();
 
-                // Save
-                if (!$user->save()) {
                     return response()->json(
                         [
-                            'message' => 'Error updating password, verification number, new token, and expiration time',
+                            'message' => 'Email already exist'
                         ],
-                        Response::HTTP_INTERNAL_SERVER_ERROR
+                        Response::HTTP_UNPROCESSABLE_ENTITY
                     );
                 }
-
-                // Arr Logs details
-                $arr_log_details = [
-                    'fields' => [
-                        'user_id' => $user->user_id,
-                        'email' => Crypt::encrypt($arr_data['email']),
-                        'password' => Crypt::encrypt($arr_data['password']),
-                    ]
-                ];
-
-                // Arr Data Logs
-                $arr_data_logs = [
-                    'user_device' => $arr_data['eu_device'],
-                    'user_id' => $user->user_id,
-                    'is_sensitive' => 1,
-                    'is_history' => 1,
-                    'log_details' => $arr_log_details,
-                    'user_action' => 'EXISTING ACCOUNT REDIRECTED TO VERIFICATION PAGE',
-                ];
-
-                // Logs
-                $log_result = $this->helper->log($request, $arr_data_logs);
-
-                // Get the Name of Gmail
-                $email_parts = explode('@', $arr_data['email']);
-                $name = [$email_parts[0]];
-
-                // Send the new token to the user via email
-                $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
-                if (!$email) {
-                    return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
-                return response()->json([
-                    'message' => 'Successfully create token',
-                    // 'data' => $user,
-                    'url_token' => '/signup/verify-email?tj=' . $new_token,
-                    'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
-                    'log_message' => $log_result
-                ], Response::HTTP_OK);
             }
 
-            // If same email exist and email_verified_at not null send error message
-            else if ($decrypted_email === $arr_data['email'] && $user->email_verified_at !== null) {
-
-                return response()->json(
-                    [
-                        'message' => 'Email already exist'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
-            }
-        }
-
-        // User with the given email does not exist, create a new user
-        $user_create = AuthModel::create([
-            'user_id' => $arr_data['user_id'],
-            'email' => Crypt::encrypt($arr_data['email']),
-            'password' => Hash::make($arr_data['password']),
-            'role' => $arr_data['account_role'],
-            'status' => $arr_data['status'],
-            'verification_number' => $arr_data['verification_number'],
-        ]);
-
-        if (!$user_create) {
-            // Error creating user
-            return response()->json(['message' => 'Failed to create user'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user_create);
-
-        if (!$new_token) {
-            return response()->json(['message' => 'Failed to generate token'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Update user with the new token for email verification
-        $user_create->verify_email_token = $new_token;
-        $user_create->verify_email_token_expire_at = $expiration_time;
-
-        if (!$user_create->save()) {
-            return response()->json(['message' => 'Failed to update token and expire at'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Arr Logs details
-        $arr_log_details = [
-            'fields' => [
+            // User with the given email does not exist, create a new user
+            $user_create = AuthModel::create([
                 'user_id' => $arr_data['user_id'],
                 'email' => Crypt::encrypt($arr_data['email']),
-                'password' => Crypt::encrypt($arr_data['password']),
-            ]
-        ];
+                'password' => Hash::make($arr_data['password']),
+                'role' => $arr_data['account_role'],
+                'status' => $arr_data['status'],
+                'verification_number' => $arr_data['verification_number'],
+            ]);
 
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $arr_data['eu_device'],
-            'user_id' => $arr_data['user_id'],
-            'is_sensitive' => 1,
-            'is_history' => 1,
-            'log_details' => $arr_log_details,
-            'user_action' => 'REGISTER AN ACCOUNT USING EMAIL',
-        ];
+            if (!$user_create) {
+                // Rollback the transaction
+                DB::rollBack();
 
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+                return response()->json(['message' => 'Failed to create user'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
 
-        // Get the Name of Gmail
-        $emailParts = explode('@', $arr_data['email']);
-        $name = $emailParts[0];
+            $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user_create);
 
-        // Send an email to the user with the new token
-        $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
-        if (!$email) {
-            return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            if (!$new_token) {
+                // Rollback the transaction
+                DB::rollBack();
+
+                return response()->json(['message' => 'Failed to generate token'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Update user with the new token for email verification
+            $user_create->verify_email_token = $new_token;
+            $user_create->verify_email_token_expire_at = $expiration_time;
+
+            if (!$user_create->save()) {
+                // Rollback the transaction
+                DB::rollBack();
+
+                return response()->json(['message' => 'Failed to update token and expire at'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Arr Logs details
+            $arr_log_details = [
+                'fields' => [
+                    'user_id' => $arr_data['user_id'],
+                    'email' => Crypt::encrypt($arr_data['email']),
+                    'password' => [
+                        'new' => Crypt::encrypt($arr_data['password']),
+                    ]
+                ]
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $arr_data['eu_device'],
+                'user_id' => $arr_data['user_id'],
+                'is_sensitive' => 1,
+                'is_history' => 1,
+                'log_details' => $arr_log_details,
+                'user_action' => 'REGISTER AN ACCOUNT USING EMAIL',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Get the Name of Gmail
+            $emailParts = explode('@', $arr_data['email']);
+            $name = $emailParts[0];
+
+            // Send an email to the user with the new token
+            $email = Mail::to($arr_data['email'])->send(new VerificationMail($arr_data['verification_number'], $name));
+            if (!$email) {
+                // Rollback the transaction
+                DB::rollBack();
+
+                return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully register email',
+                'url_token' => '/signup/verify-email?tj=' . $new_token,
+                'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the registration process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        return response()->json([
-            'message' => 'Successfully create token',
-            'url_token' => '/signup/verify-email?tj=' . $new_token,
-            'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     /**
      * CHILD EMAIL REGISTER
@@ -694,60 +738,90 @@ class AuthController extends Controller
             return $result_validate_eu_device;
         }
 
-        // Check if the provided verification number matches the stored one
-        if ($user->verification_number != $request->verification_number) {
-            return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        // Begin a transaction
+        DB::beginTransaction();
 
-        // Expiration to verified Email
-        $expiration_time = Carbon::now()->addSecond();
-        $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+        try {
+            // Check if the provided verification number matches the stored one
+            if ($user->verification_number != $request->verification_number) {
+                // Rollback the transaction
+                DB::rollBack();
 
-        // Update user status and set email_verified_at to the current timestamp
-        $user->status = 'ACTIVE';
-        $user->verify_email_token = $new_token;
-        $user->email_verified_at = now();
-        $user->verification_number = $verification_number;
+                return response()->json(['message' => 'Invalid verification number'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
-        if (!$user->save()) {
+            // Expiration to verified Email
+            $expiration_time = Carbon::now()->addSecond();
+            $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+
+            // Update user status and set email_verified_at to the current timestamp
+            $user->status = 'ACTIVE';
+            $user->verify_email_token = $new_token;
+            $user->email_verified_at = now();
+            $user->verification_number = $verification_number;
+
+            if (!$user->save()) {
+                // Rollback the transaction
+                DB::rollBack();
+
+                return response()->json(
+                    [
+                        'message' => 'Failed to verify email',
+                    ],
+                    Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+
+            // Log Details
+            $log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'email_verified_at' =>  Carbon::parse($user->email_verified_at)->format("F j, Y g:i a"),
+                    'verification_number' => $request->verification_number,
+                ]
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'SUCCESS VERIFY EMAIL',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
             return response()->json(
                 [
-                    'message' => 'Failed to verify email',
+                    'message' => 'Email verified successfully',
+                    'log_message' => $log_result
+                ],
+                Response::HTTP_OK
+            );
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+
+            return response()->json(
+                [
+                    'message' => 'An error occurred during the verification process',
+                    'error' => $e->getMessage()
                 ],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
-
-        // Log Details
-        $log_details = [
-            'fields' => [
-                'user_id' => $user->user_id,
-                'email_verified_at' =>  Carbon::parse($user->email_verified_at)->format("F j, Y g:i a"),
-                'verification_number' => $request->verification_number,
-            ]
-        ];
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $log_details,
-            'user_action' => 'SUCCESS VERIFY EMAIL',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json(
-            [
-                'message' => 'Email verified successfully',
-                'log_message' => $log_result
-            ],
-            Response::HTTP_OK
-        );
     }
+
 
     /**
      * SIGN UP | VERIFY EMAIL RESEND CODE
@@ -760,8 +834,10 @@ class AuthController extends Controller
     {
         $verification_number = mt_rand(100000, 999999);
 
+
         // Authorize the user
         $user = $this->authorizeUserResendCode($request);
+
         // Check if authenticated user
         if (empty($user->user_id)) {
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
@@ -772,58 +848,91 @@ class AuthController extends Controller
             'eu_device' => 'required|string',
         ]);
         if ($validator->fails()) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => $validator->errors()], Response::HTTP_NOT_FOUND);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
+            DB::rollBack();
             return $result_validate_eu_device;
         }
 
-        $update_user_verification_number = $user->update([
-            'verification_number' => $verification_number,
-        ]);
+        // Begin a transaction
+        DB::beginTransaction();
 
-        if (!$update_user_verification_number) {
-            return response()->json([
-                'message' => 'Failed to generate verification number',
-            ], Response::HTTP_OK);
-        }
+        try {
+            // Log Details
+            $log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'old_verification_number' => $user->verification_number,
+                ]
+            ];
 
-        $email_parts = explode('@', Crypt::decrypt($user->email));
-        $name = [$email_parts[0]];
+            // Update user's verification number
+            $update_user_verification_number = $user->update([
+                'verification_number' => $verification_number,
+            ]);
 
-        $email =  Mail::to(Crypt::decrypt($user->email))->send(new VerificationMail($verification_number, $name));
-        if (!$email) {
-            return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+            if (!$update_user_verification_number) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Failed to generate verification number',
+                ], Response::HTTP_OK);
+            }
 
-        $log_details = [
-            'fields' => [
+            // Get user's email
+            $userEmail = Crypt::decrypt($user->email);
+            $email_parts = explode('@', $userEmail);
+            $name = [$email_parts[0]];
+
+            // Send email with the new verification code
+            $email =  Mail::to($userEmail)->send(new VerificationMail($verification_number, $name));
+            if (!$email) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to send the verification number to your email'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Log Details
+            $log_details['fields']['new_verification_number'] = $verification_number;
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
                 'user_id' => $user->user_id,
-                'verification_number' => $user->verification_number
-            ]
-        ];
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL',
+            ];
 
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 0,
-            'is_history' => 0,
-            'log_details' => $log_details,
-            'user_action' => 'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL',
-        ];
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
 
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+            // Commit the transaction
+            DB::commit();
 
-        return response()->json([
-            'message' => 'A new verification code has been sent to your email',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
+            return response()->json([
+                'message' => 'A new verification code has been sent to your email',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
+
 
     /**
      * SIGN UP | VERIFY EMAIL RESEND CODE
@@ -841,77 +950,107 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
+            // Rollback the transaction
+            DB::rollBack();
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
         // Validate Eu Device
         $result_validate_eu_device = $this->helper->validateEuDevice($request->eu_device);
         if ($result_validate_eu_device) {
+            // Rollback the transaction
+            DB::rollBack();
             return $result_validate_eu_device;
         }
 
-        // Get All Users and Decrypt
-        $users = AuthModel::all();
 
-        // Decrypt
-        foreach ($users as $user) {
-            // Start Decrypt
-            $decrypted_email = Crypt::decrypt($user->email);
+        // Begin a transaction
+        DB::beginTransaction();
 
-            // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
-            if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
-                // 2hrs expiration to verified Email
-                $expiration_time = Carbon::now()->addMinutes(120);
-                $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+        try {
+            // Get All Users and Decrypt
+            $users = AuthModel::all();
 
-                // Update token and expiration
-                $user->reset_password_token = $new_token;
-                $user->reset_password_token_expire_at = $expiration_time;
+            // Decrypt
+            foreach ($users as $user) {
+                // Start Decrypt
+                $decrypted_email = Crypt::decrypt($user->email);
 
-                // Save
-                if (!$user->save()) {
-                    return response()->json(['message' => 'Failed to save token and expiration',], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
+                // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
+                if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
+                    // 2hrs expiration to verified Email
+                    $expiration_time = Carbon::now()->addMinutes(120);
+                    $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
-                // Send to Email Now
-                $mail = Mail::to($request->email)->send(new ResetPasswordMail($new_token, $request->email, $expiration_time));
-                if (!$mail) {
-                    return response()->json(['message' => 'Failed to send reset password link on your email'], Response::HTTP_OK);
-                }
+                    // Update token and expiration
+                    $user->reset_password_token = $new_token;
+                    $user->reset_password_token_expire_at = $expiration_time;
 
-                $log_details = [
-                    'fields' => [
+                    // Save
+                    if (!$user->save()) {
+                        // Rollback the transaction
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to save token and expiration'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+
+                    // Send to Email Now
+                    $mail = Mail::to($request->email)->send(new ResetPasswordMail($new_token, $request->email, $expiration_time));
+                    if (!$mail) {
+                        // Rollback the transaction
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to send reset password link on your email'], Response::HTTP_OK);
+                    }
+
+                    $log_details = [
+                        'fields' => [
+                            'user_id' => $user->user_id,
+                            'email' => Crypt::encrypt($request->email),
+                        ]
+                    ];
+
+                    // Arr Data Logs
+                    $arr_data_logs = [
+                        'user_device' => $request->eu_device,
                         'user_id' => $user->user_id,
-                        'email' => Crypt::encrypt($request->email),
-                    ]
-                ];
+                        'is_sensitive' => 1,
+                        'is_history' => 0,
+                        'log_details' => $log_details,
+                        'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
+                    ];
 
-                // Arr Data Logs
-                $arr_data_logs = [
-                    'user_device' => $request->eu_device,
-                    'user_id' => $user->user_id,
-                    'is_sensitive' => 1,
-                    'is_history' => 0,
-                    'log_details' => $log_details,
-                    'user_action' => 'SUCCESSFULLY SENT RESET LINK FOR PASSWORD UPDATE',
-                ];
+                    // Logs
+                    $log_result = $this->helper->log($request, $arr_data_logs);
+                    if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                        DB::rollBack();
+                        return $log_result;
+                    }
 
-                // Logs
-                $log_result = $this->helper->log($request, $arr_data_logs);
+                    // Commit the transaction
+                    DB::commit();
 
-                return response()->json([
-                    'message' => 'Successfully sent a reset password link to your email ' . $decrypted_email,
-                    'log_message' => $log_result
-                ], Response::HTTP_OK);
+                    return response()->json([
+                        'message' => 'Successfully sent a reset password link to your email ' . $decrypted_email,
+                        'log_message' => $log_result
+                    ], Response::HTTP_OK);
+                }
+                // If same email exist and email_verified_at equal null send error message
+                else if ($decrypted_email === $request->email && $user->email_verified_at === null) {
+                    // Rollback the transaction
+                    DB::rollBack();
+                    return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
+                }
             }
-            // If same email exist and email_verified_at equal null send error message
-            else if ($decrypted_email === $request->email && $user->email_verified_at === null) {
-                return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
-            }
+
+            // Rollback the transaction
+            DB::rollBack();
+            return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        return response()->json(['message' => 'Email not found or not verified'], Response::HTTP_NOT_FOUND);
     }
+
 
     /**
      * FORGOT PASSWORD | UPDATE PASSWORD
@@ -938,6 +1077,7 @@ class AuthController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
+            // Return the validation errors
             return response()->json(['message' => $validator->errors()], Response::HTTP_BAD_REQUEST);
         }
 
@@ -947,63 +1087,93 @@ class AuthController extends Controller
             return $result_validate_eu_device;
         }
 
-        // Fetch the user from the database
-        $user_auth = AuthModel::where('user_id', $user->user_id)->first();
 
-        // Check if user exists
-        if (!$user_auth) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
+        // Begin a transaction
+        DB::beginTransaction();
 
-        if (Hash::check($request->input('password'), $user_auth->password)) {
-            return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        try {
+            // Fetch the user from the database
+            $user_auth = AuthModel::where('user_id', $user->user_id)->first();
 
-        $history = HistoryModel::where('tbl_id', $user_auth->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
-        if (!$history) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
+            // Check if user exists
+            if (!$user_auth) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
 
-        $log_details = [
-            'fields' => [
+            if (Hash::check($request->input('password'), $user_auth->password)) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'The new password cannot be the same as the old password. Please choose a different one'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $history = HistoryModel::where('tbl_id', $user_auth->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+            if (!$history) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
+
+
+            // Expiration to verified Email
+            $expiration_time = Carbon::now()->addSecond();
+            $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+
+            // Update the user's password
+            $user_auth->password =  Hash::make($request->input('password'));
+            $user_auth->reset_password_token =  $new_token;
+            $user_auth->reset_password_token_expire_at =  $expiration_time;
+
+            // Saving
+            if (!$user_auth->save()) {
+                // Rollback the transaction
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $log_details = [
+                'fields' => [
+                    'user_id' => $user->user_id,
+                    'password' => [
+                        'old' => $history->value,
+                        'new' => Crypt::encrypt($request->input('password')),
+                    ]
+                ]
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
                 'user_id' => $user->user_id,
-                'old_password' => $history->value,
-                'new_password' => Crypt::encrypt($request->input('password')),
-            ]
-        ];
+                'is_sensitive' => 1,
+                'is_history' => 1,
+                'log_details' => $log_details,
+                'user_action' => 'UPDATE PASSWORD ON FORGOT PASSWORD',
+            ];
 
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 1,
-            'log_details' => $log_details,
-            'user_action' => 'UPDATE PASSWORD ON FORGOT PASSWORD',
-        ];
 
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
 
-        // Expiration to verified Email
-        $expiration_time = Carbon::now()->addSecond();
-        $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
+            // Commit the transaction
+            DB::commit();
 
-        // Update the user's password
-        $user_auth->password =  Hash::make($request->input('password'));
-        $user_auth->reset_password_token =  $new_token;
-        $user_auth->reset_password_token_expire_at =  $expiration_time;
-
-        // Saving
-        if (!$user_auth->save()) {
-            return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json([
+                'message' => 'Password updated successfully',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        return response()->json([
-            'message' => 'Password updated successfully',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     /**
      * AUTHENTICATE TOKEN
@@ -1103,266 +1273,5 @@ class AuthController extends Controller
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
             return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    // Logs
-    public function resendVerificationCodeAllLogs($request, $userId, $indicator, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 0,
-            'ip_address' => $request->ip(),
-            'user_action' => $indicator ==  env('VERIFY_EMAIL_NUM_CODE') ? 'RESEND NEW VERIFICATION CODE AT VERIFY EMAIL' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'RESEND NEW VERIFICATION CODE AT USER SETTING UPDATE EMAIL' : 'RESEND NEW VERIFICATION CODE AT USER SETTING UPDATE PASSWORD'),
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for ' . ($indicator == env('VERIFY_EMAIL_NUM_CODE') ? 'resending new verification code at email verification' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'resending new verification code at user setting email update' : 'resending new verification code at user setting password update'))], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
-    }
-
-    public function updateEmailOnSettingUserLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE EMAIL ON SETTINGS OF USER',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for update email'], Response::HTTP_OK);
-    }
-
-    public function updatePasswordOnSettingUserLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        $history = HistoryModel::create([
-            'tbl_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'password',
-            'value' => $logDetails['fields']['new_password'],
-        ]);
-
-        if ($history) {
-            $history->update([
-                'history_id' => 'history_id-'  . $history->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to create history for update password on user setting'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE PASSWORD ON USER SETTING',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs for update password on user setting'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for update password on user setting'], Response::HTTP_OK);
-    }
-
-    public function updateEmailAndPasswordSendVerificationCodeLogs($request, $userId, $indicator, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 0,
-            'ip_address' => $request->ip(),
-            'user_action' => $indicator == env('UPDATE_EMAIL_NUM_CODE')
-                ? 'RESEND NEW VERIFICATION CODE AT USER SETTING (UPDATE EMAIL)'
-                : 'RESEND NEW VERIFICATION CODE AT USER SETTING (UPDATE PASSWORD)',
-            'user_device' => $userAgent,
-            'details' => json_encode($logDetails, JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs for ' . ($indicator == env('VERIFY_EMAIL_NUM_CODE') ? 'resending new verification code at email verification' : ($indicator == env('UPDATE_EMAIL_NUM_CODE') ? 'resending new verification code at user setting email update' : 'resending new verification code at user setting password update'))], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history for successful email verification'], Response::HTTP_OK);
-    }
-
-    public function loginLogs($request, $userId)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 0,
-            'ip_address' => $request->ip(),
-            'user_action' => 'LOGIN',
-            'user_device' => $userAgent,
-            'details' => json_encode([
-                'fields' => [
-                    'user_id' => $userId,
-                    'ip_address' => $request->ip(),
-                ]
-            ], JSON_PRETTY_PRINT),
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-' . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to store logs login'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs login'], Response::HTTP_OK);
-    }
-
-    public function updateEmailAdminLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-        $arr = [];
-        $arr['user_id'] = $userId;
-        $arr['fields'] = $logDetails;
-
-        $details = json_encode($arr, JSON_PRETTY_PRINT);
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE EMAIL ON ADMIN DASHBOARD',
-            'user_device' => $userAgent,
-            'details' => $details,
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs update email'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs update email'], Response::HTTP_OK);
-    }
-
-    public function updatePasswordAdminLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-        $arr = [];
-        $arr['user_id'] = $userId;
-        $arr['fields'] = $logDetails;
-
-        $history = HistoryModel::create([
-            'tbl_id' => $userId,
-            'tbl_name' => 'users_tbl',
-            'column_name' => 'password',
-            'value' => $arr['fields']['old_password'],
-        ]);
-
-        if ($history) {
-            $history->update([
-                'history_id' => 'history_id-'  . $history->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to create history for password storage during password update'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $details = json_encode($arr, JSON_PRETTY_PRINT);
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE PASSWORD ON ADMIN DASHBOARD',
-            'user_device' => $userAgent,
-            'details' => $details,
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs update password'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully stored logs and history update password'], Response::HTTP_OK);
-    }
-
-    public function updateRoleAndStatusLogs($request, $userId, $logDetails)
-    {
-        // Get Device Information
-        $userAgent = $request->header('User-Agent');
-        $arr = [];
-        $arr['user_id'] = $userId;
-        $arr['fields'] = $logDetails;
-
-        $details = json_encode($arr, JSON_PRETTY_PRINT);
-
-        // Create LogsModel entry
-        $log = LogsModel::create([
-            'user_id' => $userId,
-            'is_sensitive' => 1,
-            'ip_address' => $request->ip(),
-            'user_action' => 'UPDATE ROLE OR STATUS',
-            'user_device' => $userAgent,
-            'details' => $details,
-        ]);
-
-        if ($log) {
-            $log->update([
-                'log_id' => 'log_id-'  . $log->id,
-            ]);
-        } else {
-            return response()->json(['message' => 'Failed to update logs for update role and status'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return response()->json(['message' => 'Successfully update logs for update role and status'], Response::HTTP_OK);
     }
 }

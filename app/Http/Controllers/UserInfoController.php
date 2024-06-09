@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 
 use App\Models\UserInfoModel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
 use App\Http\Controllers\Helper\Helper;
 use Illuminate\Support\Facades\Storage;
@@ -149,63 +150,80 @@ class UserInfoController extends Controller
             return $result_validate_eu_device;
         }
 
-        // UpperCase Specific Field
-        $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
+        DB::beginTransaction(); // Begin transaction
 
-        // Handle image upload and update
-        if ($request->hasFile('image')) {
-            $arr_data_file = [
-                'custom_folder' => 'user-info',
-                'file_image' => $request->file('image'),
-                'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
-            ];
-            $file_name = $this->helper->handleUploadImage($arr_data_file);
-        }
+        try {
+            // UpperCase Specific Field
+            $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
 
-        // Encrypt the data
-        foreach ($validated_data as $key => $value) {
-            if ($key === 'image') {
-                $validated_data[$key] = $file_name != '' ? Crypt::encrypt($file_name) : null;
-            } else {
-                // Check if the value is empty
-                if ($value !== null) {
-                    $validated_data[$key] = Crypt::encrypt($value);
+            // Handle image upload and update
+            if ($request->hasFile('image')) {
+                $arr_data_file = [
+                    'custom_folder' => 'user-info',
+                    'file_image' => $request->file('image'),
+                    'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
+                ];
+                $file_name = $this->helper->handleUploadImage($arr_data_file);
+            }
+
+            // Encrypt the data
+            foreach ($validated_data as $key => $value) {
+                if ($key === 'image') {
+                    $validated_data[$key] = $file_name != '' ? Crypt::encrypt($file_name) : null;
+                } else {
+                    // Check if the value is empty
+                    if ($value !== null) {
+                        $validated_data[$key] = Crypt::encrypt($value);
+                    }
                 }
             }
+
+            // Create UserInfoModel with encrypted data
+            $user_info_create = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validated_data));
+            if (!$user_info_create) {
+                DB::rollBack(); // Rollback transaction
+                return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $user_info_create->update([
+                'user_info_id' => 'user_info_id-'  . $user_info_create->id,
+            ]);
+
+            $log_details = [
+                'fields' => $user_info_create
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 1,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'STORE PERSONAL INFORMATION',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack(); // Rollback transaction
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully stored user information',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Create UserInfoModel with encrypted data
-        $user_info_create = UserInfoModel::create(array_merge(['user_id' => $user->user_id], $validated_data));
-        if (!$user_info_create) {
-            return response()->json(['message' => 'Failed to store user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $user_info_create->update([
-            'user_info_id' => 'user_info_id-'  . $user_info_create->id,
-        ]);
-
-        $log_details = [
-            'fields' => $user_info_create
-        ];
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 0,
-            'log_details' => $log_details,
-            'user_action' => 'STORE PERSONAL INFORMATION',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully stored user information',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     /**
      * Display the specified resource.
@@ -262,103 +280,118 @@ class UserInfoController extends Controller
             return $result_validate_eu_device;
         }
 
-        // Unset Column not needed
-        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
 
-        // UpperCase Specific Field
-        $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
+        DB::beginTransaction(); // Begin transaction
 
-        // Retrieve the user information
-        $user_info = UserInfoModel::where('user_id', $user->user_id)->first();
+        try {
+            // UpperCase Specific Field
+            $validated_data = $this->helper->upperCaseSpecific($validator->validated(), $this->fillableAttrUserInfos->getUppercase());
 
-        // Check if user information exists
-        if (!$user_info) {
-            return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
-        }
+            // Retrieve the user information
+            $user_info = UserInfoModel::where('user_id', $user->user_id)->first();
 
-        // Handle image upload and update
-        if ($request->hasFile('image')) {
-            $arr_data_file = [
-                'custom_folder' => 'user-info',
-                'file_image' => $request->file('image'),
-                'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
-            ];
-            $file_name = $this->helper->handleUploadImage($arr_data_file);
-        }
+            // Check if user information exists
+            if (!$user_info) {
+                return response()->json(['message' => 'Data not found'], Response::HTTP_NOT_FOUND);
+            }
 
-        // Loop through the fields for encryption and decryption
-        foreach ($this->fillableAttrUserInfos->arrToUpdates() as $arrToUpdates) {
-            // Check if the key exists in the $validated_data array
-            if (isset($validated_data[$arrToUpdates])) {
-                $existing_value = $user_info->$arrToUpdates !== null ? Crypt::decrypt($user_info->$arrToUpdates) : null;
+            // Handle image upload and update
+            if ($request->hasFile('image')) {
+                $arr_data_file = [
+                    'custom_folder' => 'user-info',
+                    'file_image' => $request->file('image'),
+                    'image_actual_extension' => $request->file('image')->getClientOriginalExtension(),
+                ];
+                $file_name = $this->helper->handleUploadImage($arr_data_file);
+            }
 
-                if ($arrToUpdates != 'image') {
-                    $new_value = Crypt::encrypt($validated_data[$arrToUpdates]);
+            // Loop through the fields for encryption and decryption
+            foreach ($this->fillableAttrUserInfos->arrToUpdates() as $arrToUpdates) {
+                // Check if the key exists in the $validated_data array
+                if (isset($validated_data[$arrToUpdates])) {
+                    $existing_value = $user_info->$arrToUpdates !== null ? Crypt::decrypt($user_info->$arrToUpdates) : null;
 
-                    // Check if the value has changed for logs
-                    if ($existing_value != $validated_data[$arrToUpdates]) {
-                        $changes_for_logs[$arrToUpdates] = [
-                            'oldEnc' => $existing_value,
-                            'newEnc' => $validated_data[$arrToUpdates],
-                        ];
+                    if ($arrToUpdates != 'image') {
+                        $new_value = Crypt::encrypt($validated_data[$arrToUpdates]);
+
+                        // Check if the value has changed for logs
+                        if ($existing_value != $validated_data[$arrToUpdates]) {
+                            $changes_for_logs[$arrToUpdates] = [
+                                'oldEnc' => $existing_value,
+                                'newEnc' => $validated_data[$arrToUpdates],
+                            ];
+                            $user_info->{$arrToUpdates} = $new_value; // Set the new value
+                        }
+                    } else {
+                        $new_value =  $file_name != '' ? Crypt::encrypt($file_name) : null;
+
+                        if ($existing_value == null && $new_value != null) {
+                            $changes_for_logs['image'] = [
+                                'oldEnc' => $existing_value,
+                                'newEnc' => $file_name,
+                            ];
+                        } else if ($existing_value != null && $new_value != null) {
+                            $changes_for_logs['image'] = [
+                                'oldEnc' => $existing_value,
+                                'newEnc' => $file_name,
+                            ];
+                        }
+
                         $user_info->{$arrToUpdates} = $new_value; // Set the new value
                     }
-                } else {
-                    $new_value =  $file_name != '' ? Crypt::encrypt($file_name) : null;
-
-                    if ($existing_value == null && $new_value != null) {
-                        $changes_for_logs['image'] = [
-                            'oldEnc' => $existing_value,
-                            'newEnc' => $file_name,
-                        ];
-                    } else if ($existing_value != null && $new_value != null) {
-                        $changes_for_logs['image'] = [
-                            'oldEnc' => $existing_value,
-                            'newEnc' => $file_name,
-                        ];
-                    }
-
-                    $user_info->{$arrToUpdates} = $new_value; // Set the new value
                 }
             }
+
+            // Check if there are changes before logging
+            if (empty($changes_for_logs)) {
+                return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Save the changes
+            if (!$user_info->save()) {
+                DB::rollBack(); // Rollback transaction
+                // If the code reaches here, there was an issue saving the changes
+                return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $result_format_logs = $this->formatLogsEncData($changes_for_logs);
+
+            $log_details = [
+                'user_id' => $user->user_id,
+                'fields' => $result_format_logs
+            ];
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 1,
+                'is_history' => 0,
+                'log_details' => $log_details,
+                'user_action' => 'UPDATE PERSONAL INFORMATION',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+            
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Successfully update user information',
+                'log_message' => $log_result
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction on any exception
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Save the changes
-        if (!$user_info->save()) {
-            // If the code reaches here, there was an issue saving the changes
-            return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Check if there are changes before logging
-        if (empty($changes_for_logs)) {
-            return response()->json(['message' => 'No changes have been made'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $result_format_logs = $this->formatLogsEncData($changes_for_logs);
-
-        $log_details = [
-            'user_id' => $user->user_id,
-            'fields' => $result_format_logs
-        ];
-
-        // Arr Data Logs
-        $arr_data_logs = [
-            'user_device' => $request->eu_device,
-            'user_id' => $user->user_id,
-            'is_sensitive' => 1,
-            'is_history' => 0,
-            'log_details' => $log_details,
-            'user_action' => 'UPDATE PERSONAL INFORMATION',
-        ];
-
-        // Logs
-        $log_result = $this->helper->log($request, $arr_data_logs);
-
-        return response()->json([
-            'message' => 'Successfully update user information',
-            'log_message' => $log_result
-        ], Response::HTTP_OK);
     }
+
 
     public function formatLogsEncData($changes_for_logs)
     {
