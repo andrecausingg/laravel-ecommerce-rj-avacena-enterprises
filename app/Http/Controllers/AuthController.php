@@ -144,7 +144,6 @@ class AuthController extends Controller
         }
     }
 
-
     public function logout(Request $request)
     {
         // Authorize the user
@@ -235,7 +234,7 @@ class AuthController extends Controller
         $arr_data = [];
 
         // Check if phone number is not empty
-        if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
+        if ($request->has('phone_number') && ($request->input('phone_number') !== '' || $request->input('phone_number') !== null)) {
             $validator = Validator::make($request->all(), [
                 'phone_number' => 'required|numeric',
                 'password' => 'required|string',
@@ -249,7 +248,7 @@ class AuthController extends Controller
             }
         }
         // Check if Email is not empty
-        else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
+        else if ($request->has('email') && ($request->input('email') !== '' || $request->input('email') !== null)) {
             // Validate Password
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
@@ -449,7 +448,7 @@ class AuthController extends Controller
         ];
 
         // Check if phone number is not empty
-        if (($request->input('phone_number') !== '' || $request->input('phone_number') !== null) && ($request->input('email') === '' || $request->input('email') === null)) {
+        if ($request->has('phone_number') && ($request->input('phone_number') !== '' || $request->input('phone_number') !== null)) {
             $validator = Validator::make($request->all(), [
                 'phone_number' => 'required|numeric',
                 'password' => 'required|string|min:8|confirmed:password_confirmation',
@@ -469,7 +468,7 @@ class AuthController extends Controller
             }
         }
         // Check if Email is not empty
-        else if ($request->input('email') !== '' || $request->input('email') !== null && ($request->input('phone_number') === '' || $request->input('phone_number') === null)) {
+        else if ($request->has('email') && ($request->input('email') !== '' || $request->input('email') !== null)) {
             // Validate Password
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
@@ -510,7 +509,7 @@ class AuthController extends Controller
 
         try {
             // Generate a new token for the user
-            $expiration_time = Carbon::now()->addMinutes(120);
+            $expiration_time = Carbon::now()->addMinutes(5);
             // Get All Users and Decrypt
             $users = AuthModel::all();
 
@@ -979,7 +978,7 @@ class AuthController extends Controller
                 // Check if the requested email exists in the decrypted emails and email_verified_at is null then send verification code
                 if ($decrypted_email === $request->email && $user->email_verified_at !== null) {
                     // 2hrs expiration to verified Email
-                    $expiration_time = Carbon::now()->addMinutes(120);
+                    $expiration_time = Carbon::now()->addMinutes(5);
                     $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
                     // Update token and expiration
@@ -1253,18 +1252,25 @@ class AuthController extends Controller
         try {
             // Authenticate the user with the provided token
             $user = JWTAuth::parseToken()->authenticate();
+            // Get the bearer token from the headers
+            $bearer_token = $request->bearerToken();
 
+            // Check if user is not found
             if (!$user) {
                 return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
             }
 
-            // Get the bearer token from the headers
-            $bearerToken = $request->bearerToken();
-
-            if (!$bearerToken || $user->reset_password_token !== $bearerToken || $user->reset_password_token_expire_at < Carbon::now()) {
+            // Check if bearer token is missing
+            if ($user->reset_password_token !== $bearer_token) {
                 return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
             }
 
+            // Check if the user's session token does not match the bearer token or if the session has expired
+            if ($user->reset_password_token_expire_at < Carbon::now()) {
+                return response()->json(['message' => 'Session Expired'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            // If everything is valid, return the authenticated user
             return $user;
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
             return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);

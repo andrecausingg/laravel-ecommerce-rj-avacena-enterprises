@@ -125,7 +125,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     {
         return [
             'ACCOUNT_PENDING' => env('ACCOUNT_PENDING'),
-            'ACCOUNT_ACTIVE' => env('ACCOUNT_ACTIVE'),
+            'ACCOUNT_ACTIVATE' => env('ACCOUNT_ACTIVATE'),
             'ACCOUNT_BANNED' => env('ACCOUNT_BANNED'),
             'ACCOUNT_RESTRICTED' => env('ACCOUNT_RESTRICTED'),
         ];
