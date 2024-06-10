@@ -245,13 +245,14 @@ class InventoryProductModel extends Model
     {
         return [
             'item_code',
-            'image', 
-            'name', 
-            'category', 
-            'retail_price', 
-            'discounted_price', 
-            'sells', 
-            'stocks', 
+            'image',
+            'name',
+            'category',
+            'retail_price',
+            'discounted_price',
+            'sells',
+            'stocks',
+            'actions',
         ];
     }
 }
