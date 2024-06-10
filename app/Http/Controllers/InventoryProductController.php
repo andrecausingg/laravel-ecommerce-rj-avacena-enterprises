@@ -90,7 +90,6 @@ class InventoryProductController extends Controller
                     $action['details'][] = [
                         'label' => "Product " . ucfirst($arrDetails),
                         'type' => 'input',
-                        'value' => $arr_inventory_item[$arrDetails]
                     ];
                 }
             }
@@ -132,7 +131,11 @@ class InventoryProductController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $arr_inventory_product = [];
+        $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
+        $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
+        $view_settings = $this->fillable_attr_inventory_children->getViewRowTable();
+        $arr_inventory_item = [];
+        $all_inventory_items = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -140,9 +143,8 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))
-            ->orderBy('created_at', 'desc')->get();
-        if ($inventory_product->isEmpty()) {
+        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->first();
+        if (!$inventory_product) {
             return response()->json(
                 [
                     'message' => 'Data not found',
@@ -151,36 +153,146 @@ class InventoryProductController extends Controller
             );
         }
 
-        foreach ($inventory_product->toArray() as $toArray) {
-            $arr_product = [];
-            foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
-                if ($getFillableAttribute == 'inventory_product_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if ($getFillableAttribute == 'inventory_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
-                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
-                } else {
-                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
-                }
+        foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
+            if ($getFillableAttribute == 'inventory_product_id') {
+                $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
+            } else if ($getFillableAttribute == 'inventory_id') {
+                $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
+            } elseif (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
+            } else {
+                $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
+            }
+        }
+
+        // ***************************** //
+        // Format Api
+        $crud_action = $this->helper->formatApi(
+            $crud_settings['prefix'],
+            $crud_settings['payload'],
+            $crud_settings['method'],
+            $crud_settings['button_name'],
+            $crud_settings['icon'],
+            $crud_settings['container']
+        );
+
+        // Checking Id on other tbl if exist unset the api
+        $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
+        // Unset actions based on conditions
+        if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+            foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {
+                $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+                    return $action['button_name'] !== ucfirst($unsetAction);
+                });
+            }
+        }
+
+        // Add the format Api Crud
+        $arr_inventory_item['action'] = array_values($crud_action);
+        // ***************************** //
+
+        // ***************************** //
+        // Add details on action crud
+        foreach ($arr_inventory_item['action'] as &$action) {
+            // Check if 'details' key doesn't exist, then add it
+            if (!isset($action['details'])) {
+                $action['details'] = [];
             }
 
-            // Column not exist must put a data
-            $arr_product['sells'] = 0;
-            $arr_product['stocks'] = 0;
-
-            $arr_inventory_product[] = $arr_product;
+            // Populate details for each attribute
+            foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
+                $action['details'][] = [
+                    'label' => "Product " . ucfirst($arrDetails),
+                    'type' => 'input',
+                ];
+            }
         }
+        // ***************************** //
+
+        // Add view on row item
+        $arr_inventory_item['view'] = [[
+            'url' => $view_settings['url'] . $arr_inventory_item['inventory_product_id'],
+            'method' => $view_settings['method']
+        ]];
+
+        // Collect each inventory item
+        $all_inventory_items[] = $arr_inventory_item;
+
+        // Final response structure
+        $response = [
+            'inventory_product' => $all_inventory_items,
+            'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->arrColumns()),
+            'buttons' => $this->helper->formatApi(
+                $relative_settings['prefix'],
+                $relative_settings['payload'],
+                $relative_settings['method'],
+                $relative_settings['button_name'],
+                $relative_settings['icon'],
+                $relative_settings['container']
+            ),
+            // 'filter' => $filter
+        ];
 
         return response()->json(
             [
                 'messages' => "Successfully retrieve data",
-                'data' => $arr_inventory_product,
-                'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->arrColumns()),
+                'data' => $response
             ],
             Response::HTTP_OK
         );
     }
+
+    // public function show(Request $request, string $id)
+    // {
+    //     $arr_inventory_product = [];
+
+    //     // Authorize the user
+    //     $user = $this->helper->authorizeUser($request);
+    //     if (empty($user->user_id)) {
+    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+    //     }
+
+    //     $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))
+    //         ->orderBy('created_at', 'desc')->get();
+    //     if ($inventory_product->isEmpty()) {
+    //         return response()->json(
+    //             [
+    //                 'message' => 'Data not found',
+    //             ],
+    //             Response::HTTP_NOT_FOUND
+    //         );
+    //     }
+
+    //     foreach ($inventory_product->toArray() as $toArray) {
+    //         $arr_product = [];
+    //         foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
+    //             if ($getFillableAttribute == 'inventory_product_id') {
+    //                 $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+    //             } else if ($getFillableAttribute == 'inventory_id') {
+    //                 $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+    //             } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+    //                 $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
+    //             } else {
+    //                 $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
+    //             }
+    //         }
+
+    //         // Column not exist must put a data
+    //         $arr_product['sells'] = 0;
+    //         $arr_product['stocks'] = 0;
+
+    //         $arr_inventory_product[] = $arr_product;
+    //     }
+
+    //     return response()->json(
+    //         [
+    //             'messages' => "Successfully retrieve data",
+    //             'data' => $arr_inventory_product,
+    //             'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->arrColumns()),
+    //         ],
+    //         Response::HTTP_OK
+    //     );
+    // }
 
     public function store(Request $request)
     {
@@ -461,12 +573,11 @@ class InventoryProductController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_product_id' => 'required|string',
-            'item_code' => 'required|string|max:255',
+            'item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
             'is_refund' => 'nullable',
             'name' => 'required|string|max:500',
-            'category' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
             'stocks' => 'required|numeric',
@@ -585,12 +696,11 @@ class InventoryProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
-            'items.*.item_code' => 'required|string|max:255',
+            'items.*.item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'nullable',
             'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
-            'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
             'items.*.stocks' => 'required|numeric',

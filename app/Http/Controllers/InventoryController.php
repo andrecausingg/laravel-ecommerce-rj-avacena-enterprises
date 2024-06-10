@@ -170,7 +170,7 @@ class InventoryController extends Controller
         // Final response structure
         $response = [
             'inventory' => $all_inventory_items,
-            'column' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
+            'columns' => $this->helper->transformColumnName($this->fillable_attr_inventorys->getFillableAttributes()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['payload'],
@@ -526,7 +526,7 @@ class InventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'inventory_id' => 'required|string',
             'name' => 'required|string|max:255',
-            'category' => 'required|string|max:255',
+            'category' => 'required|string|max:255|unique:inventory_tbl,category',
             'eu_device' => 'required|string',
         ]);
 
@@ -564,7 +564,7 @@ class InventoryController extends Controller
             $result_changes_item_for_logs = $this->helper->updateLogsOldNew($inventory, $this->fillable_attr_inventorys->arrToUpdates(), $request->all(), '');
             $changes_for_logs[] = [
                 'inventory_id' => $decrypted_inventory_id,
-                'fields' => $result_changes_item_for_logs,
+                'fields_parent' => $result_changes_item_for_logs,
             ];
 
             // Check if there's Changes Logs
@@ -579,6 +579,16 @@ class InventoryController extends Controller
             if ($result_update_multi_data) {
                 DB::rollBack();
                 return $result_update_multi_data;
+            }
+
+            // Update Category Child
+            $inventory_product = InventoryProductModel::where('inventory_id', $inventory->inventory_id)->update([
+                'category' => $inventory->category,
+            ]);
+
+            if (!$inventory_product) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to update inventory child category'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             $eu_device = $request->input('eu_device');
@@ -712,6 +722,16 @@ class InventoryController extends Controller
                 if ($result_update_multi_data) {
                     DB::rollBack();
                     return $result_update_multi_data;
+                }
+
+                // Update Category Child
+                $inventory_product = InventoryProductModel::where('inventory_id', $inventory->inventory_id)->update([
+                    'category' => $inventory->category,
+                ]);
+
+                if (!$inventory_product) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to update inventory child category'], Response::HTTP_INTERNAL_SERVER_ERROR);
                 }
 
                 $eu_device = $user_input['eu_device'];
