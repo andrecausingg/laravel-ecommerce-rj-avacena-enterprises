@@ -407,6 +407,24 @@ class Helper
         return $arr_result;
     }
 
+    // Add column and data to store or update 
+    public function addColumnAndValue($arr_result_data, $arr_field_appends,  $model)
+    {
+
+        if (!is_array($arr_result_data)) {
+            return 'Result data is not an array';
+        } else  if (!is_array($arr_field_appends)) {
+            return 'Field to append is not an array';
+        }
+
+        foreach ($arr_field_appends as $arr_field_append) {
+            $arr_result_data[$arr_field_append] = $model->$arr_field_append;
+        }
+
+        return $arr_result_data;
+    }
+
+
     // Store Multiple Data
     public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '')
     {
@@ -429,6 +447,7 @@ class Helper
 
         return $arr_attributes_store;
     }
+
 
     // Update a unique I.D on store and update
     public function updateUniqueId($model, $id_to_updates, $id)

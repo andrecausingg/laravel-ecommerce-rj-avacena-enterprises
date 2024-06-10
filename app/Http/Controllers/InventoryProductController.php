@@ -163,14 +163,19 @@ class InventoryProductController extends Controller
                     $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
                 }
             }
+
+            // Column not exist must put a data
+            $arr_product['sells'] = 0;
+            $arr_product['stock'] = 0;
+
             $arr_inventory_product[] = $arr_product;
         }
 
         return response()->json(
             [
                 'messages' => "Successfully retrieve data",
-                'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
                 'data' => $arr_inventory_product,
+                'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->arrColumns()),
             ],
             Response::HTTP_OK
         );
@@ -191,12 +196,11 @@ class InventoryProductController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_id' => 'required|string',
-            'item_code' => 'required|string|max:255',
+            'item_code' => 'required|string|max:500|unique:inventory_product_tbl,item_code',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
             'is_refund' => 'nullable',
             'name' => 'required|string|max:500',
-            'category' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
             'stock' => 'required|numeric',
@@ -248,7 +252,11 @@ class InventoryProductController extends Controller
 
             // Create the InventoryProductModel instance with the selected attributes
             $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventory_children->arrToStores(), $request->all(), $file_name);
-            $created = InventoryProductModel::create($result_to_create);
+
+            // Added column and value to store
+            $result_append_data = $this->helper->addColumnAndValue($result_to_create, $this->fillable_attr_inventory_children->getArrFieldsToAppend(), $inventory);
+
+            $created = InventoryProductModel::create($result_append_data);
             if (!$created) {
                 DB::rollBack();
                 return response()->json(
@@ -319,7 +327,7 @@ class InventoryProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
-            'items.*.item_code' => 'required|string|max:255',
+            'items.*.item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'nullable',
@@ -385,7 +393,11 @@ class InventoryProductController extends Controller
 
                 // Create the InventoryProductModel instance with the selected attributes
                 $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventory_children->arrToStores(), $user_input, $file_name);
-                $created = InventoryProductModel::create($result_to_create);
+
+                // Added column and value to store
+                $result_append_data = $this->helper->addColumnAndValue($result_to_create, $this->fillable_attr_inventory_children->getArrFieldsToAppend(), $inventory);
+
+                $created = InventoryProductModel::create($result_append_data);
                 if (!$created) {
                     DB::rollBack();
                     return response()->json(

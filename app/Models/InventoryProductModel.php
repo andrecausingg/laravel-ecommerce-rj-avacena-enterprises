@@ -233,4 +233,25 @@ class InventoryProductModel extends Model
         $method = 'GET';
         return compact('url',  'method');
     }
+
+    public function getArrFieldsToAppend(): array
+    {
+        return [
+            'category',
+        ];
+    }
+
+    public function arrColumns(): array
+    {
+        return [
+            'item_code',
+            'image', 
+            'name', 
+            'category', 
+            'retail_price', 
+            'discounted_price', 
+            'sells', 
+            'stocks', 
+        ];
+    }
 }
