@@ -54,7 +54,7 @@ class UserInfoController extends Controller
         }
 
         return response()->json([
-            'message' => 'Successfully Retrieve Data',
+            'messages' => "Successfully retrieve data",
             'result' => $decrypted_user_infos,
         ], Response::HTTP_OK);
     }
@@ -89,7 +89,7 @@ class UserInfoController extends Controller
 
         return response()->json(
             [
-                'message' => 'Successfully Retrieve Data',
+                'messages' => "Successfully retrieve data",
                 'result' => $decrypted_user_infos,
             ],
             Response::HTTP_OK
@@ -377,7 +377,7 @@ class UserInfoController extends Controller
                 DB::rollBack();
                 return $log_result;
             }
-            
+
             // Commit the transaction
             DB::commit();
 
