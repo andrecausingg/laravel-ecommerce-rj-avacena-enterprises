@@ -69,7 +69,7 @@ class AccountController extends Controller
         $unset_results = $this->helper->unsetColumn($this->fillable_attr_auth->unsetForRetrieves(), $this->fillable_attr_auth->getFillableAttributes());
 
         // Retrieve all AuthModel records
-        $auth_users = AuthModel::get();
+        $auth_users = AuthModel::orderBy('created_at', 'desc')->get();
 
         // Data
         foreach ($auth_users as $auth_user) {

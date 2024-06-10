@@ -34,7 +34,7 @@ class LogController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $logs = LogsModel::get();
+        $logs = LogsModel::orderBy('created_at', 'desc')->get();
 
         foreach ($logs as $log) {
             $details_json = json_decode($log['details'], true);

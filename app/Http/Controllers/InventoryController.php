@@ -41,7 +41,7 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_parents = InventoryModel::get();
+        $inventory_parents = InventoryModel::orderBy('created_at', 'desc')->get();
         // Get all data
         foreach ($inventory_parents as $inventory_parent) {
 

@@ -36,7 +36,7 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_products = InventoryProductModel::get();
+        $inventory_products = InventoryProductModel::orderBy('created_at', 'desc')->get();
         foreach ($inventory_products as $inventory_product) {
 
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
@@ -140,7 +140,8 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
+        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))
+            ->orderBy('created_at', 'desc')->get();
         if ($inventory_product->isEmpty()) {
             return response()->json(
                 [

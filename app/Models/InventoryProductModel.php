@@ -251,7 +251,7 @@ class InventoryProductModel extends Model
             'retail_price', 
             'discounted_price', 
             'sells', 
-            'stocks', 
+            'stock', 
         ];
     }
 }

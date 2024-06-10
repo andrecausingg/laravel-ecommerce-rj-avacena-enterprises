@@ -39,7 +39,7 @@ class UserInfoController extends Controller
         // Unset Column not needed to decrypt
         $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
 
-        $user_infos = UserInfoModel::get();
+        $user_infos = UserInfoModel::orderBy('created_at', 'desc')->get();
         foreach ($user_infos as $user_info) {
             if ($user_info) {
                 $arr_user_info = $user_info->toArray();
