@@ -291,7 +291,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to store inventory records', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -430,7 +430,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to store inventory records', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -548,7 +548,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to update inventory child', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -683,7 +683,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to update inventory child', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -776,7 +776,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to delete inventory record', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -906,7 +906,7 @@ class InventoryProductController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to delete data', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

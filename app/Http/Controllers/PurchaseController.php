@@ -370,7 +370,7 @@ class PurchaseController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -510,7 +510,7 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -677,7 +677,7 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -812,7 +812,7 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1053,7 +1053,7 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1336,7 +1336,7 @@ class PurchaseController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();
-            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 

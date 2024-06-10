@@ -747,7 +747,7 @@ class AccountController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -783,7 +783,7 @@ class AccountController extends Controller
         if ($validator->fails()) {
             // Rollback the transaction
             DB::rollBack();
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
@@ -861,7 +861,7 @@ class AccountController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -897,7 +897,7 @@ class AccountController extends Controller
         if ($validator->fails()) {
             // Rollback the transaction
             DB::rollBack();
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
@@ -977,7 +977,7 @@ class AccountController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1082,7 +1082,7 @@ class AccountController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1186,7 +1186,7 @@ class AccountController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

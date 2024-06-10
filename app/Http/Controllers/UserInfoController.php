@@ -141,7 +141,7 @@ class UserInfoController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
@@ -271,7 +271,7 @@ class UserInfoController extends Controller
 
         // Check if validation fails
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => $validator->errors()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Validate Eu Device
@@ -351,7 +351,7 @@ class UserInfoController extends Controller
             if (!$user_info->save()) {
                 DB::rollBack(); // Rollback transaction
                 // If the code reaches here, there was an issue saving the changes
-                return response()->json(['error' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return response()->json(['message' => 'Failed to update user information'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             $result_format_logs = $this->formatLogsEncData($changes_for_logs);

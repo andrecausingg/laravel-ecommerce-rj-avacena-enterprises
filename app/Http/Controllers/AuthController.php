@@ -219,7 +219,7 @@ class AuthController extends Controller
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to store inventory records', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -699,7 +699,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the registration process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -813,8 +813,7 @@ class AuthController extends Controller
 
             return response()->json(
                 [
-                    'message' => 'An error occurred during the verification process',
-                    'error' => $e->getMessage()
+                    'message' => $e->getMessage()
                 ],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
@@ -928,7 +927,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1046,7 +1045,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1169,7 +1168,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
             DB::rollBack();
-            return response()->json(['message' => 'An error occurred during the process', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1198,11 +1197,11 @@ class AuthController extends Controller
 
             return $user;
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1232,11 +1231,11 @@ class AuthController extends Controller
 
             return $user;
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1273,11 +1272,11 @@ class AuthController extends Controller
             // If everything is valid, return the authenticated user
             return $user;
         } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Token expired'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
         } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['message' => 'Failed to authenticate'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
