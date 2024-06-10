@@ -169,6 +169,7 @@ class InventoryProductController extends Controller
         return response()->json(
             [
                 "message" => "Successfully Retrieve Data",
+                'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
                 'result' => $arr_inventory_product,
             ],
             Response::HTTP_OK
