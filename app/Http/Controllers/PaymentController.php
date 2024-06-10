@@ -41,7 +41,7 @@ class PaymentController extends Controller
         // Retrieve data if not cached
         $dashboardData = [
             'messages' => "Successfully retrieve data",
-            'stock' => $this->getTotalStock(),
+            'stocks' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
             'today_transaction' => $this->getTodayTransaction(),
             'chart' => [[
@@ -183,7 +183,7 @@ class PaymentController extends Controller
     private function getTotalStock()
     {
         // Get the sum of inventory products
-        $inventory_product_sum = InventoryProductModel::sum('stock');
+        $inventory_product_sum = InventoryProductModel::sum('stocks');
 
         return $inventory_product_sum;
     }

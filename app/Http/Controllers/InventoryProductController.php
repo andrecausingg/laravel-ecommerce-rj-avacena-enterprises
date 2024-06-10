@@ -167,7 +167,7 @@ class InventoryProductController extends Controller
 
             // Column not exist must put a data
             $arr_product['sells'] = 0;
-            $arr_product['stock'] = 0;
+            $arr_product['stocks'] = 0;
 
             $arr_inventory_product[] = $arr_product;
         }
@@ -204,7 +204,7 @@ class InventoryProductController extends Controller
             'name' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
-            'stock' => 'required|numeric',
+            'stocks' => 'required|numeric',
             'supplier_name' => 'nullable',
             'design' => 'nullable|string|max:500',
             'size' => 'nullable|string|max:500',
@@ -336,7 +336,7 @@ class InventoryProductController extends Controller
             'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
-            'items.*.stock' => 'required|numeric',
+            'items.*.stocks' => 'required|numeric',
             'items.*.supplier_name' => 'nullable',
             'items.*.design' => 'nullable|string|max:500',
             'items.*.size' => 'nullable|string|max:500',
@@ -469,7 +469,7 @@ class InventoryProductController extends Controller
             'category' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
-            'stock' => 'required|numeric',
+            'stocks' => 'required|numeric',
             'supplier_name' => 'nullable',
             'design' => 'nullable|string|max:500',
             'size' => 'nullable|string|max:500',
@@ -593,7 +593,7 @@ class InventoryProductController extends Controller
             'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
-            'items.*.stock' => 'required|numeric',
+            'items.*.stocks' => 'required|numeric',
             'items.*.supplier_name' => 'nullable',
             'items.*.design' => 'nullable|string|max:500',
             'items.*.size' => 'nullable|string|max:500',

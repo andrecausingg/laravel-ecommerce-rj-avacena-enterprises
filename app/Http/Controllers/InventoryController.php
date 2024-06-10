@@ -66,7 +66,7 @@ class InventoryController extends Controller
             $arr_inventory_item = $arr_parent_inventory_data;
             $inventory_children = InventoryProductModel::where('inventory_id', $inventory_parent->inventory_id)->get();
             $arr_inventory_item['variant'] =  $inventory_children->count();
-            $arr_inventory_item['stock'] = $inventory_children->sum('stock');
+            $arr_inventory_item['stocks'] = $inventory_children->sum('stocks');
 
             // TODO : check if correct total sales
             // Calculate total sales for all inventory items including both discounted and retail prices

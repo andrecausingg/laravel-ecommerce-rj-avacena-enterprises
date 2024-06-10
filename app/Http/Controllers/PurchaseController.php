@@ -77,8 +77,8 @@ class PurchaseController extends Controller
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
             }
 
-            if ($inventory_product->stock < $request->quantity) {
-                return response()->json(['message' => 'Sorry, can\'t add due to insufficient stock', 'stock' => $inventory_product->stock], Response::HTTP_UNPROCESSABLE_ENTITY);
+            if ($inventory_product->stocks < $request->quantity) {
+                return response()->json(['message' => 'Sorry, can\'t add due to insufficient stock', 'stocks' => $inventory_product->stock], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             // Add New Item on purchase_group_id
@@ -178,7 +178,7 @@ class PurchaseController extends Controller
                 return response()->json(
                     [
                         'message' => 'Purchase and Payment records stored successfully',
-                        'message_stock' => $minus_stock,
+                        'message_stocks' => $minus_stock,
                     ],
                     Response::HTTP_OK
                 );
@@ -363,7 +363,7 @@ class PurchaseController extends Controller
                 return response()->json(
                     [
                         'message' => 'Purchase and Payment records stored successfully',
-                        'message_stock' => $minus_stock,
+                        'message_stocks' => $minus_stock,
                     ],
                     Response::HTTP_OK
                 );
@@ -427,7 +427,7 @@ class PurchaseController extends Controller
             }
 
             $update_stock = $inventory_product->update([
-                'stock' => max(0, $inventory_product->stock + 1),
+                'stocks' => max(0, $inventory_product->stocks + 1),
             ]);
 
             if (!$update_stock) {
@@ -567,7 +567,7 @@ class PurchaseController extends Controller
             }
 
             $update_stock = $inventory_product->update([
-                'stock' => max(0, $inventory_product->stock - 1),
+                'stocks' => max(0, $inventory_product->stock - 1),
             ]);
 
             if (!$update_stock) {
@@ -755,7 +755,7 @@ class PurchaseController extends Controller
             }
 
             $inventory_product->update([
-                'stock' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
+                'stocks' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
             ]);
 
             $total_amount_payment = $this->totalAmountPaymentDeleteAll($decrypted_purchase_group_id, $decrypted_user_id_customer);
@@ -991,7 +991,7 @@ class PurchaseController extends Controller
                     }
 
                     $inventory_product->update([
-                        'stock' => max(0, $inventory_product->stock + count($arr_all_purchase)),
+                        'stocks' => max(0, $inventory_product->stocks + count($arr_all_purchase)),
                     ]);
 
                     $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchase_data->purchase_group_id, $purchase_data->user_id_customer);
@@ -1320,19 +1320,19 @@ class PurchaseController extends Controller
 
             // Perform the stock deduction
             $updated = $inventory_product->update([
-                'stock' => $inventory_product->stock - 1,
+                'stocks' => $inventory_product->stocks - 1,
             ]);
 
             if (!$updated) {
                 // Rollback the transaction if failed to update stock
                 DB::rollBack();
-                return response()->json(['message' => 'Failed to update new stock'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return response()->json(['message' => 'Failed to update new stocks'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             // Commit the transaction
             DB::commit();
 
-            return response()->json(['message' => 'Stock deducted successfully'], Response::HTTP_OK);
+            return response()->json(['message' => 'Stocks deducted successfully'], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction in case of any error
             DB::rollBack();

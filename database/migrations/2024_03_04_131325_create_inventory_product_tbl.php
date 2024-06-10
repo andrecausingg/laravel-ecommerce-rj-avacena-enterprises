@@ -35,7 +35,7 @@ return new class extends Migration
             $table->double('unit_supplier_price', 30, 2)->default(0.00);
 
             // Stock
-            $table->bigInteger('stock')->default(0);
+            $table->bigInteger('stocks')->default(0);
 
             // Date | Time
             $table->timestamps();

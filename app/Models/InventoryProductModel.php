@@ -32,7 +32,7 @@ class InventoryProductModel extends Model
         'discounted_price',
         'unit_supplier_price',
 
-        'stock',
+        'stocks',
 
         'created_at',
         'updated_at',
@@ -60,7 +60,7 @@ class InventoryProductModel extends Model
             'retail_price',
             'discounted_price',
             'unit_supplier_price',
-            'stock',
+            'stocks',
         ];
     }
     public function arrToUpdates(): array
@@ -78,7 +78,7 @@ class InventoryProductModel extends Model
             'retail_price',
             'discounted_price',
             'unit_supplier_price',
-            'stock',
+            'stocks',
         ];
     }
 
@@ -131,7 +131,7 @@ class InventoryProductModel extends Model
                 'retail_price',
                 'discounted_price',
                 'unit_supplier_price',
-                'stock',
+                'stocks',
                 'eu_device'
             ],
             'destroy' => ['inventory_product_id', 'eu_device']
@@ -174,7 +174,7 @@ class InventoryProductModel extends Model
                 'retail_price',
                 'discounted_price',
                 'unit_supplier_price',
-                'stock',
+                'stocks',
                 'eu_device'
             ]
         ];
@@ -220,7 +220,7 @@ class InventoryProductModel extends Model
             'retail_price',
             'discounted_price',
             'unit_supplier_price',
-            'stock',
+            'stocks',
         ];
     }
 
@@ -251,7 +251,7 @@ class InventoryProductModel extends Model
             'retail_price', 
             'discounted_price', 
             'sells', 
-            'stock', 
+            'stocks', 
         ];
     }
 }
