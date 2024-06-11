@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuthModel;
-use App\Models\LogsModel;
 use Illuminate\Support\Str;
 use App\Models\HistoryModel;
 use Illuminate\Http\Request;
@@ -171,7 +170,6 @@ class AuthController extends Controller
         DB::beginTransaction();
 
         try {
-            // Expiration Time 1month
             $expiration_time = Carbon::now()->addSeconds(1);
             $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
             if (!$new_token) {
@@ -189,6 +187,8 @@ class AuthController extends Controller
                     Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
+
+            JWTAuth::invalidate(JWTAuth::getToken());
 
             // Arr Logs details
             $arr_log_details = [
@@ -771,6 +771,8 @@ class AuthController extends Controller
                 );
             }
 
+            JWTAuth::invalidate(JWTAuth::getToken());
+
             // Log Details
             $log_details = [
                 'fields' => [
@@ -1130,6 +1132,8 @@ class AuthController extends Controller
                 return response()->json(['message' => 'Failed to update new password'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
+            JWTAuth::invalidate(JWTAuth::getToken());
+
             $log_details = [
                 'fields' => [
                     'user_id' => $user->user_id,
@@ -1186,12 +1190,14 @@ class AuthController extends Controller
             // Authenticate the user with the provided token
             $user = JWTAuth::parseToken()->authenticate();
             if (!$user) {
+                JWTAuth::invalidate(JWTAuth::getToken());
                 return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
             }
 
             // Get the bearer token from the headers
             $bearerToken = $request->bearerToken();
             if (!$bearerToken || $user->verify_email_token !== $bearerToken || $user->verify_email_token_expire_at < Carbon::now()) {
+                JWTAuth::invalidate(JWTAuth::getToken());
                 return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
             }
 

@@ -35,16 +35,19 @@ class Helper
 
             // Check if user is not found
             if (!$user) {
+                JWTAuth::invalidate(JWTAuth::getToken());
                 return response()->json(['message' => 'User not found'], Response::HTTP_UNAUTHORIZED);
             }
 
             // Check if bearer token is missing
             if ($user->session_token !== $bearer_token) {
+                JWTAuth::invalidate(JWTAuth::getToken());
                 return response()->json(['message' => 'Invalid token'], Response::HTTP_UNAUTHORIZED);
             }
 
             // Check if the user's session token does not match the bearer token or if the session has expired
             if ($user->session_expire_at < Carbon::now()) {
+                JWTAuth::invalidate(JWTAuth::getToken());
                 return response()->json(['message' => 'Session Expired'], Response::HTTP_UNAUTHORIZED);
             }
 
@@ -58,6 +61,7 @@ class Helper
             return response()->json(['message' => 'Failed to authenticate'], Response::HTTP_UNAUTHORIZED);
         }
     }
+
 
     // Unset column dont want to include to save on database
     public function unsetColumn($unsets, $fillableAttr)

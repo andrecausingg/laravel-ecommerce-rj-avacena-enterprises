@@ -73,6 +73,7 @@ class PurchaseModel extends Model
 
             'retail_price',
             'discounted_price',
+            'unit_supplier_price',
 
             'status',
         ];
@@ -102,6 +103,7 @@ class PurchaseModel extends Model
 
             'retail_price',
             'discounted_price',
+            'unit_supplier_price',
 
             'status',
         ];
@@ -137,6 +139,7 @@ class PurchaseModel extends Model
             'color',
             'retail_price',
             'discounted_price',
+            'unit_supplier_price',
             'count',
         ];
     }

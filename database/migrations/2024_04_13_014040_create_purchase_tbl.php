@@ -41,6 +41,7 @@ return new class extends Migration
             // Prices
             $table->double('retail_price', 30, 2)->default(0.00);
             $table->double('discounted_price', 30, 2)->default(0.00);
+            $table->double('unit_supplier_price', 30, 2)->default(0.00);
 
             // Status
             $table->string('status')->default('NOT PAID')->comment('NOT PAID | VOID | DONE');

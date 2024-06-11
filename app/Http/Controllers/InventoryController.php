@@ -243,8 +243,8 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
-        if ($inventory_product->isEmpty()) {
+        $inventory_products = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
+        if ($inventory_products->isEmpty()) {
             return response()->json(
                 [
                     'message' => 'Data not found',
@@ -252,22 +252,24 @@ class InventoryController extends Controller
                 Response::HTTP_NOT_FOUND
             );
         }
-
-        foreach ($inventory_product->toArray() as $toArray) {
+        
+        foreach ($inventory_products as $inventory_product) {
             $arr_product = [];
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_product_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($inventory_product[$getFillableAttribute]);
                 } else if ($getFillableAttribute == 'inventory_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($toArray[$getFillableAttribute]);
+                    $arr_product[$getFillableAttribute] = Crypt::encrypt($inventory_product[$getFillableAttribute]);
                 } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($toArray[$getFillableAttribute]);
+                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product[$getFillableAttribute]);
                 } else {
-                    $arr_product[$getFillableAttribute] = $toArray[$getFillableAttribute];
+                    $arr_product[$getFillableAttribute] = $inventory_product[$getFillableAttribute];
                 }
             }
             $arr_inventory_product[] = $arr_product;
         }
+
+        dd($arr_inventory_product);
 
         return response()->json(
             [

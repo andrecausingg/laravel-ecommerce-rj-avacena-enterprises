@@ -48,6 +48,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     // Checking token
     Route::get('/check-token', [$AuthController, 'checkToken']);
     Route::get('/role-nav-links', [$AuthController, 'roleNavLinks']);
+    Route::post('/logout', [$AuthController, 'logout']);
 
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
