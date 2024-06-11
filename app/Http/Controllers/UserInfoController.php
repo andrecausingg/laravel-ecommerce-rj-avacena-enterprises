@@ -36,17 +36,14 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Unset Column not needed to decrypt
-        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
-
         $user_infos = UserInfoModel::orderBy('created_at', 'desc')->get();
         foreach ($user_infos as $user_info) {
             if ($user_info) {
                 $arr_user_info = $user_info->toArray();
 
-                foreach ($unset_results as $unset_result) {
-                    if (isset($arr_user_info[$unset_result])) {
-                        $arr_user_info[$unset_result] = $user_info->{$unset_result} ? Crypt::decrypt($user_info->{$unset_result}) : null;
+                foreach ($this->fillableAttrUserInfos->arrToDecrypt() as $arrToDecrypt) {
+                    if (isset($arr_user_info[$arrToDecrypt])) {
+                        $arr_user_info[$arrToDecrypt] = $user_info->{$arrToDecrypt} ? Crypt::decrypt($user_info->{$arrToDecrypt}) : null;
                     }
                 }
                 $decrypted_user_infos = $arr_user_info;
@@ -72,16 +69,13 @@ class UserInfoController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $unset_results = $this->helper->unsetColumn($this->fillableAttrUserInfos->unsetDecrypt(), $this->fillableAttrUserInfos->getFillableAttributes());
-
-
         $userInfos = UserInfoModel::where('user_id', $user->user_id)->first();
         if ($userInfos) {
             $arr_user_info = $userInfos->toArray();
 
-            foreach ($unset_results as $unset_result) {
-                if (isset($arr_user_info[$unset_result])) {
-                    $arr_user_info[$unset_result] = $userInfos->{$unset_result} ? Crypt::decrypt($userInfos->{$unset_result}) : null;
+            foreach ($this->fillableAttrUserInfos->arrToDecrypt() as $arrToDecrypt) {
+                if (isset($arr_user_info[$arrToDecrypt])) {
+                    $arr_user_info[$arrToDecrypt] = $userInfos->{$arrToDecrypt} ? Crypt::decrypt($userInfos->{$arrToDecrypt}) : null;
                 }
             }
             $decrypted_user_infos = $arr_user_info;

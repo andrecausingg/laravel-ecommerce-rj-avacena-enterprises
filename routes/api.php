@@ -83,15 +83,16 @@ Route::middleware(['jwt.auth'])->group(function () {
 
 
     // Personal User Information
-    Route::prefix('user-info')->group(function () use ($UserInfoController, $AuthController) {
+    Route::prefix('user-info')->group(function () use ($UserInfoController, $AccountController) {
         Route::get('index', [$UserInfoController, 'index']);
         Route::post('store', [$UserInfoController, 'store']);
         Route::post('update', [$UserInfoController, 'update']);
         Route::get('get-personal-info', [$UserInfoController, 'getPersonalInfo']);
 
-        Route::post('update-email', [$AuthController, 'updateEmailOnSettingUser']);
-        Route::post('update-password', [$AuthController, 'updatePasswordOnSettingUser']);
-        Route::post('update-password-and-email/send-verification-code', [$AuthController, 'updateEmailAndPasswordSendVerificationCode']);
+        Route::post('update-email', [$AccountController, 'updateEmailOnSettingUser']);
+        Route::post('update-password', [$AccountController, 'updatePasswordOnSettingUser']);
+        Route::post('resend-code-email', [$AccountController, 'resendVerificationCodeEmail']);
+        Route::post('resend-code-password', [$AccountController, 'resendVerificationCodePassword']);
     });
 
     // Inventory
@@ -130,7 +131,6 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('add-qty', [$PurchaseController, 'addQty']);
         Route::delete('delete-all-qty', [$PurchaseController, 'deleteQtyAll']);
         Route::post('update-qty', [$PurchaseController, 'updateQty']);
-
     });
 
     // Payment

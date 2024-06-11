@@ -311,7 +311,7 @@ class Helper
         $file_name = '';
 
         // Generate File Name
-        $file_name = Str::uuid() . "_" . time() . "_" . mt_rand() . "_" . Str::uuid() . "." . $arr_data_file['image_actual_extension'];
+        $file_name = Str::uuid() . "_" . Str::uuid() . "_" . time() . "_" . mt_rand() . "." . $arr_data_file['image_actual_extension'];
 
         // Generate the file path within the custom folder
         $file_path = $arr_data_file['custom_folder'] . '/' . $file_name;
