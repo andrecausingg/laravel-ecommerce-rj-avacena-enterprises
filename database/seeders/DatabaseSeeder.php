@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
                 'email' => Crypt::encrypt($faker->unique()->safeEmail),
                 'password' => Hash::make('password'), // Change 'password' to the actual password if needed
                 'role' => 'CLIENT',
-                'status' => 'ACTIVE',
+                'status' => 'ACTIVATE',
                 'verification_number' => $faker->numberBetween(100000, 999999),
                 'verification_key' => null,
                 'session_token' => null,

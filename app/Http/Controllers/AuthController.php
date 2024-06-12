@@ -754,7 +754,7 @@ class AuthController extends Controller
             $new_token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($user);
 
             // Update user status and set email_verified_at to the current timestamp
-            $user->status = 'ACTIVE';
+            $user->status = env('ACCOUNT_ACTIVATE');
             $user->verify_email_token = $new_token;
             $user->email_verified_at = now();
             $user->verification_number = $verification_number;
