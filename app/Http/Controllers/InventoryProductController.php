@@ -108,7 +108,7 @@ class InventoryProductController extends Controller
         // Final response structure
         $response = [
             'inventory_product' => $all_inventory_items,
-            'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
+            'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['payload'],

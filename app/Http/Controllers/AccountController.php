@@ -210,7 +210,7 @@ class AccountController extends Controller
         // Final response structure
         $response = [
             'account' => $decrypted_auth_users,
-            'column' => $column_name,
+            'columns' => $column_name,
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['payload'],

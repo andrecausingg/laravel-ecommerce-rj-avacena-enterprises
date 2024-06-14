@@ -243,7 +243,6 @@ class InventoryProductModel extends Model
             'item_code',
             'image',
             'name',
-            'category',
             'retail_price',
             'discounted_price',
             'sells',
