@@ -270,7 +270,8 @@ class InventoryController extends Controller
                 }
             }
 
-            $total_sales = PurchaseModel::where('inventory_id', $inventory_product->inventory_product_id)
+            $total_sales = PurchaseModel::where('inventory_id', $inventory_product->inventory_id)
+                ->where('inventory_product_id', $inventory_product->inventory_product_id)
                 ->where('status', 'DONE')
                 ->count();
             $arr_inventory_item['sells'] = $total_sales;
@@ -329,9 +330,6 @@ class InventoryController extends Controller
             // Collect each inventory item
             $all_inventory_items[] = $arr_inventory_item;
         }
-
-
-
 
         // Final response structure
         $response = [
