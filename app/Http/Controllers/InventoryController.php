@@ -235,7 +235,11 @@ class InventoryController extends Controller
 
     public function showProduct(Request $request, string $id)
     {
-        $arr_inventory_product = [];
+        $crud_settings = $this->fillable_attr_inventory_children->getApiAccountCrudSettings();
+        $relative_settings = $this->fillable_attr_inventory_children->getApiAccountRelativeSettings();
+        $view_settings = $this->fillable_attr_inventory_children->getViewRowTable();
+        $arr_inventory_item = [];
+        $all_inventory_items = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -243,36 +247,94 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_products = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->get();
-        if ($inventory_products->isEmpty()) {
-            return response()->json(
-                [
-                    'message' => 'Data not found',
-                ],
-                Response::HTTP_NOT_FOUND
-            );
-        }
-
+        $inventory_products = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->orderBy('created_at', 'desc')->get();
         foreach ($inventory_products as $inventory_product) {
-            $arr_product = [];
+
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
                 if ($getFillableAttribute == 'inventory_product_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($inventory_product[$getFillableAttribute]);
+                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
                 } else if ($getFillableAttribute == 'inventory_id') {
-                    $arr_product[$getFillableAttribute] = Crypt::encrypt($inventory_product[$getFillableAttribute]);
-                } else if (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
-                    $arr_product[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product[$getFillableAttribute]);
+                    $arr_inventory_item[$getFillableAttribute] = Crypt::encrypt($inventory_product->$getFillableAttribute);
+                } elseif (in_array($getFillableAttribute, $this->fillable_attr_inventory_children->arrToConvertToReadableDateTime())) {
+                    $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
                 } else {
-                    $arr_product[$getFillableAttribute] = $inventory_product[$getFillableAttribute];
+                    $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
                 }
             }
-            $arr_inventory_product[] = $arr_product;
+
+            // ***************************** //
+            // Format Api
+            $crud_action = $this->helper->formatApi(
+                $crud_settings['prefix'],
+                $crud_settings['payload'],
+                $crud_settings['method'],
+                $crud_settings['button_name'],
+                $crud_settings['icon'],
+                $crud_settings['container']
+            );
+
+            // Checking Id on other tbl if exist unset the api
+            $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($inventory_product->inventory_id, $this->fillable_attr_inventory_children->arrModelWithId());
+            // Unset actions based on conditions
+            if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+                foreach ($this->fillable_attr_inventory_children->unsetActions() as $unsetAction) {
+                    $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+                        return $action['button_name'] !== ucfirst($unsetAction);
+                    });
+                }
+            }
+
+            // Add the format Api Crud
+            $arr_inventory_item['action'] = array_values($crud_action);
+            // ***************************** //
+
+            // ***************************** //
+            // Add details on action crud
+            foreach ($arr_inventory_item['action'] as &$action) {
+                // Check if 'details' key doesn't exist, then add it
+                if (!isset($action['details'])) {
+                    $action['details'] = [];
+                }
+
+                // Populate details for each attribute
+                foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
+                    $action['details'][] = [
+                        'label' => "Product " . ucfirst($arrDetails),
+                        'type' => 'input',
+                    ];
+                }
+            }
+            // ***************************** //
+
+            // Add view on row item
+            $arr_inventory_item['view'] = [[
+                'url' => $view_settings['url'] . $arr_inventory_item['inventory_product_id'],
+                'method' => $view_settings['method']
+            ]];
+
+            // Collect each inventory item
+            $all_inventory_items[] = $arr_inventory_item;
         }
+
+        // Final response structure
+        $response = [
+            'inventory_product' => $all_inventory_items,
+            'column' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->getFillableAttributes()),
+            'buttons' => $this->helper->formatApi(
+                $relative_settings['prefix'],
+                $relative_settings['payload'],
+                $relative_settings['method'],
+                $relative_settings['button_name'],
+                $relative_settings['icon'],
+                $relative_settings['container']
+            ),
+            // 'filter' => $filter
+        ];
 
         return response()->json(
             [
                 'messages' => "Successfully retrieve data",
-                'data' => $arr_inventory_product,
+                'data' => $response
             ],
             Response::HTTP_OK
         );
