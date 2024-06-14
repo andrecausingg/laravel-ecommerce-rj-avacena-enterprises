@@ -252,7 +252,7 @@ class InventoryController extends Controller
                 Response::HTTP_NOT_FOUND
             );
         }
-        
+
         foreach ($inventory_products as $inventory_product) {
             $arr_product = [];
             foreach ($this->fillable_attr_inventory_children->getFillableAttributes() as $getFillableAttribute) {
@@ -268,8 +268,6 @@ class InventoryController extends Controller
             }
             $arr_inventory_product[] = $arr_product;
         }
-
-        dd($arr_inventory_product);
 
         return response()->json(
             [
