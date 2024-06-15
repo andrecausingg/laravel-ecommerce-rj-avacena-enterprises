@@ -220,6 +220,26 @@ class InventoryProductModel extends Model
         ];
     }
 
+    public function arrDetailsProductShow(): array
+    {
+        return [
+            'item_code',
+            'image',
+            'name',
+            // 'category',
+            // 'description',
+            'supplier_name',
+            // 'design',
+            // 'size',
+            // 'color',
+            'retail_price',
+            'discounted_price',
+            'unit_supplier_price',
+            'stocks',
+        ];
+    }
+
+
 
     public function getViewRowTable()
     {
