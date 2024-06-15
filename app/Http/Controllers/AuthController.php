@@ -589,7 +589,8 @@ class AuthController extends Controller
 
                     return response()->json([
                         'message' => 'Successfully register email',
-                        'url_token' => '/signup/verify-email?tj=' . $new_token,
+                        'token' => $new_token,
+                        'url_token' => 'verification/' . $new_token,
                         'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
                         'log_message' => $log_result
                     ], Response::HTTP_OK);
@@ -692,7 +693,8 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Successfully register email',
-                'url_token' => '/signup/verify-email?tj=' . $new_token,
+                'token' => $new_token,
+                'url_token' => 'verification/' . $new_token,
                 'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
                 'log_message' => $log_result
             ], Response::HTTP_OK);
