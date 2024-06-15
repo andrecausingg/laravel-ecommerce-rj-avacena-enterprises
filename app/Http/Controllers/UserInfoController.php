@@ -51,7 +51,7 @@ class UserInfoController extends Controller
         }
 
         return response()->json([
-            'messages' => "Successfully retrieve data",
+            'message' => "Successfully retrieve data",
             'result' => $decrypted_user_infos,
         ], Response::HTTP_OK);
     }
@@ -83,7 +83,7 @@ class UserInfoController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'result' => $decrypted_user_infos,
             ],
             Response::HTTP_OK

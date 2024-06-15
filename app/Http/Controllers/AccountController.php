@@ -224,7 +224,7 @@ class AccountController extends Controller
 
         // Display or use the decrypted attributes as needed
         return response()->json([
-            'messages' => "Successfully retrieve data",
+            'message' => "Successfully retrieve data",
             'data' => $response
         ], Response::HTTP_OK);
     }
@@ -308,7 +308,7 @@ class AccountController extends Controller
 
         // Display or use the decrypted attributes as needed
         return response()->json([
-            'messages' => "Successfully retrieve data",
+            'message' => "Successfully retrieve data",
             'data' => [$decrypted_user_auth]
         ], Response::HTTP_OK);
     }

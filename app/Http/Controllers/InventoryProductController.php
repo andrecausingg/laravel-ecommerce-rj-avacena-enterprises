@@ -122,7 +122,7 @@ class InventoryProductController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'data' => $response
             ],
             Response::HTTP_OK
@@ -235,7 +235,7 @@ class InventoryProductController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'data' => $response
             ],
             Response::HTTP_OK
@@ -286,7 +286,7 @@ class InventoryProductController extends Controller
 
     //     return response()->json(
     //         [
-    //             'messages' => "Successfully retrieve data",
+    //             'message' => "Successfully retrieve data",
     //             'data' => $arr_inventory_product,
     //             'columns' => $this->helper->transformColumnName($this->fillable_attr_inventory_children->arrColumns()),
     //         ],

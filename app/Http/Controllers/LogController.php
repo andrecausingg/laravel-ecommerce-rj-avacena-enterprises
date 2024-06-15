@@ -74,7 +74,7 @@ class LogController extends Controller
         }
 
         return response()->json([
-            'messages' => "Successfully retrieve data",
+            'message' => "Successfully retrieve data",
             'result' => $result_json,
         ], Response::HTTP_OK);
     }

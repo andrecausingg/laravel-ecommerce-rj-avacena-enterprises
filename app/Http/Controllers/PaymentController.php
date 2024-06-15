@@ -40,7 +40,7 @@ class PaymentController extends Controller
 
         // Retrieve data if not cached
         $dashboardData = [
-            'messages' => "Successfully retrieve data",
+            'message' => "Successfully retrieve data",
             'stocks' => $this->getTotalStock(),
             'sale' => $this->getSaleTodayMonthYear(),
             'today_transaction' => $this->getTodayTransaction(),

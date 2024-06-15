@@ -184,7 +184,7 @@ class InventoryController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'data' => $response
             ],
             Response::HTTP_OK
@@ -226,7 +226,7 @@ class InventoryController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'data' => $arr_inventory,
             ],
             Response::HTTP_OK
@@ -348,7 +348,7 @@ class InventoryController extends Controller
 
         return response()->json(
             [
-                'messages' => "Successfully retrieve data",
+                'message' => "Successfully retrieve data",
                 'data' => $response
             ],
             Response::HTTP_OK
