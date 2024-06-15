@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\PurchaseModel;
 use App\Models\InventoryModel;
 use Illuminate\Support\Facades\DB;
 use App\Models\InventoryProductModel;
@@ -143,7 +144,7 @@ class InventoryProductController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $inventory_product = InventoryProductModel::where('inventory_id', Crypt::decrypt($id))->first();
+        $inventory_product = InventoryProductModel::where('inventory_product_id', Crypt::decrypt($id))->first();
         if (!$inventory_product) {
             return response()->json(
                 [
@@ -164,6 +165,13 @@ class InventoryProductController extends Controller
                 $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
             }
         }
+
+        $total_sales = PurchaseModel::where('inventory_id', $inventory_product->inventory_id)
+            ->where('inventory_product_id', $inventory_product->inventory_product_id)
+            ->where('status', 'DONE')
+            ->count();
+        $arr_inventory_item['sells'] = $total_sales;
+
 
         // ***************************** //
         // Format Api
@@ -203,6 +211,7 @@ class InventoryProductController extends Controller
             foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
                 $action['details'][] = [
                     'label' => "Product " . ucfirst($arrDetails),
+                    'value' => $inventory_product->$arrDetails ?? null,
                     'type' => 'input',
                 ];
             }
