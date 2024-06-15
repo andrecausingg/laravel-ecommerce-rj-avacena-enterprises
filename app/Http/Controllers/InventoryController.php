@@ -315,6 +315,7 @@ class InventoryController extends Controller
                 foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
                     $action['details'][] = [
                         'label' => "Product " . ucfirst($arrDetails),
+                        'value' => $inventory_product->$arrDetails ?? null,
                         'type' => 'input',
                     ];
                 }
