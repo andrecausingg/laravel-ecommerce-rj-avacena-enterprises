@@ -208,10 +208,10 @@ class InventoryProductController extends Controller
             }
 
             // Populate details for each attribute
-            foreach ($this->fillable_attr_inventory_children->arrDetails() as $arrDetails) {
+            foreach ($this->fillable_attr_inventory_children->arrDetailsProductShow() as $arrDetailsProductShow) {
                 $action['details'][] = [
-                    'label' => "Product " . ucfirst($arrDetails),
-                    'value' => $inventory_product->$arrDetails ?? null,
+                    'label' => "Product " . $this->helper->transformColumnName($arrDetailsProductShow),
+                    'value' => $inventory_product->$arrDetailsProductShow ?? null,
                     'type' => 'input',
                 ];
             }
