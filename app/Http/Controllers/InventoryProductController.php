@@ -343,7 +343,7 @@ class InventoryProductController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_id' => 'required|string',
-            'item_code' => 'required|string|max:500|unique:inventory_product_tbl,item_code',
+            'item_code' => 'required|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
             'is_refund' => 'required|string|max:3',
@@ -474,7 +474,7 @@ class InventoryProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
-            'items.*.item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
+            'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'required|string|max:3',
