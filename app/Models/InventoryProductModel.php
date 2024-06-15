@@ -135,23 +135,23 @@ class InventoryProductModel extends Model
                 'stocks',
                 'eu_device'
             ],
-            'destroy' => ['inventory_product_id', 'eu_device']
+            'delete' => ['inventory_product_id', 'eu_device']
         ];
         $method = [
             'update' => 'POST',
-            'destroy' => 'DELETE',
+            'delete' => 'DELETE',
         ];
         $button_name = [
             'update' => 'edit',
-            'destroy' => 'delete',
+            'delete' => 'delete',
         ];
         $icon = [
             'update' => "radix-icons:pencil-1",
-            'destroy' =>  "radix-icons:trash",
+            'delete' =>  "radix-icons:trash",
         ];
         $container = [
             'update' => 'modal',
-            'destroy' => 'modal',
+            'delete' => 'modal',
         ];
 
         return compact('prefix', 'payload', 'method', 'button_name', 'icon', 'container');
