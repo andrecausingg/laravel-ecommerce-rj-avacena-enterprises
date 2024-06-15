@@ -418,7 +418,7 @@ class InventoryController extends Controller
             ->exists();
         if ($exists) {
             return response()->json([
-                'message' => 'The combination of name and category already exists.',
+                'message' => 'The product name is already exist.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -642,7 +642,7 @@ class InventoryController extends Controller
             ->exists();
         if ($exists) {
             return response()->json([
-                'message' => 'The combination of name and category already exists.',
+                'message' => 'The product name is already exist.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
