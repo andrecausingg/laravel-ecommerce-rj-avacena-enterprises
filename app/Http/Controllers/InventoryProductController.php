@@ -901,7 +901,7 @@ class InventoryProductController extends Controller
             }
 
             // Delete the inventory record
-            if (!$inventory->delete()) {
+            if (!$inventory_product->delete()) {
                 DB::rollBack();
                 return response()->json(['message' => 'Failed to delete'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
