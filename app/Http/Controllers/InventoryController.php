@@ -303,12 +303,36 @@ class InventoryController extends Controller
                     $action['details'] = [];
                 }
 
-                // Populate details for each attribute
+                // Iterate through each attribute to populate details
                 foreach ($this->fillable_attr_inventory_children->arrDetailsProductShow() as $arrDetailsProductShow) {
+                    $label = '';
+                    $type = '';
+
+                    // Determine label and type based on attribute
+                    switch ($arrDetailsProductShow) {
+                        case 'name':
+                            $label = 'Product ' . $this->helper->transformColumnName($arrDetailsProductShow);
+                            $type = 'input';
+                            break;
+                        case 'is_refund':
+                            $label = 'Can be refunded?';
+                            $type = 'select';
+                            break;
+                        case 'image':
+                            $label = 'Image'; // Assuming you want a label for image
+                            $type = 'file';
+                            break;
+                        default:
+                            $label = $this->helper->transformColumnName($arrDetailsProductShow);
+                            $type = 'input';
+                            break;
+                    }
+
+                    // Populate details for the attribute
                     $action['details'][] = [
-                        'label' => $arrDetailsProductShow  == 'name' ? 'Product' . " " . $this->helper->transformColumnName($arrDetailsProductShow) : $this->helper->transformColumnName($arrDetailsProductShow),
-                        'value' => $inventory_product->$arrDetailsProductShow ?? null,
-                        'type' => 'input',
+                        'label' => $label,
+                        'value' => $inventory_product->{$arrDetailsProductShow} ?? null,
+                        'type' => $type,
                     ];
                 }
             }
