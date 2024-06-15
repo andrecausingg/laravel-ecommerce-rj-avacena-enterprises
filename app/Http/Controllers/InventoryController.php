@@ -145,15 +145,7 @@ class InventoryController extends Controller
             // ***************************** //
             // Add details on action crud
             foreach ($arr_inventory_item['action'] as &$action) {
-                // Check if 'details' key doesn't exist, then add it
-                if (!isset($action['inventory_id'])) {
-                    $action['inventory_id'] = [];
-                }
-
-                // Populate details for each attribute
-                foreach ($this->fillable_attr_inventorys->arrDetails() as $arrDetails) {
-                    $action['inventory_id'] =  $arr_parent_inventory_data['inventory_id'];
-                }
+                $action['inventory_id'] =  $arr_parent_inventory_data['inventory_id'];
             }
             // ***************************** //
 
@@ -319,6 +311,14 @@ class InventoryController extends Controller
                         'type' => 'input',
                     ];
                 }
+            }
+            // ***************************** //
+
+            // ***************************** //
+            // Add details on action crud
+            foreach ($arr_inventory_item['action'] as &$action) {
+                $action['inventory_product_id'] =  $arr_inventory_item['inventory_product_id'];
+                $action['inventory_id'] =  $arr_inventory_item['inventory_id'];
             }
             // ***************************** //
 

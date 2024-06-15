@@ -23,6 +23,7 @@ class InventoryProductModel extends Model
         'name',
         'category',
         'description',
+        'is_refund',
         'supplier_name',
         'design',
         'size',
@@ -52,6 +53,7 @@ class InventoryProductModel extends Model
             'image',
             'name',
             'description',
+            'is_refund',
             'supplier_name',
             'design',
             'size',
@@ -69,6 +71,7 @@ class InventoryProductModel extends Model
             'image',
             'name',
             'description',
+            'is_refund',
             'supplier_name',
             'design',
             'size',
@@ -122,6 +125,7 @@ class InventoryProductModel extends Model
                 'name',
                 'description',
                 'supplier_name',
+                'is_refund',
                 'design',
                 'size',
                 'color',
@@ -163,6 +167,7 @@ class InventoryProductModel extends Model
                 'image',
                 'name',
                 'description',
+                'is_refund',
                 'supplier_name',
                 'design',
                 'size',
@@ -180,7 +185,7 @@ class InventoryProductModel extends Model
         ];
 
         $button_name = [
-            'store' => 'create',
+            'store' => 'Add Product',
         ];
 
         $icon = [
@@ -209,6 +214,7 @@ class InventoryProductModel extends Model
             'name',
             'category',
             'description',
+            'is_refund',
             'supplier_name',
             'design',
             'size',
@@ -234,6 +240,7 @@ class InventoryProductModel extends Model
             // 'color',
             'retail_price',
             'discounted_price',
+            'is_refund',
             'unit_supplier_price',
             'stocks',
         ];
@@ -265,6 +272,7 @@ class InventoryProductModel extends Model
             'name',
             'retail_price',
             'discounted_price',
+            'is_refund',
             'sells',
             'stocks',
             'actions',
