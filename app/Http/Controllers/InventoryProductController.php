@@ -30,6 +30,7 @@ class InventoryProductController extends Controller
         $view_settings = $this->fillable_attr_inventory_children->getViewRowTable();
         $arr_inventory_item = [];
         $all_inventory_items = [];
+        $arr_filter = [];
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -49,6 +50,13 @@ class InventoryProductController extends Controller
                     $arr_inventory_item[$getFillableAttribute] = $this->helper->convertReadableTimeDate($inventory_product->$getFillableAttribute);
                 } else {
                     $arr_inventory_item[$getFillableAttribute] = $inventory_product->$getFillableAttribute;
+                }
+
+                // Get all category and put in filter
+                if ($getFillableAttribute == 'category') {
+                    if (!in_array($inventory_product->$getFillableAttribute, $arr_filter)) {
+                        $arr_filter[] = $inventory_product->$getFillableAttribute;
+                    }
                 }
             }
 
@@ -143,7 +151,7 @@ class InventoryProductController extends Controller
                 $relative_settings['icon'],
                 $relative_settings['container']
             ),
-            // 'filter' => $filter
+            'filter' => $arr_filter
         ];
 
         return response()->json(
