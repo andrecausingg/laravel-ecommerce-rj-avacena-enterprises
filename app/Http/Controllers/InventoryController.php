@@ -314,7 +314,7 @@ class InventoryController extends Controller
                             $label = 'Product ' . $this->helper->transformColumnName($arrDetailsProductShow);
                             $type = 'input';
                             break;
-                        case 'is_refund':
+                        case 'refundable':
                             $label = 'Refundable';
                             $type = 'select';
                             break;

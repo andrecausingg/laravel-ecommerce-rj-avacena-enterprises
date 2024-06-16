@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('name');
             $table->string('category')->nullable();
             $table->longText('description')->nullable();
-            $table->string('is_refund');
+            $table->string('refundable');
             $table->text('supplier_name')->nullable();
             $table->text('design')->nullable();
             $table->string('size')->nullable();

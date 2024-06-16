@@ -97,7 +97,7 @@ class InventoryProductController extends Controller
                             $label = 'Product ' . $this->helper->transformColumnName($arrDetailsProductShow);
                             $type = 'input';
                             break;
-                        case 'is_refund':
+                        case 'refundable':
                             $label = 'Can be refunded?';
                             $type = 'select';
                             break;
@@ -346,7 +346,7 @@ class InventoryProductController extends Controller
             'item_code' => 'required|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
-            'is_refund' => 'required|string|max:3',
+            'refundable' => 'required|string|max:3',
             'name' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
@@ -481,7 +481,7 @@ class InventoryProductController extends Controller
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
-            'items.*.is_refund' => 'required|string|max:3',
+            'items.*.refundable' => 'required|string|max:3',
             'items.*.name' => 'required|string|max:500',
             'items.*.category' => 'required|string|max:500',
             'items.*.retail_price' => 'required|numeric',
@@ -619,7 +619,7 @@ class InventoryProductController extends Controller
             'item_code' => 'required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
-            'is_refund' => 'required|string|max:3',
+            'refundable' => 'required|string|max:3',
             'name' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
             'discounted_price' => 'nullable|numeric',
@@ -646,7 +646,10 @@ class InventoryProductController extends Controller
         // Decrypted id
         $decrypted_inventory_product_id = Crypt::decrypt($request->input('inventory_product_id'));
 
-        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))->where('inventory_product_id', $decrypted_inventory_product_id)->first();
+        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))
+            ->where('inventory_product_id', '!=', $decrypted_inventory_product_id)
+            ->where('inventory_product_id', '!=', $decrypted_inventory_product_id)
+            ->first();
         if ($inventoryItemCode) {
             return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -748,7 +751,7 @@ class InventoryProductController extends Controller
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
-            'items.*.is_refund' => 'required|string|max:3',
+            'items.*.refundable' => 'required|string|max:3',
             'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
             'items.*.retail_price' => 'required|numeric',
             'items.*.discounted_price' => 'nullable|numeric',
