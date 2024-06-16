@@ -345,7 +345,7 @@ class InventoryProductController extends Controller
             'inventory_id' => 'required|string',
             'item_code' => 'required|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'description' => $request->has('description') ? 'string' : 'nullable',
+            'description' => 'nullable',
             'is_refund' => 'required|string|max:3',
             'name' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
@@ -480,7 +480,7 @@ class InventoryProductController extends Controller
             'items.*.inventory_id' => 'required|string',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'items.*.description' => $request->has('description') ? 'string' : 'nullable',
+            'items.*.description' => 'nullable',
             'items.*.is_refund' => 'required|string|max:3',
             'items.*.name' => 'required|string|max:500',
             'items.*.category' => 'required|string|max:500',
@@ -618,7 +618,7 @@ class InventoryProductController extends Controller
             'inventory_product_id' => 'required|string',
             'item_code' => 'required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'description' => $request->has('description') ? 'string' : 'nullable',
+            'description' => 'nullable',
             'is_refund' => 'required|string|max:3',
             'name' => 'required|string|max:500',
             'retail_price' => 'required|numeric',
@@ -643,7 +643,10 @@ class InventoryProductController extends Controller
             return $result_validate_eu_device;
         }
 
-        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))->first();
+        // Decrypted id
+        $decrypted_inventory_product_id = Crypt::decrypt($request->input('inventory_product_id'));
+
+        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'), 'inventory_product_id', $decrypted_inventory_product_id)->first();
         if ($inventoryItemCode) {
             return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -651,8 +654,7 @@ class InventoryProductController extends Controller
 
         DB::beginTransaction();
         try {
-            // Decrypted id
-            $decrypted_inventory_product_id = Crypt::decrypt($request->input('inventory_product_id'));
+
             // Check if inventory record exists
             $inventory = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
                 ->first();
@@ -745,7 +747,7 @@ class InventoryProductController extends Controller
             'items.*.inventory_id' => 'required|string',
             'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'items.*.description' => $request->has('description') ? 'string' : 'nullable',
+            'items.*.description' => 'nullable',
             'items.*.is_refund' => 'required|string|max:3',
             'items.*.name' => 'required|string|max:500|unique:inventory_product_tbl,name',
             'items.*.retail_price' => 'required|numeric',
