@@ -371,6 +371,10 @@ class InventoryProductController extends Controller
             return $result_validate_eu_device;
         }
 
+        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))->first();
+        if ($inventoryItemCode) {
+            return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         DB::beginTransaction();
         try {
@@ -509,6 +513,11 @@ class InventoryProductController extends Controller
         DB::beginTransaction();
         try {
             foreach ($request['items'] as $user_input) {
+                $inventoryItemCode = InventoryProductModel::where('item_code', $user_input['eu_device'])->first();
+                if ($inventoryItemCode) {
+                    return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+
                 $decrypted_inventory_id = Crypt::decrypt($user_input['inventory_id']);
 
                 // Validate eu_device
@@ -607,7 +616,7 @@ class InventoryProductController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'inventory_product_id' => 'required|string',
-            'item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
+            'item_code' => 'required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable',
             'is_refund' => 'required|string|max:3',
@@ -634,6 +643,10 @@ class InventoryProductController extends Controller
             return $result_validate_eu_device;
         }
 
+        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))->first();
+        if ($inventoryItemCode) {
+            return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
 
         DB::beginTransaction();
@@ -730,7 +743,7 @@ class InventoryProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'items.*.inventory_id' => 'required|string',
-            'items.*.item_code' => 'required|string|max:255|unique:inventory_product_tbl,item_code',
+            'items.*.item_code' => 'required|string|max:255',
             'items.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'items.*.description' => 'nullable',
             'items.*.is_refund' => 'required|string|max:3',
@@ -764,6 +777,11 @@ class InventoryProductController extends Controller
 
         try {
             foreach ($request['items'] as $user_input) {
+                $inventoryItemCode = InventoryProductModel::where('item_code', $user_input['eu_device'])->first();
+                if ($inventoryItemCode) {
+                    return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+
                 // Decrypted id
                 $decrypted_inventory_product_id = Crypt::decrypt($user_input['inventory_product_id']);
 

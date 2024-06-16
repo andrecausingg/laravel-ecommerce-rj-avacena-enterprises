@@ -315,7 +315,7 @@ class InventoryController extends Controller
                             $type = 'input';
                             break;
                         case 'is_refund':
-                            $label = 'Can be refunded';
+                            $label = 'Refundable';
                             $type = 'select';
                             break;
                         case 'image':
