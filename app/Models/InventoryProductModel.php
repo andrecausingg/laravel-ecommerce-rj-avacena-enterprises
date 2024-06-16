@@ -70,7 +70,7 @@ class InventoryProductModel extends Model
             'item_code',
             'image',
             'name',
-            'description',
+            // 'description',
             'is_refund',
             'supplier_name',
             'design',
