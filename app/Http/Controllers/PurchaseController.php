@@ -1173,55 +1173,65 @@ class PurchaseController extends Controller
             }
         }
 
-        // Add payment information
-        $arr_purchase_customer = [];
+        // Prepare an array to hold each customer's data as objects
+        $formatted_data = [];
+
+        // Add payment information and format as objects
         foreach ($grouped_purchases as $user_id_customer => $items) {
-            $arr_purchase_customer[$user_id_customer]['payment'] = PaymentModel::where('purchase_group_id', $items[0]['purchase_group_id'])
+            $customer_data = new \stdClass(); // Create a new stdClass object for each customer
+            $customer_data->customer_id = $user_id_customer;
+            $customer_data->payment = PaymentModel::where('purchase_group_id', $items[0]['purchase_group_id'])
                 ->where('user_id', $user_id_customer)
                 ->get()
                 ->toArray();
-            $arr_purchase_customer[$user_id_customer]['items'] = $items;
-        }
 
-        // Encrypt purchase IDs
-        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
-            foreach ($customer_data['items'] as &$item) {
-                // Encrypt each purchase ID in arr_purchase_id
-                $encrypted_purchase_ids = [];
-                foreach ($item['arr_purchase_id'] as $purchase_id) {
-                    $encrypted_purchase_ids[] = Crypt::encrypt($purchase_id);
-                }
-                $item['arr_purchase_id'] = $encrypted_purchase_ids;
-            }
-        }
-
-        // Encrypt payment information
-        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
-            foreach ($customer_data['payment'] as &$payment_info) {
+            // Encrypt payment information
+            foreach ($customer_data->payment as &$payment_info) {
                 $payment_info['payment_id'] = Crypt::encrypt($payment_info['payment_id']);
                 $payment_info['user_id'] = Crypt::encrypt($payment_info['user_id']);
                 $payment_info['purchase_group_id'] = Crypt::encrypt($payment_info['purchase_group_id']);
                 $payment_info['voucher_id'] = Crypt::encrypt($payment_info['voucher_id']);
                 unset($payment_info['id']);
             }
-        }
 
-        // Encrypt purchase items information
-        foreach ($arr_purchase_customer as $user_id_customer => &$customer_data) {
-            foreach ($customer_data['items'] as &$item) {
-                $item['purchase_id'] = Crypt::encrypt($item['purchase_id']);
-                $item['purchase_group_id'] = Crypt::encrypt($item['purchase_group_id']);
-                $item['user_id_customer'] = Crypt::encrypt($item['user_id_customer']);
-                $item['inventory_id'] = Crypt::encrypt($item['inventory_id']);
-                $item['inventory_product_id'] = Crypt::encrypt($item['inventory_product_id']);
+            $customer_data->items = [];
+
+            // Add items and format each as an object
+            foreach ($items as $item) {
+                $formatted_item = new \stdClass();
+                $formatted_item->purchase_id = Crypt::encrypt($item['purchase_id']);
+                $formatted_item->purchase_group_id = Crypt::encrypt($item['purchase_group_id']);
+                $formatted_item->user_id_customer = Crypt::encrypt($item['user_id_customer']);
+                $formatted_item->inventory_id = Crypt::encrypt($item['inventory_id']);
+                $formatted_item->inventory_product_id = Crypt::encrypt($item['inventory_product_id']);
+                $formatted_item->item_code = $item['item_code'];
+                $formatted_item->name = $item['name'];
+                $formatted_item->category = $item['category'];
+                $formatted_item->design = $item['design'];
+                $formatted_item->size = $item['size'];
+                $formatted_item->color = $item['color'];
+                $formatted_item->retail_price = $item['retail_price'];
+                $formatted_item->discounted_price = $item['discounted_price'];
+                $formatted_item->count = $item['count'];
+                $formatted_item->total_price = $item['total_price'];
+
+                // Encrypt arr_purchase_id
+                $encrypted_purchase_ids = [];
+                foreach ($item['arr_purchase_id'] as $purchase_id) {
+                    $encrypted_purchase_ids[] = Crypt::encrypt($purchase_id);
+                }
+                $formatted_item->arr_purchase_id = $encrypted_purchase_ids;
+
+                $customer_data->items[] = $formatted_item;
             }
-        }
 
+            $formatted_data[] = $customer_data;
+        }
 
         // Prepare response
         $response_data = [
             'message' => 'Data retrieved successfully',
-            'data' => [$arr_purchase_customer],
+            'data' => $formatted_data,
         ];
 
         return response()->json($response_data, Response::HTTP_OK);
