@@ -151,7 +151,7 @@ class InventoryProductController extends Controller
                 $relative_settings['icon'],
                 $relative_settings['container']
             ),
-            'filter' => $arr_filter
+            'filter_category' => $arr_filter
         ];
 
         return response()->json(
