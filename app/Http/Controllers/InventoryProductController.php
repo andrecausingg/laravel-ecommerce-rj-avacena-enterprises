@@ -646,7 +646,7 @@ class InventoryProductController extends Controller
         // Decrypted id
         $decrypted_inventory_product_id = Crypt::decrypt($request->input('inventory_product_id'));
 
-        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'), 'inventory_product_id', $decrypted_inventory_product_id)->first();
+        $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))->where('inventory_product_id', $decrypted_inventory_product_id)->first();
         if ($inventoryItemCode) {
             return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
