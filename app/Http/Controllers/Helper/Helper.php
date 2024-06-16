@@ -498,7 +498,7 @@ class Helper
 
         foreach ($arr_update_fields as $arr_update_field) {
             $existing_value = $model->$arr_update_field ?? null;
-            $new_value = $user_input_data[$arr_update_field] ?? null;
+            $new_value = isset($user_input_data[$arr_update_field]) ? $user_input_data[$arr_update_field] : null;
 
             if ($arr_update_field != 'image') {
                 // Check if the value has changed
