@@ -1221,7 +1221,7 @@ class PurchaseController extends Controller
         // Prepare response
         $response_data = [
             'message' => 'Data retrieved successfully',
-            'data' => $arr_purchase_customer,
+            'data' => [$arr_purchase_customer],
         ];
 
         return response()->json($response_data, Response::HTTP_OK);
