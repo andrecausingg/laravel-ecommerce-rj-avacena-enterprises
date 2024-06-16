@@ -84,7 +84,7 @@ class AuthController extends Controller
                 'title' => 'Menu',
                 'path' => '/menu',
                 'icon' => 'heroicons-outline:view-grid',
-                'path_key' => 'inventory/parent/index'
+                'path_key' => 'inventory/product/index'
             ],
             [
                 'title' => 'Dashboard',

@@ -53,7 +53,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     // Register
     Route::prefix('signup')->group(function () use ($AuthController) {
         Route::post('verify-email', [$AuthController, 'verifyEmail']);
-        Route::post('resend-code', [$AuthController, 'resendVerificationAuth']);
+        Route::post('resend-code', [$AuthController, 'resendVerificationAuth'])->middleware('countdown.limiter');
     });
 
     // Update Password
