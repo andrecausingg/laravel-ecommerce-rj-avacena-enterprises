@@ -648,8 +648,7 @@ class InventoryProductController extends Controller
 
         $inventoryItemCode = InventoryProductModel::where('item_code', $request->input('item_code'))
             ->where('inventory_product_id', '!=', $decrypted_inventory_product_id)
-            ->where('inventory_product_id', '!=', $decrypted_inventory_product_id)
-            ->first();
+            ->exists();
         if ($inventoryItemCode) {
             return response()->json(['message' => "This item code is already used by another product."], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
