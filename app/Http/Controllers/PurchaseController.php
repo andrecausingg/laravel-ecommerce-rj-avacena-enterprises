@@ -1180,6 +1180,9 @@ class PurchaseController extends Controller
         foreach ($grouped_purchases as $user_id_customer => $items) {
             $customer_data = new \stdClass(); // Create a new stdClass object for each customer
             $customer_data->customer_id = $user_id_customer;
+            $customer_data->purchase_group_id = Crypt::encrypt($items[0]['purchase_group_id']); // Add purchase_group_id
+            $customer_data->user_id_customer = Crypt::encrypt($user_id_customer); // Add user_id_customer
+            $customer_data->total_orders = count($items); // Calculate total_orders as the number of unique items
             $customer_data->payment = PaymentModel::where('purchase_group_id', $items[0]['purchase_group_id'])
                 ->where('user_id', $user_id_customer)
                 ->get()
@@ -1236,6 +1239,8 @@ class PurchaseController extends Controller
 
         return response()->json($response_data, Response::HTTP_OK);
     }
+
+
 
     // CHILD store
     private function generateGroupPurchaseId()
