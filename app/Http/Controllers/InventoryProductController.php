@@ -60,6 +60,16 @@ class InventoryProductController extends Controller
                 }
             }
 
+            // Count how many items have been sold
+            $sold_count = PurchaseModel::where('inventory_id', $inventory_product->inventory_id)
+                ->where('inventory_product_id', $inventory_product->inventory_product_id)
+                ->where('status', 'DONE')
+                ->count();
+
+            // Assign the sold count to the inventory item array
+            $arr_inventory_item['sold'] = $sold_count;
+
+
             // ***************************** //
             // Format Api
             $crud_action = $this->helper->formatApi(
