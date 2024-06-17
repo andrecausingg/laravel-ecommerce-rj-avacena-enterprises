@@ -16,12 +16,13 @@ class PurchaseModel extends Model
         'purchase_group_id',
 
         'user_id_customer',
-        'user_id_ecom',
         'user_id_menu',
 
         'inventory_product_id',
         'inventory_id',
         'item_code',
+
+        'customer_name',
 
         'image',
         'name',
@@ -91,6 +92,8 @@ class PurchaseModel extends Model
             'inventory_product_id',
             'inventory_id',
             'item_code',
+
+            'customer_name',
 
             'image',
             'name',
@@ -195,5 +198,12 @@ class PurchaseModel extends Model
         $prefix = 'purchase/';
 
         return compact('prefix', 'api_with_payloads', 'method', 'button_names', 'icons', 'actions');
+    }
+
+    public function arrUpdateCustomerName(): array
+    {
+        return [
+            'customer_name'
+        ];
     }
 }

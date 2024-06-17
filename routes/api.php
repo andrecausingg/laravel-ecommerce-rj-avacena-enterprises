@@ -132,6 +132,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         Route::post('add-qty', [$PurchaseController, 'addQty']);
         Route::delete('delete-all-qty', [$PurchaseController, 'deleteQtyAll']);
         Route::post('update-qty', [$PurchaseController, 'updateQty']);
+        Route::post('update-name', [$PurchaseController, 'updateCustomerName']);
     });
 
     // Payment

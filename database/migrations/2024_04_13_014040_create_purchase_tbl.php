@@ -28,6 +28,9 @@ return new class extends Migration
             $table->text('inventory_product_id');
             $table->string('item_code');
 
+            // Customer Name
+            $table->text('customer_name')->nullable(); 
+            
             // Name 
             $table->longText('image')->nullable();
             $table->text('name');

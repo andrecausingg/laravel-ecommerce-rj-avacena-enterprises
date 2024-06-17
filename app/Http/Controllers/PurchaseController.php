@@ -426,7 +426,7 @@ class PurchaseController extends Controller
             }
 
             $update_stock = $inventory_product->update([
-                'stocks' => max(0, $inventory_product->stocks + 1),
+                'stocks' => $inventory_product->stocks + 1,
             ]);
 
             if (!$update_stock) {
@@ -560,16 +560,17 @@ class PurchaseController extends Controller
             $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
                 ->where('inventory_id', $decrypted_inventory_id)
                 ->first();
+
             if (!$inventory_product) {
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
             }
 
-            if ($inventory_product->stock == 0) {
+            if ($inventory_product->stocks == 0) {
                 return response()->json(['message' => 'Failed to increment out of stocks'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             $update_stock = $inventory_product->update([
-                'stocks' => max(0, $inventory_product->stock - 1),
+                'stocks' => $inventory_product->stocks - 1,
             ]);
 
             if (!$update_stock) {
@@ -672,7 +673,7 @@ class PurchaseController extends Controller
             return response()->json(
                 [
                     'message' => 'Success add on item',
-                    'parameter' => $purchase
+                    // 'parameter' => $purchase
                 ],
                 Response::HTTP_OK
             );
@@ -860,6 +861,17 @@ class PurchaseController extends Controller
             $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
             $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
             $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
+            $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
+                ->where('inventory_id', $decrypted_inventory_id)
+                ->first();
+            if (!$inventory_product) {
+                return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            if ($inventory_product->stock < $request->quantity) {
+                return response()->json(['message' => 'Failed to increment out of stocks'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
             $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
                 ->where('purchase_group_id', $decrypted_purchase_group_id)
@@ -1178,10 +1190,13 @@ class PurchaseController extends Controller
         // Prepare an array to hold each customer's data as objects
         $formatted_data = [];
 
+        dd($grouped_purchases);
+
         // Add payment information and format as objects
         foreach ($grouped_purchases as $user_id_customer => $items) {
             $customer_data = new \stdClass(); // Create a new stdClass object for each customer
             $customer_data->customer_id = $user_id_customer;
+            // $customer_data->customer_name = $items[0]['customer_name'];
             $customer_data->purchase_group_id = Crypt::encrypt($items[0]['purchase_group_id']); // Add purchase_group_id
             $customer_data->user_id_customer = Crypt::encrypt($user_id_customer); // Add user_id_customer
             $customer_data->total_orders = count($items); // Calculate total_orders as the number of unique items
@@ -1242,7 +1257,107 @@ class PurchaseController extends Controller
         return response()->json($response_data, Response::HTTP_OK);
     }
 
+    public function updateCustomerName(Request $request)
+    {
+        // Authorize the user
+        $user = $this->helper->authorizeUser($request);
+        if (empty($user->user_id)) {
+            DB::rollBack();
+            return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+        }
 
+        // Validation rules for each item in the array
+        $validator = Validator::make($request->all(), [
+            'purchase_group_id' => 'required|string',
+            'user_id_customer' => 'required|string',
+            'customer_name' => 'required|string',
+            'eu_device' => 'required|string',
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Start the transaction
+        DB::beginTransaction();
+
+        try {
+            $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
+            $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
+
+            $purchases = PurchaseModel::where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('user_id_customer', $decrypted_user_id_customer)
+                ->get();
+
+            if (!$purchases) {
+                return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            foreach ($purchases as $purchase) {
+                // Get the changes of the fields
+                $result_changes_item_for_logs = $this->helper->updateLogsOldNew($purchase, $this->fillable_attr_purchase->arrUpdateCustomerName(), $request->all(), '');
+                $changes_for_logs[] = [
+                    'purchase_id' => $purchase->purchase_id,
+                    'purchase_group_id' => $decrypted_purchase_group_id,
+                    'user_id_customer' => $decrypted_user_id_customer,
+                    'fields' => $result_changes_item_for_logs,
+                ];
+
+                // Check if there's Changes Logs
+                $result_changes_logs = $this->helper->checkIfTheresChangesLogs($changes_for_logs);
+                if ($result_changes_logs) {
+                    DB::rollBack();
+                    return $result_changes_logs;
+                }
+
+                // Update Multiple Data
+                $result_update_multi_data = $this->helper->arrUpdateMultipleData($purchase, $this->fillable_attr_purchase->arrUpdateCustomerName(), $request->all(), '');
+                if ($result_update_multi_data) {
+                    DB::rollBack();
+                    return $result_update_multi_data;
+                }
+
+                if (!$purchase) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to update'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                $arr_log_details['fields'] = $changes_for_logs;
+            }
+
+
+            // Arr Data Logs
+            $arr_data_logs = [
+                'user_device' => $request->eu_device,
+                'user_id' => $user->user_id,
+                'is_sensitive' => 0,
+                'is_history' => 0,
+                'log_details' => $arr_log_details,
+                'user_action' =>  'UPDATE CUSTOMER NAME',
+            ];
+
+            // Logs
+            $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
+
+            // Commit the transaction
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Success update customer name',
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Rollback the transaction in case of any error
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 
     // CHILD store
     private function generateGroupPurchaseId()
@@ -1356,7 +1471,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
 
     // CHILD deleteALl
     private function totalAmountPaymentDeleteAll($purchase_group_id, $customer_id)
