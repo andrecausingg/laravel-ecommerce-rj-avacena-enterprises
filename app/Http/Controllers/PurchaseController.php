@@ -78,7 +78,7 @@ class PurchaseController extends Controller
             }
 
             if ($inventory_product->stocks < $request->quantity) {
-                return response()->json(['message' => 'Sorry, can\'t add due to insufficient stock', 'stocks' => $inventory_product->stock], Response::HTTP_UNPROCESSABLE_ENTITY);
+                return response()->json(['message' => 'Sorry, can\'t add due to insufficient stock', 'stocks' => $inventory_product->stocks], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             // Add New Item on purchase_group_id
@@ -869,7 +869,7 @@ class PurchaseController extends Controller
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
             }
 
-            if ($inventory_product->stock < $request->quantity) {
+            if ($inventory_product->stocks < $request->quantity) {
                 return response()->json(['message' => 'Failed to increment out of stocks'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
