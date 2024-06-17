@@ -390,6 +390,7 @@ class PurchaseController extends Controller
             'inventory_product_id' => 'required|string',
             'user_id_customer' => 'required|string',
             'eu_device' => 'required|string',
+            'quantity' => 'required|numeric|min:1',
         ]);
 
         // Check if validation fails
@@ -515,6 +516,9 @@ class PurchaseController extends Controller
 
     public function addQty(Request $request)
     {
+        $arr_add_purchase = [];
+        $ctr = 0;
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -528,6 +532,7 @@ class PurchaseController extends Controller
             'inventory_id' => 'required|string',
             'inventory_product_id' => 'required|string',
             'user_id_customer' => 'required|string',
+            'quantity' => 'required|numeric|min:1',
             'eu_device' => 'required|string',
         ]);
 
@@ -557,6 +562,7 @@ class PurchaseController extends Controller
             $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
             $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
 
+
             $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
                 ->where('inventory_id', $decrypted_inventory_id)
                 ->first();
@@ -565,90 +571,95 @@ class PurchaseController extends Controller
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
             }
 
-            if ($inventory_product->stocks == 0) {
+            if ($inventory_product->stocks < $request->quantity) {
                 return response()->json(['message' => 'Failed to increment out of stocks'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
-            $update_stock = $inventory_product->update([
-                'stocks' => $inventory_product->stocks - 1,
-            ]);
-
-            if (!$update_stock) {
-                DB::rollBack();
-                return response()->json(
-                    [
-                        'message' => 'Failed to update stock. Please try again later.',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            }
-
-            $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
-                ->where('purchase_group_id', $decrypted_purchase_group_id)
-                ->where('inventory_id', $decrypted_inventory_id)
-                ->where('inventory_product_id', $decrypted_inventory_product_id)
-                ->where('user_id_customer', $decrypted_user_id_customer)
-                ->where('user_id_menu', $user->user_id)
-                ->first();
-
-            if (!$purchase) {
-                DB::rollBack();
-                return response()->json(
-                    [
-                        'message' => 'No data found',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            }
-
-            $arr_store = [];
-            foreach ($this->fillable_attr_purchase->arrAddQtyPurchases() as $arrAddQtyPurchases) {
-                $arr_store[$arrAddQtyPurchases] = $purchase->$arrAddQtyPurchases;
-            }
-
-            // Create a new purchase using the attributes of $purchase
-            $created = PurchaseModel::create($arr_store);
-            if (!$created) {
-                DB::rollBack();
-                return response()->json(
-                    [
-                        'message' => 'Failed to store purchase',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            }
-
-            // Update the purchase_id with the correct format
-            $update_purchase_id = $created->update([
-                'purchase_id' => 'purchase_id-' . $created->id,
-            ]);
-            if (!$update_purchase_id) {
-                DB::rollBack();
-                return response()->json(
-                    ['message' => 'Failed to update purchase ID'],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            }
-
-            $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
-            $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
-                ->where('purchase_group_id', $decrypted_purchase_group_id)
-                ->first()
-                ->update([
-                    'total_amount' => $total_amount_payment['total_amount'],
-                    'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
+            while ($ctr < $request->quantity) {
+                $update_stock = $inventory_product->update([
+                    'stocks' => $inventory_product->stocks - 1,
                 ]);
 
-            // Check if payment record exists
-            if (!$update_payment) {
-                DB::rollBack();
-                return response()->json(
-                    ['message' => 'Failed to update total amount'],
-                    Response::HTTP_NOT_FOUND
-                );
+                if (!$update_stock) {
+                    DB::rollBack();
+                    return response()->json(
+                        [
+                            'message' => 'Failed to update stock. Please try again later.',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+
+                $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
+                    ->where('purchase_group_id', $decrypted_purchase_group_id)
+                    ->where('inventory_id', $decrypted_inventory_id)
+                    ->where('inventory_product_id', $decrypted_inventory_product_id)
+                    ->where('user_id_customer', $decrypted_user_id_customer)
+                    ->where('user_id_menu', $user->user_id)
+                    ->first();
+
+                if (!$purchase) {
+                    DB::rollBack();
+                    return response()->json(
+                        [
+                            'message' => 'No data found',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+
+                $arr_store = [];
+                foreach ($this->fillable_attr_purchase->arrAddQtyPurchases() as $arrAddQtyPurchases) {
+                    $arr_store[$arrAddQtyPurchases] = $purchase->$arrAddQtyPurchases;
+                }
+
+                // Create a new purchase using the attributes of $purchase
+                $created = PurchaseModel::create($arr_store);
+                if (!$created) {
+                    DB::rollBack();
+                    return response()->json(
+                        [
+                            'message' => 'Failed to store purchase',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+
+                // Update the purchase_id with the correct format
+                $update_purchase_id = $created->update([
+                    'purchase_id' => 'purchase_id-' . $created->id,
+                ]);
+                if (!$update_purchase_id) {
+                    DB::rollBack();
+                    return response()->json(
+                        ['message' => 'Failed to update purchase ID'],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
+
+                $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
+                $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
+                    ->where('purchase_group_id', $decrypted_purchase_group_id)
+                    ->first()
+                    ->update([
+                        'total_amount' => $total_amount_payment['total_amount'],
+                        'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
+                    ]);
+
+                // Check if payment record exists
+                if (!$update_payment) {
+                    DB::rollBack();
+                    return response()->json(
+                        ['message' => 'Failed to update total amount'],
+                        Response::HTTP_NOT_FOUND
+                    );
+                }
+
+                $arr_add_purchase[] = $purchase;
+                $ctr++;
             }
 
-            $arr_log_details['fields'] = $purchase;
+            $arr_log_details['fields'] = $arr_add_purchase;
 
             // Arr Data Logs
             $arr_data_logs = [
@@ -1005,7 +1016,7 @@ class PurchaseController extends Controller
                     }
 
                     $inventory_product->update([
-                        'stocks' => max(0, $inventory_product->stocks + count($arr_all_purchase)),
+                        'stocks' =>  $inventory_product->stocks + count($arr_all_purchase),
                     ]);
 
                     $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchase_data->purchase_group_id, $purchase_data->user_id_customer);
