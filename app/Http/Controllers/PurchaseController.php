@@ -376,6 +376,8 @@ class PurchaseController extends Controller
 
     public function minusQty(Request $request)
     {
+        $arr_minus_purchase = [];
+
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
         if (empty($user->user_id)) {
@@ -384,7 +386,6 @@ class PurchaseController extends Controller
 
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
-            'purchase_id' => 'required|string',
             'purchase_group_id' => 'required|string',
             'inventory_id' => 'required|string',
             'inventory_product_id' => 'required|string',
@@ -409,7 +410,6 @@ class PurchaseController extends Controller
             return $result_validate_eu_device;
         }
 
-        $decrypted_purchase_id = Crypt::decrypt($request->purchase_id);
         $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
         $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
         $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
@@ -419,6 +419,24 @@ class PurchaseController extends Controller
         DB::beginTransaction();
 
         try {
+            $purchases = PurchaseModel::where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('user_id_customer', $decrypted_user_id_customer)
+                ->where('user_id_menu', $user->user_id)
+                ->where('inventory_id', $decrypted_inventory_id)
+                ->where('inventory_product_id', $decrypted_inventory_product_id)
+                ->get();
+
+            $purchases_count = PurchaseModel::where('purchase_group_id', $decrypted_purchase_group_id)
+                ->where('user_id_customer', $decrypted_user_id_customer)
+                ->where('user_id_menu', $user->user_id)
+                ->where('inventory_id', $decrypted_inventory_id)
+                ->where('inventory_product_id', $decrypted_inventory_product_id)
+                ->count();
+
+            if ($purchases_count < $request->quantity) {
+                return response()->json(['message' => 'Failed to decrement purchase. The quantity is greater than the purchased quantity.'], Response::HTTP_NOT_FOUND);
+            }
+
             $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
                 ->where('inventory_id', $decrypted_inventory_id)
                 ->first();
@@ -427,7 +445,7 @@ class PurchaseController extends Controller
             }
 
             $update_stock = $inventory_product->update([
-                'stocks' => $inventory_product->stocks + 1,
+                'stocks' => $inventory_product->stocks + $request->quantity,
             ]);
 
             if (!$update_stock) {
@@ -440,25 +458,24 @@ class PurchaseController extends Controller
                 );
             }
 
-            $purchase = PurchaseModel::where('purchase_id', $decrypted_purchase_id)
-                ->where('purchase_group_id', $decrypted_purchase_group_id)
-                ->where('inventory_id', $decrypted_inventory_id)
-                ->where('inventory_product_id', $decrypted_inventory_product_id)
-                ->where('user_id_customer', $decrypted_user_id_customer)
-                ->where('user_id_menu', $user->user_id)
-                ->first();
+            foreach ($purchases as $purchase) {
+                if (!$purchase) {
+                    DB::rollBack();
+                    return response()->json(
+                        [
+                            'message' => 'No data found',
+                        ],
+                        Response::HTTP_INTERNAL_SERVER_ERROR
+                    );
+                }
 
-            if (!$purchase) {
-                DB::rollBack();
-                return response()->json(
-                    [
-                        'message' => 'No data found',
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+                if (!$purchase->delete()) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Failed to delete item.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                $arr_minus_purchase[] = $purchase;
             }
-
-            $purchase->delete();
 
             $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
             $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
@@ -478,7 +495,7 @@ class PurchaseController extends Controller
                 );
             }
 
-            $arr_log_details['fields'] = $purchase;
+            $arr_log_details['fields'] = $arr_minus_purchase;
 
             // Arr Data Logs
             $arr_data_logs = [
@@ -503,7 +520,7 @@ class PurchaseController extends Controller
             return response()->json(
                 [
                     'message' => 'Success minus on item',
-                    'parameter' => $purchase
+                    'parameter' => $arr_minus_purchase // Ensure it returns the expected purchase array
                 ],
                 Response::HTTP_OK
             );
@@ -513,6 +530,7 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
 
     public function addQty(Request $request)
     {
@@ -561,7 +579,6 @@ class PurchaseController extends Controller
             $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
             $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
             $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
-
 
             $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
                 ->where('inventory_id', $decrypted_inventory_id)
@@ -1420,15 +1437,10 @@ class PurchaseController extends Controller
         $total_discounted_amount = 0.00;
         $arr_to_data = [];
 
-        // Retrieve all purchases with the given purchase group ID
+        // Retrieve all purchases with the given purchase group ID  
         $purchases = PurchaseModel::where('purchase_group_id', $purchase_group_id)
             ->where('user_id_customer', $customer_id)
             ->get();
-
-        if ($purchases->isEmpty()) {
-            // No purchases found for the given purchase group ID
-            return response()->json(['message' => 'No purchases found for the given purchase group ID'], Response::HTTP_NOT_FOUND);
-        }
 
         foreach ($purchases as $purchase) {
             $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase->inventory_product_id)
@@ -1447,6 +1459,7 @@ class PurchaseController extends Controller
 
         $arr_to_data['total_amount'] = $total_amount;
         $arr_to_data['total_discounted_amount'] = $total_discounted_amount;
+
         // Return the total amount
         return $arr_to_data;
     }
