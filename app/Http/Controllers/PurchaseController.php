@@ -1102,6 +1102,7 @@ class PurchaseController extends Controller
                         $grouped_purchase['purchase_group_id'] === $purchase->purchase_group_id &&
                         $grouped_purchase['inventory_id'] === $purchase->inventory_id &&
                         $grouped_purchase['inventory_product_id'] === $purchase->inventory_product_id &&
+                        $grouped_purchase['customer_name'] === $purchase->customer_name &&
                         $grouped_purchase['item_code'] === $purchase->item_code &&
                         $grouped_purchase['name'] === $purchase->name &&
                         $grouped_purchase['category'] === $purchase->category &&
@@ -1150,6 +1151,7 @@ class PurchaseController extends Controller
                         'user_id_customer' => $purchase->user_id_customer,
                         'inventory_id' => $purchase->inventory_id,
                         'inventory_product_id' => $purchase->inventory_product_id,
+                        'customer_name' => $purchase->customer_name,
                         'item_code' => $purchase->item_code,
                         'name' => $purchase->name,
                         'category' => $purchase->category,
@@ -1172,6 +1174,7 @@ class PurchaseController extends Controller
                     'user_id_customer' => $purchase->user_id_customer,
                     'inventory_id' => $purchase->inventory_id,
                     'inventory_product_id' => $purchase->inventory_product_id,
+                    'customer_name' => $purchase->customer_name,
                     'item_code' => $purchase->item_code,
                     'name' => $purchase->name,
                     'category' => $purchase->category,
@@ -1190,13 +1193,11 @@ class PurchaseController extends Controller
         // Prepare an array to hold each customer's data as objects
         $formatted_data = [];
 
-        dd($grouped_purchases);
-
         // Add payment information and format as objects
         foreach ($grouped_purchases as $user_id_customer => $items) {
             $customer_data = new \stdClass(); // Create a new stdClass object for each customer
             $customer_data->customer_id = $user_id_customer;
-            // $customer_data->customer_name = $items[0]['customer_name'];
+            $customer_data->customer_name = $items[0]['customer_name'];
             $customer_data->purchase_group_id = Crypt::encrypt($items[0]['purchase_group_id']); // Add purchase_group_id
             $customer_data->user_id_customer = Crypt::encrypt($user_id_customer); // Add user_id_customer
             $customer_data->total_orders = count($items); // Calculate total_orders as the number of unique items
@@ -1234,6 +1235,10 @@ class PurchaseController extends Controller
                 $formatted_item->discounted_price = $item['discounted_price'];
                 $formatted_item->count = $item['count'];
                 $formatted_item->total_price = $item['total_price'];
+                $formatted_item->stocks = InventoryProductModel::where('inventory_product_id', $item['inventory_product_id'])
+                    ->first()
+                    ->stocks;
+
 
                 // Encrypt arr_purchase_id
                 $encrypted_purchase_ids = [];

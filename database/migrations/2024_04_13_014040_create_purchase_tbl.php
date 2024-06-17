@@ -26,11 +26,12 @@ return new class extends Migration
             // Inventory I.Ds
             $table->text('inventory_id');
             $table->text('inventory_product_id');
-            $table->string('item_code');
 
             // Customer Name
-            $table->text('customer_name')->nullable(); 
+            $table->text('customer_name')->nullable();
             
+            $table->string('item_code');
+
             // Name 
             $table->longText('image')->nullable();
             $table->text('name');
