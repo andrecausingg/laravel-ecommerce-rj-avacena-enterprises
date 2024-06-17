@@ -422,7 +422,6 @@ class PurchaseController extends Controller
                 ->where('inventory_id', $decrypted_inventory_id)
                 ->first();
             if (!$inventory_product) {
-                DB::rollBack();
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
             }
 
@@ -562,8 +561,11 @@ class PurchaseController extends Controller
                 ->where('inventory_id', $decrypted_inventory_id)
                 ->first();
             if (!$inventory_product) {
-                DB::rollBack();
                 return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            if ($inventory_product->stock == 0) {
+                return response()->json(['message' => 'Failed to increment out of stocks'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             $update_stock = $inventory_product->update([
