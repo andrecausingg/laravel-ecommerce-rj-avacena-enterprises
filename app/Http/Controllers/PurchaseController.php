@@ -539,7 +539,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     public function addQty(Request $request)
     {
         $arr_add_purchase = [];
@@ -854,7 +853,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     public function updateQty(Request $request)
     {
         $user_action = '';
@@ -1106,7 +1104,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     public function getUserIdMenuCustomer(Request $request)
     {
         // Initialize array to store purchase information
@@ -1122,7 +1119,9 @@ class PurchaseController extends Controller
         // Fetch purchases
         $purchases = PurchaseModel::where('user_id_menu', $user->user_id)
             ->where('status', 'NOT PAID')
+            ->orderBy('created_at', 'asc') // Add this line to sort by 'created_at' in ascending order
             ->get();
+
 
         // Loop through purchases 
         foreach ($purchases as $purchase) {
