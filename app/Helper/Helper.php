@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Helper;
+namespace App\Helper;
 
 use App\Models\AuthModel;
 use App\Models\LogsModel;
@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
-
+use Faker\Factory as Faker;
 
 
 class Helper
@@ -412,12 +412,12 @@ class Helper
     }
 
     // Add column and data to store or update 
-    public function addColumnAndValue($arr_result_data, $arr_field_appends,  $model)
+    public function addColumnAndValue($arr_result_data, $arr_field_appends, $model)
     {
 
         if (!is_array($arr_result_data)) {
             return 'Result data is not an array';
-        } else  if (!is_array($arr_field_appends)) {
+        } else if (!is_array($arr_field_appends)) {
             return 'Field to append is not an array';
         }
 
@@ -430,7 +430,7 @@ class Helper
 
 
     // Store Multiple Data
-    public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '')
+    public function arrStoreMultipleData($arr_store_fields, $user_input_data, $file_name = '', $arr_fields_make_lowercase = [])
     {
         $arr_attributes_store = [];
         $arr_encrypted_ids = ['inventory_id'];
@@ -440,17 +440,26 @@ class Helper
                 if ($arr_store_field === 'image') {
                     $arr_attributes_store[$arr_store_field] = $file_name;
                 } else {
-                    if (in_array($arr_store_field, $arr_encrypted_ids)) {
-                        $arr_attributes_store[$arr_store_field] = Crypt::decrypt($user_input_data[$arr_store_field]);
-                    } else {
-                        $arr_attributes_store[$arr_store_field] = $user_input_data[$arr_store_field];
+                    $value = $user_input_data[$arr_store_field];
+
+                    // Check if field should be converted to lowercase
+                    if (in_array($arr_store_field, $arr_fields_make_lowercase)) {
+                        $value = strtolower($value);
                     }
+
+                    // Decrypt if it's in the encrypted IDs array
+                    if (in_array($arr_store_field, $arr_encrypted_ids)) {
+                        $value = Crypt::decrypt($value);
+                    }
+
+                    $arr_attributes_store[$arr_store_field] = $value;
                 }
             }
         }
 
         return $arr_attributes_store;
     }
+
 
 
     // Update a unique I.D on store and update
@@ -560,4 +569,32 @@ class Helper
 
     //     return $value;
     // }
+
+    public function faker12DigitNumber()
+    {
+        $faker = Faker::create();
+
+        return $faker->numberBetween(100000000000, 999999999999);
+    }
+
+    public function faker6DigitNumber()
+    {
+        $faker = Faker::create();
+
+        return $faker->numberBetween(100000, 999999);
+    }
+
+    public function fakerLoremIpsum()
+    {
+        $faker = Faker::create();
+
+        return $faker->sentence();
+    }
+
+    public function fakerName()
+    {
+        $faker = Faker::create();
+
+        return $faker->name();
+    }
 }

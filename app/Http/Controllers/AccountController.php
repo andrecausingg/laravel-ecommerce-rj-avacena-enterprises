@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -388,7 +388,7 @@ class AccountController extends Controller
             }
 
             // Store only have value   
-            foreach ($this->fillable_attr_auth->arrStoreFields() as $arrStoreField) {
+            foreach ($this->fillable_attr_auth->arrToStores() as $arrStoreField) {
                 if ($arrStoreField == 'user_id') {
                     $arr_validates[$arrStoreField] = $user_id;
                 } else if ($arrStoreField == 'phone_number' && $request->filled('phone_number')) {
@@ -453,7 +453,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'message' => 'Successfully created user',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction if an exception occurs
@@ -544,60 +544,60 @@ class AccountController extends Controller
 
 
             // Put on logs not equal value then put on update
-            foreach ($this->fillable_attr_auth->arrUpdateFields() as $arrUpdateFields) {
-                if ($arrUpdateFields == 'phone_number') {
+            foreach ($this->fillable_attr_auth->arrToUpdates() as $arrToUpdates) {
+                if ($arrToUpdates == 'phone_number') {
                     if ($request->filled('phone_number')) {
-                        $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
-                        $new_value = $request->arrUpdateFields ?? null;
+                        $existing_value = $account->$arrToUpdates != '' ? Crypt::decrypt($account->$arrToUpdates) : null;
+                        $new_value = $request->arrToUpdates ?? null;
                         // Check if the value has changed
                         if ($existing_value !== $new_value) {
 
-                            $changes_for_logs[$arrUpdateFields] = [
+                            $changes_for_logs[$arrToUpdates] = [
                                 'old' => Crypt::encrypt($existing_value),
                                 'new' => Crypt::encrypt($new_value),
                             ];
 
-                            $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->phone_number);
+                            $arr_validates[$arrToUpdates] = Crypt::encrypt($request->phone_number);
                         }
                     }
-                } else if ($arrUpdateFields == 'email') {
+                } else if ($arrToUpdates == 'email') {
                     if ($request->filled('email')) {
-                        $existing_value = $account->$arrUpdateFields != '' ? Crypt::decrypt($account->$arrUpdateFields) : null;
-                        $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+                        $existing_value = $account->$arrToUpdates != '' ? Crypt::decrypt($account->$arrToUpdates) : null;
+                        $new_value = $request->$arrToUpdates != '' ? $request->$arrToUpdates : null;
 
                         // Check if the value has changed
                         if ($existing_value !== $new_value) {
-                            $changes_for_logs[$arrUpdateFields] = [
+                            $changes_for_logs[$arrToUpdates] = [
                                 'old' => Crypt::encrypt($existing_value),
                                 'new' => Crypt::encrypt($new_value),
                             ];
-                            $arr_validates[$arrUpdateFields] = Crypt::encrypt($request->email);
+                            $arr_validates[$arrToUpdates] = Crypt::encrypt($request->email);
                         }
                     }
-                } else if ($arrUpdateFields == 'password') {
-                    $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
-                    $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+                } else if ($arrToUpdates == 'password') {
+                    $existing_value = $account->$arrToUpdates != '' ? $account->$arrToUpdates : null;
+                    $new_value = $request->$arrToUpdates != '' ? $request->$arrToUpdates : null;
 
                     // Check if the value has changed
                     if (!Hash::check($new_value, $existing_value)) {
-                        $changes_for_logs[$arrUpdateFields] = [
+                        $changes_for_logs[$arrToUpdates] = [
                             'old' => $history->value,
                             'new' => Crypt::encrypt($new_value),
                         ];
-                        $arr_validates[$arrUpdateFields] = Hash::make($new_value);
+                        $arr_validates[$arrToUpdates] = Hash::make($new_value);
                     }
                 } else {
-                    $existing_value = $account->$arrUpdateFields != '' ? $account->$arrUpdateFields : null;
-                    $new_value = $request->$arrUpdateFields != '' ? $request->$arrUpdateFields : null;
+                    $existing_value = $account->$arrToUpdates != '' ? $account->$arrToUpdates : null;
+                    $new_value = $request->$arrToUpdates != '' ? $request->$arrToUpdates : null;
 
                     // Check if the value has changed
                     if ($existing_value !== $new_value) {
-                        $changes_for_logs[$arrUpdateFields] = [
+                        $changes_for_logs[$arrToUpdates] = [
                             'old' => $existing_value,
                             'new' => $new_value,
                         ];
                     }
-                    $arr_validates[$arrUpdateFields] = $request->$arrUpdateFields;
+                    $arr_validates[$arrToUpdates] = $request->$arrToUpdates;
                 }
             }
 
@@ -636,7 +636,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'message' => 'Successfully update user account',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
             // Rollback the transaction
@@ -745,7 +745,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'message' => 'Successfully created user',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
@@ -858,7 +858,7 @@ class AccountController extends Controller
 
                 return response()->json([
                     'message' => 'Email updated successfully',
-                    'log_message' => $log_result,
+                    // 'log_message' => $log_result,
                 ], Response::HTTP_OK);
             }
         } catch (\Exception $e) {
@@ -974,7 +974,7 @@ class AccountController extends Controller
 
                 return response()->json([
                     'message' => 'Password updated successfully',
-                    'log_message' => $log_result
+                    // 'log_message' => $log_result
                 ], Response::HTTP_OK);
             }
         } catch (\Exception $e) {
@@ -1080,7 +1080,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'message' => 'A new verification code has been sent to your email',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
@@ -1184,7 +1184,7 @@ class AccountController extends Controller
 
             return response()->json([
                 'message' => 'A new verification code has been sent to your email',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception

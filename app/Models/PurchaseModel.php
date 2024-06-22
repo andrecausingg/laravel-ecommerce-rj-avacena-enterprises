@@ -20,21 +20,22 @@ class PurchaseModel extends Model
 
         'inventory_product_id',
         'inventory_id',
-        'item_code',
 
         'customer_name',
-
+        'item_code',
         'image',
         'name',
         'category',
         'description',
         'supplier_name',
+        
         'design',
         'size',
         'color',
 
         'retail_price',
         'discounted_price',
+        'unit_supplier_price',
 
         'status',
 

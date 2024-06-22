@@ -41,6 +41,12 @@ class InventoryModel extends Model
         ];
     }
 
+    public function arrFieldsToLowercase(): array
+    {
+        return [
+            'name', 'category'
+        ];
+    }
     public function arrToUpdates(): array
     {
         return [

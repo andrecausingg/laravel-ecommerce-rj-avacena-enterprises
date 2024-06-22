@@ -8,7 +8,7 @@ use App\Models\InventoryModel;
 use Illuminate\Support\Facades\DB;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -464,7 +464,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Inventory records child stored successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -612,7 +612,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Inventory records child stored successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -737,7 +737,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Successfully update inventory child',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -876,7 +876,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Successfully update inventory child',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -969,7 +969,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Successfully deleted inventory record',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1099,7 +1099,7 @@ class InventoryProductController extends Controller
 
             return response()->json([
                 'message' => 'Successfully deleted data',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();

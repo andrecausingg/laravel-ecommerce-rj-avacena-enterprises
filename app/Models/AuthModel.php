@@ -95,7 +95,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         ];
     }
 
-    public function arrStoreFields(): array
+    public function arrToStores(): array
     {
         return [
             'user_id',
@@ -110,7 +110,22 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         ];
     }
 
-    public function arrUpdateFields(): array
+    public function arrSeedToStores(): array
+    {
+        return [
+            'user_id',
+            'email',
+            'password',
+            'role',
+            'status',
+            'verification_number',
+            'verify_email_token',
+            'verify_email_token_expire_at',
+            'email_verified_at',
+        ];
+    }
+
+    public function arrToUpdates(): array
     {
         return [
             'phone_number',

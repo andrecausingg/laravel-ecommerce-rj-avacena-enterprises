@@ -3,15 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Helper\Helper;
+use App\Models\PurchaseModel;
 use App\Models\InventoryModel;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
-use App\Models\PurchaseModel;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
@@ -433,7 +433,7 @@ class InventoryController extends Controller
 
         try {
             // Create the InventoryModel instance with the selected attributes
-            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $request->all());
+            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $request->all(), $file_name = '', $this->fillable_attr_inventorys->arrToStores());
             $created = InventoryModel::create($result_to_create);
             if (!$created) {
                 DB::rollBack();
@@ -475,7 +475,7 @@ class InventoryController extends Controller
             DB::commit();
             return response()->json([
                 'message' => 'Inventory records parent store successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -605,7 +605,7 @@ class InventoryController extends Controller
             DB::commit();
             return response()->json([
                 'message' => 'Inventory records parent store successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -715,7 +715,7 @@ class InventoryController extends Controller
             DB::commit();
             return response()->json([
                 'message' => 'Inventory records parent update successfully',
-                'log_message' => $log_result,
+                // 'log_message' => $log_result,
                 'exist_data' => $arr_existing_data
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
@@ -866,7 +866,7 @@ class InventoryController extends Controller
             DB::commit();
             return response()->json([
                 'message' => 'Inventory records parent update successfully',
-                'log_message' => $log_result,
+                // 'log_message' => $log_result,
                 'exist_data' => $arr_existing_data
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
@@ -955,7 +955,7 @@ class InventoryController extends Controller
 
             return response()->json([
                 'message' => 'Successfully deleted data',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1077,7 +1077,7 @@ class InventoryController extends Controller
 
             return response()->json([
                 'message' => 'Successfully deleted data',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();

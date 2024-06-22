@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('users_tbl', function (Blueprint $table) {
             // Ids
             $table->id();
-            $table->text('user_id');
+            $table->uuid('user_id'); // Changed to uuid
 
             // Authentication
             $table->longText('phone_number')->unique()->nullable();
@@ -36,7 +36,7 @@ return new class extends Migration
             // Expire Time
             $table->timestamp('session_expire_at')->nullable();
             $table->timestamp('verify_email_token_expire_at')->nullable();
-            $table->timestamp('verify_token_expire_at')->nullable();
+            $table->timestamp('verify_phone_token_expire_at')->nullable();
             $table->timestamp('reset_password_token_expire_at')->nullable();
 
             // Verified At

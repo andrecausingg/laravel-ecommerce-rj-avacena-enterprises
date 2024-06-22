@@ -6,7 +6,7 @@ use App\Models\LogsModel;
 use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller

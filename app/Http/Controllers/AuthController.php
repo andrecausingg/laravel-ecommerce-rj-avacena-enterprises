@@ -17,7 +17,7 @@ use App\Mail\ResendVerificationMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -67,7 +67,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'access_token' => $user->session_token,
+            'token' => $user->session_token,
         ], Response::HTTP_OK);
     }
 
@@ -210,12 +210,16 @@ class AuthController extends Controller
 
             // Logs
             $log_result = $this->helper->log($request, $arr_data_logs);
+            if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                DB::rollBack();
+                return $log_result;
+            }
 
             DB::commit();
 
             return response()->json([
                 'message' => 'User logout successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -341,15 +345,18 @@ class AuthController extends Controller
 
                 // Logs
                 $log_result = $this->helper->log($request, $arr_data_logs);
+                if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                    DB::rollBack();
+                    return $log_result;
+                }
 
                 return response()->json([
                     // 'user' => $user,
                     'user_info' => $user_info_exist ? 'Existing User' : 'New User',
-                    'token_type' => 'Bearer',
-                    'access_token' => $new_token,
-                    'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
+                    'token' => $new_token,
+                    'token_expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
                     'message' => 'Login Successfully',
-                    'log_message' => $log_result
+                    // 'log_message' => $log_result
                 ], Response::HTTP_OK);
             }
             // Check if Not Verified then redirect to Verify Email
@@ -570,6 +577,10 @@ class AuthController extends Controller
 
                     // Logs
                     $log_result = $this->helper->log($request, $arr_data_logs);
+                    if ($log_result->getStatusCode() !== Response::HTTP_OK) {
+                        DB::rollBack();
+                        return $log_result;
+                    }
 
                     // Get the Name of Gmail
                     $email_parts = explode('@', $arr_data['email']);
@@ -592,7 +603,7 @@ class AuthController extends Controller
                         'token' => $new_token,
                         'url_token' => 'verification/' . $new_token,
                         'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
-                        'log_message' => $log_result
+                        // 'log_message' => $log_result
                     ], Response::HTTP_OK);
                 }
 
@@ -696,7 +707,7 @@ class AuthController extends Controller
                 'token' => $new_token,
                 'url_token' => 'verification/' . $new_token,
                 'expire_at' => $expiration_time->diffInSeconds(Carbon::now()),
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
@@ -758,7 +769,7 @@ class AuthController extends Controller
             // Update user status and set email_verified_at to the current timestamp
             $user->status = env('ACCOUNT_ACTIVATE');
             $user->verify_email_token = $new_token;
-            $user->email_verified_at = now();
+            $user->email_verified_at = Carbon::now();
             $user->verification_number = $verification_number;
 
             if (!$user->save()) {
@@ -807,7 +818,7 @@ class AuthController extends Controller
             return response()->json(
                 [
                     'message' => 'Email verified successfully',
-                    'log_message' => $log_result
+                    // 'log_message' => $log_result
                 ],
                 Response::HTTP_OK
             );
@@ -926,7 +937,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'A new verification code has been sent to your email',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
@@ -1032,7 +1043,7 @@ class AuthController extends Controller
 
                     return response()->json([
                         'message' => 'Successfully sent a reset password link to your email ' . $decrypted_email,
-                        'log_message' => $log_result
+                        // 'log_message' => $log_result
                     ], Response::HTTP_OK);
                 }
                 // If same email exist and email_verified_at equal null send error message
@@ -1169,7 +1180,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Password updated successfully',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception

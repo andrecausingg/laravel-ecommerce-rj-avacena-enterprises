@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\UserInfoModel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -209,7 +209,7 @@ class UserInfoController extends Controller
 
             return response()->json([
                 'message' => 'Successfully stored user information',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception
@@ -377,7 +377,7 @@ class UserInfoController extends Controller
 
             return response()->json([
                 'message' => 'Successfully update user information',
-                'log_message' => $log_result
+                // 'log_message' => $log_result
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
             // Rollback the transaction on any exception

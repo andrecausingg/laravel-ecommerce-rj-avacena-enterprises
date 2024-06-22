@@ -8,7 +8,7 @@ use App\Models\PurchaseModel;
 use Illuminate\Support\Facades\DB;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -363,7 +363,7 @@ class PurchaseController extends Controller
                 return response()->json(
                     [
                         'message' => 'Purchase and Payment records stored successfully',
-                        'message_stocks' => $minus_stock,
+                        // 'message_stocks' => $minus_stock,
                     ],
                     Response::HTTP_OK
                 );
@@ -377,6 +377,7 @@ class PurchaseController extends Controller
     public function minusQty(Request $request)
     {
         $arr_minus_purchase = [];
+        $ctr = 0;
 
         // Authorize the user
         $user = $this->helper->authorizeUser($request);
@@ -459,22 +460,30 @@ class PurchaseController extends Controller
             }
 
             foreach ($purchases as $purchase) {
-                if (!$purchase) {
-                    DB::rollBack();
-                    return response()->json(
-                        [
-                            'message' => 'No data found',
-                        ],
-                        Response::HTTP_INTERNAL_SERVER_ERROR
-                    );
+                while ($ctr < $request->quantity) {
+                    if (!$purchase) {
+                        DB::rollBack();
+                        return response()->json(
+                            [
+                                'message' => 'No data found',
+                            ],
+                            Response::HTTP_INTERNAL_SERVER_ERROR
+                        );
+                    }
+
+                    if (!$purchase->delete()) {
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to delete item.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
+
+                    $arr_minus_purchase[] = $purchase;
+                    $ctr++;  // Increment the counter
+                    break;  // Break the while loop to proceed to the next purchase
                 }
 
-                if (!$purchase->delete()) {
-                    DB::rollBack();
-                    return response()->json(['message' => 'Failed to delete item.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                if ($ctr >= $request->quantity) {
+                    break;  // Exit the foreach loop if the required quantity is reached
                 }
-
-                $arr_minus_purchase[] = $purchase;
             }
 
             $total_amount_payment = $this->totalAmountPayment($decrypted_purchase_group_id, $decrypted_user_id_customer);
@@ -530,7 +539,6 @@ class PurchaseController extends Controller
             return response()->json(['message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
 
     public function addQty(Request $request)
     {
@@ -1289,6 +1297,197 @@ class PurchaseController extends Controller
 
         return response()->json($response_data, Response::HTTP_OK);
     }
+
+    // public function getUserIdMenuCustomer(Request $request)
+    // {
+    //     // Initialize array to store purchase information
+    //     $grouped_purchases = [];
+    //     $crud_settings = $this->fillable_attr_purchase->getApiAccountCrudSettings();
+
+    //     // Authorize the user
+    //     $user = $this->helper->authorizeUser($request);
+    //     if (empty($user->user_id)) {
+    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+    //     }
+
+    //     // Fetch purchases
+    //     $purchases = PurchaseModel::where('user_id_menu', $user->user_id)
+    //         ->where('status', 'NOT PAID')
+    //         ->get();
+
+    //     // Loop through purchases 
+    //     foreach ($purchases as $purchase) {
+    //         // Generate a key based on the user_id_customer
+    //         $key = $purchase->user_id_customer;
+
+    //         // Check if the key already exists in the grouped purchases array
+    //         if (isset($grouped_purchases[$key])) {
+    //             // If the key exists, check if the same purchase details already exist
+    //             $found = false;
+    //             foreach ($grouped_purchases[$key] as &$grouped_purchase) {
+    //                 if (
+    //                     $grouped_purchase['purchase_group_id'] === $purchase->purchase_group_id &&
+    //                     $grouped_purchase['inventory_id'] === $purchase->inventory_id &&
+    //                     $grouped_purchase['inventory_product_id'] === $purchase->inventory_product_id &&
+    //                     $grouped_purchase['customer_name'] === $purchase->customer_name &&
+    //                     $grouped_purchase['item_code'] === $purchase->item_code &&
+    //                     $grouped_purchase['name'] === $purchase->name &&
+    //                     $grouped_purchase['category'] === $purchase->category &&
+    //                     $grouped_purchase['design'] === $purchase->design &&
+    //                     $grouped_purchase['size'] === $purchase->size &&
+    //                     $grouped_purchase['color'] === $purchase->color &&
+    //                     $grouped_purchase['retail_price'] === $purchase->retail_price &&
+    //                     $grouped_purchase['discounted_price'] === $purchase->discounted_price
+    //                 ) {
+    //                     // Initialize arr_purchase_id if it's not already set
+    //                     if (!isset($grouped_purchase['arr_purchase_id'])) {
+    //                         $grouped_purchase['arr_purchase_id'] = [];
+    //                     }
+    //                     $grouped_purchase['arr_purchase_id'][] = $purchase->purchase_id;
+
+    //                     if (!isset($grouped_purchase['action'])) {
+    //                         $grouped_purchase['action'] = [];
+    //                     }
+    //                     $grouped_purchase['action'] = $this->helper->formatApi(
+    //                         $crud_settings['prefix'],
+    //                         $crud_settings['api_with_payloads'],
+    //                         $crud_settings['method'],
+    //                         $crud_settings['button_names'],
+    //                         $crud_settings['icons'],
+    //                         $crud_settings['actions']
+    //                     );
+
+    //                     // If the same purchase details exist, increment the count and update total_price
+    //                     $grouped_purchase['count']++;
+    //                     if ($purchase->discounted_price != 0) {
+    //                         $grouped_purchase['total_price'] = $purchase->discounted_price * $grouped_purchase['count'];
+    //                     } else {
+    //                         $grouped_purchase['total_price'] = $purchase->retail_price * $grouped_purchase['count'];
+    //                     }
+
+    //                     $found = true;
+    //                     break;
+    //                 }
+    //             }
+    //             // If the same purchase details not found, add the new purchase details
+    //             if (!$found) {
+    //                 $total_price = ($purchase->discounted_price != 0) ? $purchase->discounted_price : $purchase->retail_price;
+    //                 $grouped_purchases[$key][] = [
+    //                     'purchase_id' => $purchase->purchase_id,
+    //                     'purchase_group_id' => $purchase->purchase_group_id,
+    //                     'user_id_customer' => $purchase->user_id_customer,
+    //                     'inventory_id' => $purchase->inventory_id,
+    //                     'inventory_product_id' => $purchase->inventory_product_id,
+    //                     'customer_name' => $purchase->customer_name,
+    //                     'item_code' => $purchase->item_code,
+    //                     'name' => $purchase->name,
+    //                     'category' => $purchase->category,
+    //                     'design' => $purchase->design,
+    //                     'size' => $purchase->size,
+    //                     'color' => $purchase->color,
+    //                     'retail_price' => $purchase->retail_price,
+    //                     'discounted_price' => $purchase->discounted_price,
+    //                     'count' => 1,
+    //                     'total_price' => $total_price,
+    //                     'arr_purchase_id' => [$purchase->purchase_id], // Initialize arr_purchase_id with the first purchase ID
+    //                 ];
+    //             }
+    //         } else {
+    //             // If the key doesn't exist, initialize a new customer's purchases array    
+    //             $total_price = ($purchase->discounted_price != 0) ? $purchase->discounted_price : $purchase->retail_price;
+    //             $grouped_purchases[$key][] = [
+    //                 'purchase_id' => $purchase->purchase_id,
+    //                 'purchase_group_id' => $purchase->purchase_group_id,
+    //                 'user_id_customer' => $purchase->user_id_customer,
+    //                 'inventory_id' => $purchase->inventory_id,
+    //                 'inventory_product_id' => $purchase->inventory_product_id,
+    //                 'customer_name' => $purchase->customer_name,
+    //                 'item_code' => $purchase->item_code,
+    //                 'name' => $purchase->name,
+    //                 'category' => $purchase->category,
+    //                 'design' => $purchase->design,
+    //                 'size' => $purchase->size,
+    //                 'color' => $purchase->color,
+    //                 'retail_price' => $purchase->retail_price,
+    //                 'discounted_price' => $purchase->discounted_price,
+    //                 'count' => 1,
+    //                 'total_price' => $total_price,
+    //                 'arr_purchase_id' => [$purchase->purchase_id], // Initialize arr_purchase_id with the first purchase ID
+    //             ];
+    //         }
+    //     }
+
+    //     // Prepare an array to hold each customer's data as objects
+    //     $formatted_data = [];
+
+    //     // Add payment information and format as objects
+    //     foreach ($grouped_purchases as $user_id_customer => $items) {
+    //         $customer_data = new \stdClass(); // Create a new stdClass object for each customer
+    //         $customer_data->customer_id = $user_id_customer;
+    //         $customer_data->customer_name = $items[0]['customer_name'];
+    //         $customer_data->purchase_group_id = Crypt::encrypt($items[0]['purchase_group_id']); // Add purchase_group_id
+    //         $customer_data->user_id_customer = Crypt::encrypt($user_id_customer); // Add user_id_customer
+    //         $customer_data->total_orders = count($items); // Calculate total_orders as the number of unique items
+    //         $customer_data->payment = PaymentModel::where('purchase_group_id', $items[0]['purchase_group_id'])
+    //             ->where('user_id', $user_id_customer)
+    //             ->get()
+    //             ->toArray();
+
+    //         // Encrypt payment information
+    //         foreach ($customer_data->payment as &$payment_info) {
+    //             $payment_info['payment_id'] = Crypt::encrypt($payment_info['payment_id']);
+    //             $payment_info['user_id'] = Crypt::encrypt($payment_info['user_id']);
+    //             $payment_info['purchase_group_id'] = Crypt::encrypt($payment_info['purchase_group_id']);
+    //             $payment_info['voucher_id'] = Crypt::encrypt($payment_info['voucher_id']);
+    //             unset($payment_info['id']);
+    //         }
+
+    //         $customer_data->items = [];
+
+    //         // Add items and format each as an object
+    //         foreach ($items as $item) {
+    //             $formatted_item = new \stdClass();
+    //             $formatted_item->purchase_id = Crypt::encrypt($item['purchase_id']);
+    //             $formatted_item->purchase_group_id = Crypt::encrypt($item['purchase_group_id']);
+    //             $formatted_item->user_id_customer = Crypt::encrypt($item['user_id_customer']);
+    //             $formatted_item->inventory_id = Crypt::encrypt($item['inventory_id']);
+    //             $formatted_item->inventory_product_id = Crypt::encrypt($item['inventory_product_id']);
+    //             $formatted_item->item_code = $item['item_code'];
+    //             $formatted_item->name = $item['name'];
+    //             $formatted_item->category = $item['category'];
+    //             $formatted_item->design = $item['design'];
+    //             $formatted_item->size = $item['size'];
+    //             $formatted_item->color = $item['color'];
+    //             $formatted_item->retail_price = $item['retail_price'];
+    //             $formatted_item->discounted_price = $item['discounted_price'];
+    //             $formatted_item->count = $item['count'];
+    //             $formatted_item->total_price = $item['total_price'];
+    //             $formatted_item->stocks = InventoryProductModel::where('inventory_product_id', $item['inventory_product_id'])
+    //                 ->first()
+    //                 ->stocks;
+
+
+    //             // Encrypt arr_purchase_id
+    //             $encrypted_purchase_ids = [];
+    //             foreach ($item['arr_purchase_id'] as $purchase_id) {
+    //                 $encrypted_purchase_ids[] = Crypt::encrypt($purchase_id);
+    //             }
+    //             $formatted_item->arr_purchase_id = $encrypted_purchase_ids;
+
+    //             $customer_data->items[] = $formatted_item;
+    //         }
+
+    //         $formatted_data[] = $customer_data;
+    //     }
+
+    //     // Prepare response
+    //     $response_data = [
+    //         'message' => 'Data retrieved successfully',
+    //         'data' => $formatted_data,
+    //     ];
+
+    //     return response()->json($response_data, Response::HTTP_OK);
+    // }
 
     public function updateCustomerName(Request $request)
     {

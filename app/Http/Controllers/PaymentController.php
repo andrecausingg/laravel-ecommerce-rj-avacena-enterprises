@@ -11,7 +11,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
-use App\Http\Controllers\Helper\Helper;
+use App\Helper\Helper;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 

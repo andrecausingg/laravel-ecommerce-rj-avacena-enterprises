@@ -2,92 +2,275 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Helper\Helper;
+use App\Models\AuthModel;
 use Faker\Factory as Faker;
 use Illuminate\Support\Str;
+use App\Models\InventoryModel;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use App\Models\InventoryProductModel;
 use Illuminate\Support\Facades\Crypt;
 
 class DatabaseSeeder extends Seeder
 {
+    protected $helper, $fillable_attr_auths, $fillable_attr_inventorys, $fillable_attr_inventory_children;
+
+    public function __construct(Helper $helper, AuthModel $fillable_attr_auths, InventoryModel $fillable_attr_inventorys, InventoryProductModel $fillable_attr_inventory_children)
+    {
+        $this->helper = $helper;
+        $this->fillable_attr_auths = $fillable_attr_auths;
+        $this->fillable_attr_inventorys = $fillable_attr_inventorys;
+        $this->fillable_attr_inventory_children = $fillable_attr_inventory_children;
+    }
+
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        $faker = Faker::create();
+        DB::beginTransaction();
 
-        for ($i = 0; $i < 3; $i++) {
-            DB::table('users_tbl')->insert([
-                'user_id' => Str::uuid()->toString(),
-                'phone_number' => null,
-                'email' => Crypt::encrypt($faker->unique()->safeEmail),
-                'password' => Hash::make('password'), // Change 'password' to the actual password if needed
-                'role' => 'CLIENT',
-                'status' => 'ACTIVATE',
-                'verification_number' => $faker->numberBetween(100000, 999999),
-                'verification_key' => null,
-                'session_token' => null,
-                'verify_email_token' => Str::random(60),
-                'verify_phone_token' => null,
-                'reset_password_token' => null,
-                'session_expire_at' => null,
-                'verify_email_token_expire_at' => Carbon::now()->addDays(1),
-                'verify_token_expire_at' => null,
-                'reset_password_token_expire_at' => null,
-                'phone_verified_at' => null,
-                'email_verified_at' => Carbon::now(),
-                'update_password_at' => null,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'deleted_at' => null,
-            ]);
+        try {
+            $this->userTblEmail();
+            $this->inventoryParentTbl();
+            $this->inventoryChildTbl();
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Seeder error: ' . $e->getMessage());
+        }
+    }
+    private function userTblEmail()
+    {
+        info('Starting userTblEmail seeder method');
+
+        try {
+            // Generate UUID for user_id
+            $user_id = Str::uuid()->toString();
+
+            // Data to insert
+            $items = [
+                [
+                    'user_id' => $user_id,
+                    'email' => Crypt::encrypt('superadmin@superadmin.com'), // Encrypt email
+                    'password' => Hash::make('superadmin@superadmin.com'),
+                    'role' => 'SUPER_ADMIN',
+                    'status' => 'ACTIVATE',
+                    'verification_number' => $this->helper->faker6DigitNumber(),
+                    'verify_email_token' => Str::uuid()->toString(),
+                    'verify_email_token_expire_at' => Carbon::now()->addHour(), // Example: token valid for 1 hour
+                    'email_verified_at' => Carbon::now(),
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ],
+                [
+                    'user_id' => $user_id,
+                    'email' => Crypt::encrypt('admin@admin.com'), // Encrypt email
+                    'password' => Hash::make('admin@admin.com'),
+                    'role' => 'ADMIN',
+                    'status' => 'ACTIVATE',
+                    'verification_number' => $this->helper->faker6DigitNumber(),
+                    'verify_email_token' => Str::uuid()->toString(),
+                    'verify_email_token_expire_at' => Carbon::now()->addHour(), // Example: token valid for 1 hour
+                    'email_verified_at' => Carbon::now(),
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ],
+                [
+                    'user_id' => $user_id,
+                    'email' => Crypt::encrypt('cashier@cashier.com'), // Encrypt email
+                    'password' => Hash::make('cashier@cashier.com'),
+                    'role' => 'CASHIER',
+                    'status' => 'ACTIVATE',
+                    'verification_number' => $this->helper->faker6DigitNumber(),
+                    'verify_email_token' => Str::uuid()->toString(),
+                    'verify_email_token_expire_at' => Carbon::now()->addHour(), // Example: token valid for 1 hour
+                    'email_verified_at' => Carbon::now(),
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ],
+            ];
+
+            // Create the AuthModel instances with the selected attributes
+            foreach ($items as $item) {
+                $created = AuthModel::create($item);
+                if (!$created) {
+                    throw new \Exception('Failed to store');
+                }
+
+                $expiration_time = Carbon::now()->addHour();
+                $token = JWTAuth::claims(['exp' => $expiration_time->timestamp])->fromUser($created);
+
+                $created->update(['verify_email_token' => $token]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error creating AuthModel: ' . $e->getMessage());
+            throw $e; // Re-throw the exception to bubble up to the run() method
         }
 
-        // \App\Models\User::factory(10)->create();
+        info('Finished userTblEmail seeder method');
+    }
+    private function inventoryParentTbl()
+    {
+        info('Starting inventoryParentTbl seeder method');
+        // Data to insert
+        $items = [
+            [
+                'name' => "Acrylon",
+                'category' => "Paint",
+            ],
+            [
+                'name' => "Aluminum Ladder",
+                'category' => "Tools",
+            ],
+        ];
 
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
+        foreach ($items as $item) {
+            // Prepare data for insertion
+            $result_to_create = $this->helper->arrStoreMultipleData($this->fillable_attr_inventorys->arrToStores(), $item);
 
-        // DB::table('personal_access_tokens')->insert([
-        //     [
-        //         'tokenable_type' => 'App\Models\User',
-        //         'tokenable_id' => 1,
-        //         'name' => 'API Token',
-        //         'token' => hash('sha256', 'Xly8kvgcWxFpaQm1gXh1O4PuD7N78xuD'),
-        //         'abilities' => json_encode(['*']),
-        //         'last_used_at' => '2023-06-01 12:34:56',
-        //         'expires_at' => '2023-12-01 12:34:56',
-        //         'created_at' => now(),
-        //         'updated_at' => now(),
-        //     ],
-        //     [
-        //         'tokenable_type' => 'App\Models\User',
-        //         'tokenable_id' => 2,
-        //         'name' => 'Mobile App Token',
-        //         'token' => hash('sha256', 'hglB3xQvhzmZ9qxycNfp8gkS5WuZDxGJ'),
-        //         'abilities' => json_encode(['read', 'write']),
-        //         'last_used_at' => '2023-06-02 12:34:56',
-        //         'expires_at' => '2023-12-02 12:34:56',
-        //         'created_at' => now(),
-        //         'updated_at' => now(),
-        //     ],
-        //     [
-        //         'tokenable_type' => 'App\Models\User',
-        //         'tokenable_id' => 1,
-        //         'name' => 'Web Token',
-        //         'token' => hash('sha256', 'Knd2L5tzL3vsXqBm8Qj7pZkS9VcW1hGJ'),
-        //         'abilities' => json_encode(['read']),
-        //         'last_used_at' => '2023-06-03 12:34:56',
-        //         'expires_at' => '2023-12-03 12:34:56',
-        //         'created_at' => now(),
-        //         'updated_at' => now(),
-        //     ],
-        // ]);
+            // Create the InventoryModel instance with the selected attributes
+            $created = InventoryModel::create($result_to_create);
+            if (!$created) {
+                $error_message = [
+                    'message' => 'Failed to store inventory Parent',
+                    'parameter' => $created,
+                ];
+                throw new \Exception(json_encode($error_message));
+            }
+
+            $this->helper->updateUniqueId($created, $this->fillable_attr_inventorys->idToUpdate(), $created->id);
+        }
+
+        info('Finished inventoryParentTbl seeder method');
+    }
+
+    private function inventoryChildTbl()
+    {
+        info('Starting inventoryChildTbl seeder method');
+        $arr_to_store = [
+            'inventory_id',
+            'item_code',
+            'image',
+            'name',
+            'category',
+            'refundable',
+            'supplier_name',
+            'retail_price',
+            'discounted_price',
+            'unit_supplier_price',
+            'stocks',
+        ];
+
+        $inventory1 = InventoryModel::find(1);
+        $inventory2 = InventoryModel::find(2);
+
+        $inventory1Enc = Crypt::encrypt($inventory1->inventory_id);
+        $inventory2Enc = Crypt::encrypt($inventory2->inventory_id);
+
+        // Data to insert
+        $items = [
+            [
+                'inventory_id' => $inventory1Enc,
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'image' => null,
+                'name' => '2B ACRYLON 4',
+                'category' => $inventory1->category, // Assign category from inventory model
+                'refundable' => 'yes',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 10.00,
+                'discounted_price' => 0.00,
+                'unit_supplier_price' => 100.00,
+                'stocks' => 100,
+            ],
+            [
+                'inventory_id' => $inventory1Enc,
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'name' => '2B ACRYLON 7',
+                'category' => $inventory1->category,
+                'refundable' => 'yes',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 100.00,
+                'discounted_price' => 50.00,
+                'unit_supplier_price' => 200.00,
+                'stocks' => 100,
+            ],
+            [
+                'inventory_id' => $inventory1Enc,
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'name' => '2B ACRYLON 9',
+                'category' => $inventory1->category,
+                'refundable' => 'no',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 100.00,
+                'discounted_price' => 0.00,
+                'unit_supplier_price' => 500.00,
+                'stocks' => 100,
+            ],
+            [
+                'inventory_id' => $inventory2Enc,
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'name' => '2B ALUMINUM LADDER 12 STEP',
+                'category' => $inventory2->category,
+                'refundable' => 'yes',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 100.00,
+                'discounted_price' => 50.00,
+                'unit_supplier_price' => 200.00,
+                'stocks' => 100,
+            ],
+            [
+                'inventory_id' => $inventory2Enc,
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'name' => '2B ALUMINUM LADDER 10 STEP',
+                'category' => $inventory2->category,
+                'refundable' => 'no',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 100.00,
+                'discounted_price' => 0.00,
+                'unit_supplier_price' => 500.00,
+                'stocks' => 100,
+            ],
+            [
+                'inventory_id' => $inventory2Enc, // Corrected inventory_id to inventoryId2
+                'item_code' => $this->helper->faker12DigitNumber(),
+                'name' => '2B ALUMINUM LADDER 9 STEP',
+                'category' => $inventory2->category,
+                'refundable' => 'no',
+                'supplier_name' => $this->helper->fakerName(),
+                'retail_price' => 100.00,
+                'discounted_price' => 0.00,
+                'unit_supplier_price' => 500.00,
+                'stocks' => 100,
+            ],
+        ];
+
+        foreach ($items as $item) {
+
+            // Prepare data for insertion
+            $result_to_create = $this->helper->arrStoreMultipleData($arr_to_store, $item);
+            info($result_to_create);
+
+            // Create the InventoryProductModel instance with the selected attributes
+            $created = InventoryProductModel::create($result_to_create);
+
+            if (!$created) {
+                $error_message = [
+                    'message' => 'Failed to store inventory Parent',
+                    'parameter' => $created,
+                ];
+                throw new \Exception(json_encode($error_message));
+            }
+
+            $this->helper->updateUniqueId($created, $this->fillable_attr_inventory_children->idToUpdate(), $created->id);
+        }
+
+        info('Finished inventoryChildTbl seeder method');
     }
 }
