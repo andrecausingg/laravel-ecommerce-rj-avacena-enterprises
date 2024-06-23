@@ -448,6 +448,7 @@ class PurchaseController extends Controller
                 if ($inventory_product->stocks < $qty) {
                     return response()->json([
                         'message' => 'Failed to increment out of stocks',
+                        'id' => Crypt::decrypt($inventory_product->inventory_product_id),
                         'item' => 'Out of stock. Only ' . $inventory_product->stocks . " available",
                     ], Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
