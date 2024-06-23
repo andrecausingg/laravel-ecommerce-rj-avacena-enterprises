@@ -448,7 +448,7 @@ class PurchaseController extends Controller
                 if ($inventory_product->stocks < $qty) {
                     return response()->json([
                         'message' => 'Failed to increment out of stocks',
-                        'parameter' => Crypt::encrypt($inventory_product->inventory_product_id),
+                        'parameter' => $inventory_product->item_code,
                         'item' => 'Out of stock. Only ' . $inventory_product->stocks . " available",
                     ], Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
@@ -853,9 +853,9 @@ class PurchaseController extends Controller
                         $grouped_purchase['item_code'] === $purchase->item_code &&
                         $grouped_purchase['name'] === $purchase->name &&
                         $grouped_purchase['category'] === $purchase->category &&
-                        $grouped_purchase['design'] === $purchase->design &&
-                        $grouped_purchase['size'] === $purchase->size &&
-                        $grouped_purchase['color'] === $purchase->color &&
+                        // $grouped_purchase['design'] === $purchase->design &&
+                        // $grouped_purchase['size'] === $purchase->size &&
+                        // $grouped_purchase['color'] === $purchase->color &&
                         $grouped_purchase['retail_price'] === $purchase->retail_price &&
                         $grouped_purchase['discounted_price'] === $purchase->discounted_price
                     ) {
@@ -902,9 +902,9 @@ class PurchaseController extends Controller
                         'item_code' => $purchase->item_code,
                         'name' => $purchase->name,
                         'category' => $purchase->category,
-                        'design' => $purchase->design,
-                        'size' => $purchase->size,
-                        'color' => $purchase->color,
+                        // 'design' => $purchase->design,
+                        // 'size' => $purchase->size,
+                        // 'color' => $purchase->color,
                         'retail_price' => $purchase->retail_price,
                         'discounted_price' => $purchase->discounted_price,
                         'count' => 1,
@@ -925,9 +925,9 @@ class PurchaseController extends Controller
                     'item_code' => $purchase->item_code,
                     'name' => $purchase->name,
                     'category' => $purchase->category,
-                    'design' => $purchase->design,
-                    'size' => $purchase->size,
-                    'color' => $purchase->color,
+                    // 'design' => $purchase->design,
+                    // 'size' => $purchase->size,
+                    // 'color' => $purchase->color,
                     'retail_price' => $purchase->retail_price,
                     'discounted_price' => $purchase->discounted_price,
                     'count' => 1,
@@ -980,9 +980,9 @@ class PurchaseController extends Controller
                 $formatted_item->item_code = $item['item_code'];
                 $formatted_item->name = $item['name'];
                 $formatted_item->category = $item['category'];
-                $formatted_item->design = $item['design'];
-                $formatted_item->size = $item['size'];
-                $formatted_item->color = $item['color'];
+                // $formatted_item->design = $item['design'];
+                // $formatted_item->size = $item['size'];
+                // $formatted_item->color = $item['color'];
                 $formatted_item->retail_price = $item['retail_price'];
                 $formatted_item->discounted_price = $item['discounted_price'];
                 $formatted_item->count = $item['count'];
@@ -1051,9 +1051,9 @@ class PurchaseController extends Controller
                         $grouped_purchase['item_code'] === $purchase->item_code &&
                         $grouped_purchase['name'] === $purchase->name &&
                         $grouped_purchase['category'] === $purchase->category &&
-                        $grouped_purchase['design'] === $purchase->design &&
-                        $grouped_purchase['size'] === $purchase->size &&
-                        $grouped_purchase['color'] === $purchase->color &&
+                        // $grouped_purchase['design'] === $purchase->design &&
+                        // $grouped_purchase['size'] === $purchase->size &&
+                        // $grouped_purchase['color'] === $purchase->color &&
                         $grouped_purchase['retail_price'] === $purchase->retail_price &&
                         $grouped_purchase['discounted_price'] === $purchase->discounted_price
                     ) {
@@ -1100,9 +1100,9 @@ class PurchaseController extends Controller
                         'item_code' => $purchase->item_code,
                         'name' => $purchase->name,
                         'category' => $purchase->category,
-                        'design' => $purchase->design,
-                        'size' => $purchase->size,
-                        'color' => $purchase->color,
+                        // 'design' => $purchase->design,
+                        // 'size' => $purchase->size,
+                        // 'color' => $purchase->color,
                         'retail_price' => $purchase->retail_price,
                         'discounted_price' => $purchase->discounted_price,
                         'count' => 1,
@@ -1123,9 +1123,9 @@ class PurchaseController extends Controller
                     'item_code' => $purchase->item_code,
                     'name' => $purchase->name,
                     'category' => $purchase->category,
-                    'design' => $purchase->design,
-                    'size' => $purchase->size,
-                    'color' => $purchase->color,
+                    // 'design' => $purchase->design,
+                    // 'size' => $purchase->size,
+                    // 'color' => $purchase->color,
                     'retail_price' => $purchase->retail_price,
                     'discounted_price' => $purchase->discounted_price,
                     'count' => 1,
@@ -1178,9 +1178,9 @@ class PurchaseController extends Controller
                 $formatted_item->item_code = $item['item_code'];
                 $formatted_item->name = $item['name'];
                 $formatted_item->category = $item['category'];
-                $formatted_item->design = $item['design'];
-                $formatted_item->size = $item['size'];
-                $formatted_item->color = $item['color'];
+                // $formatted_item->design = $item['design'];
+                // $formatted_item->size = $item['size'];
+                // $formatted_item->color = $item['color'];
                 $formatted_item->retail_price = $item['retail_price'];
                 $formatted_item->discounted_price = $item['discounted_price'];
                 $formatted_item->count = $item['count'];
