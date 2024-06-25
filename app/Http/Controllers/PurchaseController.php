@@ -374,7 +374,6 @@ class PurchaseController extends Controller
         }
     }
 
-
     public function updateQty(Request $request)
     {
         $arr_add_purchase = [];
@@ -695,10 +694,6 @@ class PurchaseController extends Controller
         // Validation rules for each item in the array
         $validator = Validator::make($request->all(), [
             'purchase_id' => 'required|array',
-            'purchase_group_id' => 'required|string',
-            'inventory_id' => 'required|string',
-            'inventory_product_id' => 'required|string',
-            'user_id_customer' => 'required|string',
             'eu_device' => 'required|string',
         ]);
 
@@ -721,12 +716,6 @@ class PurchaseController extends Controller
         // Start the transaction
         DB::beginTransaction();
         try {
-            $decrypted_purchase_group_id = Crypt::decrypt($request->purchase_group_id);
-            $decrypted_inventory_id = Crypt::decrypt($request->inventory_id);
-            $decrypted_inventory_product_id = Crypt::decrypt($request->inventory_product_id);
-            $decrypted_user_id_customer = Crypt::decrypt($request->user_id_customer);
-
-
             foreach ($request->purchase_id as $purchase_id) {
                 $decrypted_purchase_id = Crypt::decrypt($purchase_id);
 
@@ -735,6 +724,7 @@ class PurchaseController extends Controller
                     DB::rollBack();
                     return response()->json(['message' => 'Purchase not found'], Response::HTTP_NOT_FOUND);
                 }
+
                 if (!$purchase->delete()) {
                     DB::rollBack();
                     return response()->json(['message' => 'Failed to delete purchase'], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -742,42 +732,41 @@ class PurchaseController extends Controller
 
                 // Store the successfully deleted purchase ID
                 $deleted_purchase_item[] = $purchase;
-            }
 
-
-            // Update stock after deleting all purchases
-            $inventory_product = InventoryProductModel::where('inventory_product_id', $decrypted_inventory_product_id)
-                ->where('inventory_id', $decrypted_inventory_id)
-                ->first();
-            if (!$inventory_product) {
-                DB::rollBack();
-                return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
-            }
-
-            $inventory_product->update([
-                'stocks' => max(0, $inventory_product->stock + count($deleted_purchase_item)),
-            ]);
-
-            $total_amount_payment = $this->totalAmountPaymentDeleteAll($decrypted_purchase_group_id, $decrypted_user_id_customer);
-            $update_payment = PaymentModel::where('user_id', $decrypted_user_id_customer)
-                ->where('purchase_group_id', $decrypted_purchase_group_id)
-                ->first();
-
-            if (!$update_payment) {
-                DB::rollBack();
-                return response()->json(['message' => 'Payment record not found'], Response::HTTP_NOT_FOUND);
-            }
-
-            $update_payment->update([
-                'total_amount' => $total_amount_payment['total_amount'],
-                'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
-            ]);
-
-            // Check if total amount is zero and then delete the payment record
-            if ($total_amount_payment['total_amount'] == 0.00) {
-                if (!$update_payment->delete()) {
+                // Update stock after deleting all purchases
+                $inventory_product = InventoryProductModel::where('inventory_product_id', $purchase->inventory_product_id)
+                    ->where('inventory_id', $purchase->inventory_id)
+                    ->first();
+                if (!$inventory_product) {
                     DB::rollBack();
-                    return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    return response()->json(['message' => 'Inventory Product ID not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                $inventory_product->update([
+                    'stocks' => $inventory_product->stocks + 1,
+                ]);
+
+                $total_amount_payment = $this->totalAmountPaymentDeleteAll($purchase->purchase_group_id, $purchase->user_id_customer);
+                $update_payment = PaymentModel::where('user_id', $purchase->user_id_customer)
+                    ->where('purchase_group_id', $purchase->purchase_group_id)
+                    ->first();
+
+                if (!$update_payment) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Payment record not found'], Response::HTTP_NOT_FOUND);
+                }
+
+                $update_payment->update([
+                    'total_amount' => $total_amount_payment['total_amount'],
+                    'total_discounted_amount' => $total_amount_payment['total_discounted_amount'],
+                ]);
+
+                // Check if total amount is zero and then delete the payment record
+                if ($total_amount_payment['total_amount'] == 0.00) {
+                    if (!$update_payment->delete()) {
+                        DB::rollBack();
+                        return response()->json(['message' => 'Failed to delete payment'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                    }
                 }
             }
 
