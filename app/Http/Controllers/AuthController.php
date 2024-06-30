@@ -102,7 +102,7 @@ class AuthController extends Controller
                 'title' => 'Users',
                 'path' => '/users',
                 'icon' => 'heroicons-outline:user-group',
-                'path_key' => 'admin-accounts/index'
+                'path_key' => 'accounts/admin/index'
             ],
             [
                 'title' => 'Orders',

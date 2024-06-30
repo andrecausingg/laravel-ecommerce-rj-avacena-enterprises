@@ -26,7 +26,7 @@ class CounterLimiterMiddleware
                 [
                     'message' => $validator->errors(),
                 ],
-                Response::HTTP_BAD_REQUEST
+                Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }
 
