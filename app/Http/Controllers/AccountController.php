@@ -92,9 +92,11 @@ class AccountController extends Controller
                         $arr_parent_items[$columnHeader] = trim("{$first_name} {$last_name}");
                     }
                 } elseif ($columnHeader == 'role') {
-                    $arr_parent_items[$columnHeader] = ucfirst($auth_user->$columnHeader);
+                    $value = strtolower($auth_user->$columnHeader);
+                    $arr_parent_items[$columnHeader] = ucfirst($value);
                 } elseif ($columnHeader == 'status') {
-                    $arr_parent_items[$columnHeader] = ucfirst($auth_user->$columnHeader);
+                    $value = strtolower($auth_user->$columnHeader);
+                    $arr_parent_items[$columnHeader] = ucfirst($value);
                 } elseif ($columnHeader == 'password') {
                     $history = HistoryModel::where('tbl_id', $auth_user->user_id ?? null)
                         ->where('tbl_name', 'users_tbl')

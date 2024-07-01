@@ -204,7 +204,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         ];
 
         $button_name = [
-            'store' => 'create',
+            'store' => 'Add User',
         ];
 
         $icon = [
