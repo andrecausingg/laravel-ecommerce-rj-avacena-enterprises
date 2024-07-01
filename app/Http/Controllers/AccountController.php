@@ -42,7 +42,6 @@ class AccountController extends Controller
         $relative_settings = $this->fillable_attr_auth->getApiAccountRelativeSettings();
         $view_settings = $this->fillable_attr_auth->getViewRowTable();
         $arr_parent_items = [];
-        $arr_child_items = [];
         $arr_all_items = [];
 
         $filter = [];
@@ -72,31 +71,31 @@ class AccountController extends Controller
 
         // Data
         foreach ($auth_users as $auth_user) {
-            foreach ($this->fillable_attr_auth->columnHeader() as $columnHeader) {
-                if ($columnHeader == 'user_id') {
-                    $arr_parent_items[$columnHeader] = Crypt::encrypt($auth_user->$columnHeader);
-                } else if ($columnHeader == 'image') {
+            foreach ($this->fillable_attr_auth->columnFields() as $columnFields) {
+                if ($columnFields == 'user_id') {
+                    $arr_parent_items[$columnFields] = Crypt::encrypt($auth_user->$columnFields);
+                } else if ($columnFields == 'image') {
                     $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnHeader)) {
-                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->$columnHeader);
+                    if (isset($user_info->$columnFields)) {
+                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->$columnFields);
                     } else {
-                        $arr_parent_items[$columnHeader] = null;
+                        $arr_parent_items[$columnFields] = null;
                     }
-                } else if ($columnHeader == 'name') {
+                } else if ($columnFields == 'name') {
                     $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnHeader)) {
-                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->first_name);
+                    if (isset($user_info->$columnFields)) {
+                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->first_name);
                     } else {
-                        $arr_parent_items[$columnHeader] = null;
+                        $arr_parent_items[$columnFields] = null;
                     }
                     $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnHeader)) {
-                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->last_name);
+                    if (isset($user_info->$columnFields)) {
+                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->last_name);
                     } else {
-                        $arr_parent_items[$columnHeader] = null;
+                        $arr_parent_items[$columnFields] = null;
                     }
                 } else {
-                    $arr_parent_items[$columnHeader] = $auth_user->$columnHeader ?? null;
+                    $arr_parent_items[$columnFields] = $auth_user->$columnFields ?? null;
                 }
             }
 
