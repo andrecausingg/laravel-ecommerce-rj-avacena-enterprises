@@ -91,8 +91,22 @@ class AccountController extends Controller
                         $last_name = isset($user_info->last_name) && $this->helper->isEncrypted($user_info->last_name) ? Crypt::decrypt($user_info->last_name) : $user_info->last_name;
                         $arr_parent_items[$columnHeader] = trim("{$first_name} {$last_name}");
                     }
+                } elseif ($columnHeader == 'role') {
+                    $arr_parent_items[$columnHeader] = ucfirst($auth_user->$columnHeader);
+                } elseif ($columnHeader == 'status') {
+                    $arr_parent_items[$columnHeader] = ucfirst($auth_user->$columnHeader);
                 } elseif ($columnHeader == 'password') {
-                    
+                    $history = HistoryModel::where('tbl_id', $auth_user->user_id ?? null)
+                        ->where('tbl_name', 'users_tbl')
+                        ->where('column_name', 'password')
+                        ->latest()
+                        ->first();
+                    if ($history) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($history->value);
+                    } else {
+                        // Handle the case where the history does not exist
+                        $arr_parent_items[$columnHeader] = null; // or any default value you want to set
+                    }
                 } else {
                     if (isset($auth_user->$columnHeader) && $this->helper->isEncrypted($auth_user->$columnHeader)) {
                         $arr_parent_items[$columnHeader] = Crypt::decrypt($auth_user->$columnHeader);
