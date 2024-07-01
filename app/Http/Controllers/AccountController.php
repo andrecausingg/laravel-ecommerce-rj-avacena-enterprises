@@ -71,31 +71,38 @@ class AccountController extends Controller
 
         // Data
         foreach ($auth_users as $auth_user) {
-            foreach ($this->fillable_attr_auth->columnFields() as $columnFields) {
-                if ($columnFields == 'user_id') {
-                    $arr_parent_items[$columnFields] = Crypt::encrypt($auth_user->$columnFields);
-                } else if ($columnFields == 'image') {
-                    $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnFields)) {
-                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->$columnFields);
-                    } else {
-                        $arr_parent_items[$columnFields] = null;
+            foreach ($this->fillable_attr_auth->columnHeader() as $columnHeader) {
+                // Default value for non-existing columns
+                $arr_parent_items[$columnHeader] = null;
+
+                if ($columnHeader == 'user_id') {
+                    if (isset($auth_user->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = $auth_user->$columnHeader;
                     }
-                } else if ($columnFields == 'name') {
+                } elseif ($columnHeader == 'image') {
                     $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnFields)) {
-                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->first_name);
-                    } else {
-                        $arr_parent_items[$columnFields] = null;
+                    if ($user_info && isset($user_info->$columnHeader) && $this->helper->isEncrypted($user_info->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->$columnHeader);
                     }
+                } elseif ($columnHeader == 'name') {
                     $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    if (isset($user_info->$columnFields)) {
-                        $arr_parent_items[$columnFields] = Crypt::decrypt($user_info->last_name);
-                    } else {
-                        $arr_parent_items[$columnFields] = null;
+                    if ($user_info) {
+                        $first_name = isset($user_info->first_name) && $this->helper->isEncrypted($user_info->first_name) ? Crypt::decrypt($user_info->first_name) : $user_info->first_name;
+                        $last_name = isset($user_info->last_name) && $this->helper->isEncrypted($user_info->last_name) ? Crypt::decrypt($user_info->last_name) : $user_info->last_name;
+                        $arr_parent_items[$columnHeader] = trim("{$first_name} {$last_name}");
                     }
+                } elseif ($columnHeader == 'password') {
+                    
                 } else {
-                    $arr_parent_items[$columnFields] = $auth_user->$columnFields ?? null;
+                    if (isset($auth_user->$columnHeader) && $this->helper->isEncrypted($auth_user->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($auth_user->$columnHeader);
+                    } else {
+                        foreach ($this->fillable_attr_auth->arrEnvRoles() as $arrEnvRoles) {
+                            if (isset($auth_user->$columnHeader) && $auth_user->$columnHeader) {
+                                $arr_parent_items[$columnHeader] = $auth_user->$columnHeader;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -122,12 +129,12 @@ class AccountController extends Controller
             }
 
             // Add the format Api Crud
-            $arr_parent_items['action'] = array_values($crud_action);
+            $arr_parent_items['actions'] = array_values($crud_action);
             // ***************************** //
 
             // ***************************** //
             // Add details on action crud
-            foreach ($arr_parent_items['action'] as &$action) {
+            foreach ($arr_parent_items['actions'] as &$action) {
                 // Check if 'details' key doesn't exist, then add it
                 if (!isset($action['details'])) {
                     $action['details'] = [];

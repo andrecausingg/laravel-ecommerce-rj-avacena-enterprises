@@ -4,6 +4,7 @@ namespace App\Helper;
 
 use App\Models\AuthModel;
 use App\Models\LogsModel;
+use Faker\Factory as Faker;
 use Illuminate\Support\Str;
 use App\Models\HistoryModel;
 use App\Models\PaymentModel;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 use App\Models\PurchaseModel;
 use App\Models\UserInfoModel;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Http;
 use App\Models\InventoryProductModel;
@@ -18,8 +20,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use hisorange\BrowserDetect\Facade as Browser;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\DB;
-use Faker\Factory as Faker;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 
 class Helper
@@ -596,5 +597,15 @@ class Helper
         $faker = Faker::create();
 
         return $faker->name();
+    }
+
+    public function isEncrypted($value)
+    {
+        try {
+            Crypt::decrypt($value);
+            return true;
+        } catch (DecryptException $e) {
+            return false;
+        }
     }
 }

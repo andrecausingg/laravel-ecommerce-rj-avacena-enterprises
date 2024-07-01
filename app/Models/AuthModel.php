@@ -312,19 +312,6 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         ];
     }
 
-    public function columnFields(): array
-    {
-        return [
-            'user_id',
-            'image',
-            'name',
-            'email',
-            'role',
-            'status',
-            'created_at',
-        ];
-    }
-
     public function columnHeader(): array
     {
         return [
@@ -332,10 +319,11 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
             'image',
             'name',
             'email',
+            'password',
             'role',
             'status',
             'created_at',
-            'action',
+            'actions',
         ];
     }
 }
