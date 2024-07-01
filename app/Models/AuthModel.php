@@ -18,7 +18,7 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
     protected $primaryKey = 'id';
     protected $fillable = [
         'user_id',
-        'phone_number',
+        // 'phone_number',
         'email',
         'password',
         'role',
@@ -254,5 +254,75 @@ class AuthModel extends Authenticatable implements JWTSubject, MustVerifyEmail
         $url = $prefix . 'show/';
         $method = 'GET';
         return compact('url',  'method');
+    }
+
+    public function getNavLinksRole(): array
+    {
+        return [
+            [
+                'title' => 'Menu',
+                'path' => '/menu',
+                'icon' => 'heroicons-outline:view-grid',
+                'path_key' => 'inventory/product/index'
+            ],
+            [
+                'title' => 'Dashboard',
+                'path' => '/dashboard',
+                'icon' => 'heroicons-outline:chart-pie',
+                'path_key' => 'payment/dashboard'
+            ],
+            [
+                'title' => 'Inventory',
+                'path' => '/inventory',
+                'icon' => 'heroicons-outline:cube',
+                'path_key' => 'inventory/parent/index'
+            ],
+            [
+                'title' => 'Users',
+                'path' => '/users',
+                'icon' => 'heroicons-outline:user-group',
+                'path_key' => 'accounts/admin/index'
+            ],
+            [
+                'title' => 'Orders',
+                'icon' => 'heroicons-outline:clipboard-list',
+                'submenus' => [
+                    [
+                        'title' => 'Customer Order',
+                        'path' => '/customer-order',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Return Order',
+                        'path' => '/return-order',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Failed Delivery',
+                        'path' => '/failed-delivery',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                    [
+                        'title' => 'Cancellation',
+                        'path' => '/cancellation',
+                        'icon' => 'heroicons-outline:user-group',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    public function columnHeader(): array
+    {
+        return [
+            'user_id',
+            'image',
+            'name',
+            'email',
+            'role',
+            'status',
+            'created_at',
+            'action'
+        ];
     }
 }

@@ -41,8 +41,10 @@ class AccountController extends Controller
         $crud_settings = $this->fillable_attr_auth->getApiAccountCrudSettings();
         $relative_settings = $this->fillable_attr_auth->getApiAccountRelativeSettings();
         $view_settings = $this->fillable_attr_auth->getViewRowTable();
-        $decrypted_auth_users = [];
-        $column_name = [];
+        $arr_parent_items = [];
+        $arr_child_items = [];
+        $arr_all_items = [];
+
         $filter = [];
 
         // Filter Column
@@ -65,68 +67,38 @@ class AccountController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Unset Column not needed
-        $unset_results = $this->helper->unsetColumn($this->fillable_attr_auth->unsetForRetrieves(), $this->fillable_attr_auth->getFillableAttributes());
-
         // Retrieve all AuthModel records
         $auth_users = AuthModel::orderBy('created_at', 'desc')->get();
 
         // Data
         foreach ($auth_users as $auth_user) {
-            $decrypted_auth_user = [];
-
-            foreach ($unset_results as $column) {
-                if ($column == 'user_id') {
-                    $userInfo = UserInfoModel::where('user_id', $auth_user->user_id)->first();
-                    $decrypted_auth_user['userInfo'] = [
-                        'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
-                        'name' => ($userInfo && $userInfo->first_name && $userInfo->last_name) ? (Crypt::decrypt($userInfo->first_name) . " " . Crypt::decrypt($userInfo->last_name)) : ($userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : ($userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null)),
-                    ];
-                    $decrypted_auth_user[$column] = Crypt::encrypt($auth_user->{$column});
-
-                    // Add to column_name if it doesn't exist
-                    if (!in_array($this->helper->transformColumnName($column), $column_name)) {
-                        $column_name[] = $this->helper->transformColumnName($column);
+            foreach ($this->fillable_attr_auth->columnHeader() as $columnHeader) {
+                if ($columnHeader == 'user_id') {
+                    $arr_parent_items[$columnHeader] = Crypt::encrypt($auth_user->$columnHeader);
+                } else if ($columnHeader == 'image') {
+                    $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
+                    if (isset($user_info->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->$columnHeader);
+                    } else {
+                        $arr_parent_items[$columnHeader] = null;
                     }
-                } elseif ($column == 'email') {
-                    $decrypted_auth_user[$column] = $auth_user->{$column} ? Crypt::decrypt($auth_user->{$column}) : null;
-                    $history = HistoryModel::where('tbl_id', $auth_user->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
-                    $decrypted_auth_user['password'] = $history ? Crypt::decrypt($history->value) : null;
-
-                    // Add 'email' to column_name if it doesn't exist
-                    if (!in_array($this->helper->transformColumnName($column), $column_name)) {
-                        $column_name[] = $this->helper->transformColumnName($column);
+                } else if ($columnHeader == 'name') {
+                    $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
+                    if (isset($user_info->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->first_name);
+                    } else {
+                        $arr_parent_items[$columnHeader] = null;
                     }
-                    // Add 'password' to column_name if it doesn't exist
-                    if (!in_array('password', $column_name)) {
-                        $column_name[] = 'password';
-                    }
-                } elseif ($column == 'role') {
-                    // Add 'role' to column_name if exist
-                    if (!in_array($this->helper->transformColumnName($column), $column_name)) {
-                        $column_name[] = $this->helper->transformColumnName($column);
-                    }
-                    foreach ($this->fillable_attr_auth->arrEnvRoles() as $roleEnv => $roleLabel) {
-                        if ($auth_user->{$column} == env($roleEnv)) {
-                            $decrypted_auth_user[$column] = $roleLabel;
-                            break;
-                        }
+                    $user_info = UserInfoModel::where('user_id', $auth_user->user_id)->first();
+                    if (isset($user_info->$columnHeader)) {
+                        $arr_parent_items[$columnHeader] = Crypt::decrypt($user_info->last_name);
+                    } else {
+                        $arr_parent_items[$columnHeader] = null;
                     }
                 } else {
-                    // Add other columns to column_name if they don't exist
-                    if (!in_array($this->helper->transformColumnName($column), $column_name)) {
-                        $column_name[] = $this->helper->transformColumnName($column);
-                    }
-
-                    // Check if the column needs formatting and value is not null
-                    if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
-                        $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
-                    } else {
-                        $decrypted_auth_user[$column] = $auth_user->{$column};
-                    }
+                    $arr_parent_items[$columnHeader] = $auth_user->$columnHeader ?? null;
                 }
             }
-
 
             // ***************************** //
             // Format Api
@@ -151,12 +123,12 @@ class AccountController extends Controller
             }
 
             // Add the format Api Crud
-            $decrypted_auth_user['action'] = array_values($crud_action);
+            $arr_parent_items['action'] = array_values($crud_action);
             // ***************************** //
 
             // ***************************** //
             // Add details on action crud
-            foreach ($decrypted_auth_user['action'] as &$action) {
+            foreach ($arr_parent_items['action'] as &$action) {
                 // Check if 'details' key doesn't exist, then add it
                 if (!isset($action['details'])) {
                     $action['details'] = [];
@@ -168,21 +140,21 @@ class AccountController extends Controller
                         $action['details'][] = [
                             'label' => ucfirst($arrDetails),
                             'type' => 'select',
-                            'value' => $decrypted_auth_user[$arrDetails],
+                            'value' => $arr_parent_items[$arrDetails] ?? null,
                             'option' => $filter_status
                         ];
                     } else if ($arrDetails == 'status') {
                         $action['details'][] = [
                             'label' => ucfirst($arrDetails),
                             'type' => 'select',
-                            'value' => $decrypted_auth_user[$arrDetails],
+                            'value' => $arr_parent_items[$arrDetails] ?? null,
                             'option' => $filter_role
                         ];
                     } else {
                         $action['details'][] = [
                             'label' => ucfirst($arrDetails),
                             'type' => 'input',
-                            'value' => $decrypted_auth_user[$arrDetails]
+                            'value' => $arr_parent_items[$arrDetails] ?? null
                         ];
                     }
                 }
@@ -190,27 +162,20 @@ class AccountController extends Controller
             // ***************************** //
 
             // Add view on row item
-            $decrypted_auth_user['view'] = [[
-                'url' => $view_settings['url'] . $decrypted_auth_user['user_id'],
+            $arr_parent_items['view'] = [[
+                'url' => $view_settings['url'] . $arr_parent_items['user_id'] ?? null,
                 'method' => $view_settings['method']
             ]];
 
             // Add the decrypted user data to the array
-            $decrypted_auth_users[] = $decrypted_auth_user;
+            $arr_all_items[] = $arr_parent_items;
         }
-
-        // Column Name
-        $column_name = array_map(function ($col) {
-            return $this->helper->transformColumnName($col);
-        }, $column_name);
-        array_unshift($column_name, "User Info");
-        $column_name[] = "Action";
 
 
         // Final response structure
         $response = [
-            'account' => $decrypted_auth_users,
-            'columns' => $column_name,
+            'account' => $arr_all_items,
+            'columns' => $this->helper->transformColumnName($this->fillable_attr_auth->columnHeader()),
             'buttons' => $this->helper->formatApi(
                 $relative_settings['prefix'],
                 $relative_settings['payload'],
@@ -228,6 +193,207 @@ class AccountController extends Controller
             'data' => $response
         ], Response::HTTP_OK);
     }
+
+    // /**
+    //  * GET ALL USER ACCOUNT | ADMIN SIDE
+    //  * Fetch all data
+    //  *
+    //  * @param  \Illuminate\Http\Request  $request
+    //  * @return \Illuminate\Http\JsonResponse
+    //  */
+    // public function index(Request $request)
+    // {
+    //     // Add action
+    //     $crud_settings = $this->fillable_attr_auth->getApiAccountCrudSettings();
+    //     $relative_settings = $this->fillable_attr_auth->getApiAccountRelativeSettings();
+    //     $view_settings = $this->fillable_attr_auth->getViewRowTable();
+    //     $decrypted_auth_users = [];
+    //     $column_name = [];
+    //     $filter = [];
+
+    //     // Filter Column
+    //     $filter_status = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountStatus());
+    //     $filter_role = $this->helper->upperCaseValueSelectTagFilter($this->fillable_attr_auth->arrEnvAccountRole());
+    //     $filter[] = [
+    //         'status' => [
+    //             'type' => 'select',
+    //             'option' => $filter_status
+    //         ],
+    //         'role' => [
+    //             'type' => 'select',
+    //             'option' => $filter_role
+    //         ]
+    //     ];
+
+    //     // Authorize the user
+    //     $user = $this->helper->authorizeUser($request);
+    //     if (empty($user->user_id)) {
+    //         return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
+    //     }
+
+    //     // Unset Column not needed
+    //     $unset_results = $this->helper->unsetColumn($this->fillable_attr_auth->unsetForRetrieves(), $this->fillable_attr_auth->getFillableAttributes());
+
+    //     // Retrieve all AuthModel records
+    //     $auth_users = AuthModel::orderBy('created_at', 'desc')->get();
+
+    //     // Data
+    //     foreach ($auth_users as $auth_user) {
+    //         $decrypted_auth_user = [];
+
+    //         foreach ($unset_results as $column) {
+    //             if ($column == 'user_id') {
+    //                 $userInfo = UserInfoModel::where('user_id', $auth_user->user_id)->first();
+    //                 $decrypted_auth_user['user'] = [
+    //                     'image' => $userInfo && $userInfo->image ? Crypt::decrypt($userInfo->image) : null,
+    //                     'name' => ($userInfo && $userInfo->first_name && $userInfo->last_name) ? (Crypt::decrypt($userInfo->first_name) . " " . Crypt::decrypt($userInfo->last_name)) : ($userInfo && $userInfo->first_name ? Crypt::decrypt($userInfo->first_name) : ($userInfo && $userInfo->last_name ? Crypt::decrypt($userInfo->last_name) : null)),
+    //                 ];
+    //                 $decrypted_auth_user[$column] = Crypt::encrypt($auth_user->{$column});
+
+    //                 // Add to column_name if it doesn't exist
+    //                 if (!in_array($this->helper->transformColumnName($column), $column_name)) {
+    //                     $column_name[] = $this->helper->transformColumnName($column);
+    //                 }
+    //             } elseif ($column == 'email') {
+    //                 $decrypted_auth_user[$column] = $auth_user->{$column} ? Crypt::decrypt($auth_user->{$column}) : null;
+    //                 $history = HistoryModel::where('tbl_id', $auth_user->user_id)->where('tbl_name', 'users_tbl')->where('column_name', 'password')->latest()->first();
+    //                 $decrypted_auth_user['password'] = $history ? Crypt::decrypt($history->value) : null;
+
+    //                 // Add 'email' to column_name if it doesn't exist
+    //                 if (!in_array($this->helper->transformColumnName($column), $column_name)) {
+    //                     $column_name[] = $this->helper->transformColumnName($column);
+    //                 }
+    //                 // Add 'password' to column_name if it doesn't exist
+    //                 if (!in_array('password', $column_name)) {
+    //                     $column_name[] = 'password';
+    //                 }
+    //             } elseif ($column == 'role') {
+    //                 // Add 'role' to column_name if exist
+    //                 if (!in_array($this->helper->transformColumnName($column), $column_name)) {
+    //                     $column_name[] = $this->helper->transformColumnName($column);
+    //                 }
+    //                 foreach ($this->fillable_attr_auth->arrEnvRoles() as $roleEnv => $roleLabel) {
+    //                     if ($auth_user->{$column} == env($roleEnv)) {
+    //                         $decrypted_auth_user[$column] = $roleLabel;
+    //                         break;
+    //                     }
+    //                 }
+    //             } else {
+    //                 // Add other columns to column_name if they don't exist
+    //                 if (!in_array($this->helper->transformColumnName($column), $column_name)) {
+    //                     $column_name[] = $this->helper->transformColumnName($column);
+    //                 }
+
+    //                 // Check if the column needs formatting and value is not null
+    //                 if (in_array($column, $this->fillable_attr_auth->arrToConvertToReadableDateTime()) && $auth_user->{$column} !== null) {
+    //                     $decrypted_auth_user[$column] = $this->helper->convertReadableTimeDate($auth_user->{$column});
+    //                 } else {
+    //                     $decrypted_auth_user[$column] = $auth_user->{$column};
+    //                 }
+    //             }
+    //         }
+
+
+    //         // ***************************** //
+    //         // Format Api
+    //         $crud_action = $this->helper->formatApi(
+    //             $crud_settings['prefix'],
+    //             $crud_settings['payload'],
+    //             $crud_settings['method'],
+    //             $crud_settings['button_name'],
+    //             $crud_settings['icon'],
+    //             $crud_settings['container']
+    //         );
+
+    //         // Checking Id on other tbl if exist unset the api
+    //         $is_exist_id_other_tbl = $this->helper->isExistIdOtherTbl($auth_user->user_id, $this->fillable_attr_auth->arrModelWithId());
+    //         // Unset actions based on conditions
+    //         if (!empty($is_exist_id_other_tbl) && $is_exist_id_other_tbl[0]['is_exist'] == 'yes') {
+    //             foreach ($this->fillable_attr_auth->unsetActions() as $unsetAction) {
+    //                 $crud_action = array_filter($crud_action, function ($action) use ($unsetAction) {
+    //                     return $action['button_name'] !== ucfirst($unsetAction);
+    //                 });
+    //             }
+    //         }
+
+    //         // Add the format Api Crud
+    //         $decrypted_auth_user['action'] = array_values($crud_action);
+    //         // ***************************** //
+
+    //         // ***************************** //
+    //         // Add details on action crud
+    //         foreach ($decrypted_auth_user['action'] as &$action) {
+    //             // Check if 'details' key doesn't exist, then add it
+    //             if (!isset($action['details'])) {
+    //                 $action['details'] = [];
+    //             }
+
+    //             // Populate details for each attribute
+    //             foreach ($this->fillable_attr_auth->arrDetails() as $arrDetails) {
+    //                 if ($arrDetails == 'role') {
+    //                     $action['details'][] = [
+    //                         'label' => ucfirst($arrDetails),
+    //                         'type' => 'select',
+    //                         'value' => $decrypted_auth_user[$arrDetails],
+    //                         'option' => $filter_status
+    //                     ];
+    //                 } else if ($arrDetails == 'status') {
+    //                     $action['details'][] = [
+    //                         'label' => ucfirst($arrDetails),
+    //                         'type' => 'select',
+    //                         'value' => $decrypted_auth_user[$arrDetails],
+    //                         'option' => $filter_role
+    //                     ];
+    //                 } else {
+    //                     $action['details'][] = [
+    //                         'label' => ucfirst($arrDetails),
+    //                         'type' => 'input',
+    //                         'value' => $decrypted_auth_user[$arrDetails]
+    //                     ];
+    //                 }
+    //             }
+    //         }
+    //         // ***************************** //
+
+    //         // Add view on row item
+    //         $decrypted_auth_user['view'] = [[
+    //             'url' => $view_settings['url'] . $decrypted_auth_user['user_id'],
+    //             'method' => $view_settings['method']
+    //         ]];
+
+    //         // Add the decrypted user data to the array
+    //         $decrypted_auth_users[] = $decrypted_auth_user;
+    //     }
+
+    //     // Column Name
+    //     $column_name = array_map(function ($col) {
+    //         return $this->helper->transformColumnName($col);
+    //     }, $column_name);
+    //     array_unshift($column_name, "User Info");
+    //     $column_name[] = "Action";
+
+
+    //     // Final response structure
+    //     $response = [
+    //         'account' => $decrypted_auth_users,
+    //         'columns' => $column_name,
+    //         'buttons' => $this->helper->formatApi(
+    //             $relative_settings['prefix'],
+    //             $relative_settings['payload'],
+    //             $relative_settings['method'],
+    //             $relative_settings['button_name'],
+    //             $relative_settings['icon'],
+    //             $relative_settings['container']
+    //         ),
+    //         'filter' => $filter
+    //     ];
+
+    //     // Display or use the decrypted attributes as needed
+    //     return response()->json([
+    //         'message' => "Successfully retrieve data",
+    //         'data' => $response
+    //     ], Response::HTTP_OK);
+    // }
 
     /**
      * GET SPECIFIC USER ACCOUNT | ADMIN SIDE

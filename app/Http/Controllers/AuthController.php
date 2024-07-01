@@ -23,11 +23,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    protected $helper;
+    protected $helper, $fillable_attr_auth;
 
-    public function __construct(Helper $helper)
+    public function __construct(Helper $helper, AuthModel $fillable_attr_auth)
     {
         $this->helper = $helper;
+        $this->fillable_attr_auth = $fillable_attr_auth;
     }
 
 
@@ -79,62 +80,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Not authenticated user'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $nav_links_admin = [
-            [
-                'title' => 'Menu',
-                'path' => '/menu',
-                'icon' => 'heroicons-outline:view-grid',
-                'path_key' => 'inventory/product/index'
-            ],
-            [
-                'title' => 'Dashboard',
-                'path' => '/dashboard',
-                'icon' => 'heroicons-outline:chart-pie',
-                'path_key' => 'payment/dashboard'
-            ],
-            [
-                'title' => 'Inventory',
-                'path' => '/inventory',
-                'icon' => 'heroicons-outline:cube',
-                'path_key' => 'inventory/parent/index'
-            ],
-            [
-                'title' => 'Users',
-                'path' => '/users',
-                'icon' => 'heroicons-outline:user-group',
-                'path_key' => 'accounts/admin/index'
-            ],
-            [
-                'title' => 'Orders',
-                'icon' => 'heroicons-outline:clipboard-list',
-                'submenus' => [
-                    [
-                        'title' => 'Customer Order',
-                        'path' => '/customer-order',
-                        'icon' => 'heroicons-outline:user-group',
-                    ],
-                    [
-                        'title' => 'Return Order',
-                        'path' => '/return-order',
-                        'icon' => 'heroicons-outline:user-group',
-                    ],
-                    [
-                        'title' => 'Failed Delivery',
-                        'path' => '/failed-delivery',
-                        'icon' => 'heroicons-outline:user-group',
-                    ],
-                    [
-                        'title' => 'Cancellation',
-                        'path' => '/cancellation',
-                        'icon' => 'heroicons-outline:user-group',
-                    ],
-                ],
-            ],
-        ];
-
         if ($user->role === env('ROLE_SUPER_ADMIN')) {
             return response()->json([
-                'nav_links' => $nav_links_admin,
+                'nav_links' => $this->fillable_attr_auth->getNavLinksRole(),
             ], Response::HTTP_OK);
         } else {
             return response()->json([
