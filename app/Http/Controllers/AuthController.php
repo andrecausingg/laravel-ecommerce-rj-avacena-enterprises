@@ -509,7 +509,9 @@ class AuthController extends Controller
                         'fields' => [
                             'user_id' => $user->user_id,
                             'email' => Crypt::encrypt($arr_data['email']),
-                            'password' => Crypt::encrypt($arr_data['password']),
+                            'password' => [
+                                'new' => Crypt::encrypt($arr_data['password']),
+                            ]
                         ]
                     ];
 
